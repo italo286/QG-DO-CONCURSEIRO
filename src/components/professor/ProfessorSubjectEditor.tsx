@@ -2,16 +2,16 @@ import React, { useState, useEffect, useCallback, DragEvent, TouchEvent } from '
 import * as FirebaseService from '../../services/firebaseService';
 import { Subject, Topic, SubTopic } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon } from '../Icons';
+import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
 import { ProfessorSubTopicEditor } from './ProfessorSubTopicEditor';
 
 const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) => {
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
-        let total = getter(content)?.length || 0;
+        let total = (getter(content) as any[])?.length || 0;
         if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
-            total += content.subtopics.reduce((sum, subtopic) => sum + (getter(subtopic)?.length || 0), 0);
+            total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
     };
@@ -19,6 +19,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
     const summaryItems = [
         { label: 'PDFs da Aula', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
         { label: 'PDFs de Resumo', icon: DocumentTextIcon, count: calculateTotal(c => c.summaryPdfs) },
+        { label: 'PDFs de Raio X', icon: ChartLineIcon, count: calculateTotal(c => c.raioXPdfs) },
         { label: 'Questões de Conteúdo', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) },
         { label: 'Questões (TEC)', icon: ClipboardCheckIcon, count: calculateTotal(c => c.tecQuestions) },
         { label: 'Jogos', icon: GameControllerIcon, count: calculateTotal(c => c.miniGames) },
@@ -106,7 +107,7 @@ export const ProfessorSubjectEditor: React.FC<{
         setIsSubTopicModalOpen(true);
     };
 
-    const handleSaveTopic = (topicToSave: Topic) => {
+    const handleSaveTopic = useCallback((topicToSave: Topic) => {
         let updatedTopics: Topic[];
         const isEditing = currentSubject.topics.some(t => t.id === topicToSave.id);
 
@@ -122,9 +123,9 @@ export const ProfessorSubjectEditor: React.FC<{
         
         setIsTopicModalOpen(false);
         setEditingTopic(null);
-    };
+    }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
     
-    const handleSaveSubTopic = (subTopicToSave: SubTopic) => {
+    const handleSaveSubTopic = useCallback((subTopicToSave: SubTopic) => {
         if (!parentTopicForSubTopic) return;
 
         const isEditing = parentTopicForSubTopic.subtopics.some(st => st.id === subTopicToSave.id);
@@ -146,9 +147,9 @@ export const ProfessorSubjectEditor: React.FC<{
         setIsSubTopicModalOpen(false);
         setEditingSubTopic(null);
         setParentTopicForSubTopic(null);
-    }
+    }, [currentSubject, parentTopicForSubTopic, updateSubjectStateAndDb, setToastMessage]);
 
-    const handleSaveAiTopics = (generatedItems: {name: string, description: string, subtopics: {name: string, description: string}[]}[]) => {
+    const handleSaveAiTopics = useCallback((generatedItems: {name: string, description: string, subtopics: {name: string, description: string}[]}[]) => {
         const timestamp = Date.now();
         const newTopics: Topic[] = generatedItems.map((t, i) => {
             const topicId = `t${timestamp}${i}`;
@@ -180,16 +181,16 @@ export const ProfessorSubjectEditor: React.FC<{
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         setIsAiTopicModalOpen(false);
         setToastMessage(`${newTopics.length} tópicos foram adicionados com sucesso!`);
-    };
+    }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
     
-    const handleDeleteTopic = (topicId: string, topicName: string) => {
+    const handleDeleteTopic = useCallback((topicId: string, topicName: string) => {
         if(window.confirm(`Tem certeza que deseja apagar o tópico "${topicName}" e todos os seus subtópicos e jogos?`)){
             const updatedTopics = currentSubject.topics.filter(t => t.id !== topicId);
             updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         }
-    };
+    }, [currentSubject, updateSubjectStateAndDb]);
 
-    const handleDeleteSubTopic = (subTopicId: string, subTopicName: string, parentTopic: Topic) => {
+    const handleDeleteSubTopic = useCallback((subTopicId: string, subTopicName: string, parentTopic: Topic) => {
          if(window.confirm(`Tem certeza que deseja apagar o subtópico "${subTopicName}" e todos os seus jogos?`)){
             const updatedSubtopics = parentTopic.subtopics.filter(st => st.id !== subTopicId);
             const updatedParentTopic = { ...parentTopic, subtopics: updatedSubtopics };
@@ -197,7 +198,7 @@ export const ProfessorSubjectEditor: React.FC<{
             
             updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         }
-    }
+    }, [currentSubject, updateSubjectStateAndDb]);
     
     const handleCloseTopicModal = useCallback(() => { setIsTopicModalOpen(false); setEditingTopic(null); }, []);
     const handleCloseSubTopicModal = useCallback(() => { setIsSubTopicModalOpen(false); setEditingSubTopic(null); setParentTopicForSubTopic(null); }, []);

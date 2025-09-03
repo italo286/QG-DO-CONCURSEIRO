@@ -1,6 +1,6 @@
 import React from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
-import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon } from '../../Icons';
+import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon } from '../../Icons';
 import { Button } from '../../ui';
 
 type Frequency = 'alta' | 'media' | 'baixa' | 'nenhuma';
@@ -14,9 +14,9 @@ interface SubjectViewProps {
 
 const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) => {
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
-        let total = getter(content)?.length || 0;
+        let total = (getter(content) as any[])?.length || 0;
         if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
-            total += content.subtopics.reduce((sum, subtopic) => sum + (getter(subtopic)?.length || 0), 0);
+            total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
     };
@@ -24,6 +24,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
     const summaryItems = [
         { label: 'PDFs da Aula', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
         { label: 'PDFs de Resumo', icon: DocumentTextIcon, count: calculateTotal(c => c.summaryPdfs) },
+        { label: 'PDFs de Raio X', icon: ChartLineIcon, count: calculateTotal(c => c.raioXPdfs) },
         { label: 'Questões de Conteúdo', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) },
         { label: 'Questões (TEC)', icon: ClipboardCheckIcon, count: calculateTotal(c => c.tecQuestions) },
         { label: 'Jogos', icon: GameControllerIcon, count: calculateTotal(c => c.miniGames) },

@@ -91,6 +91,7 @@ export interface SubTopic {
   description?: string;
   fullPdfs: PdfFile[];
   summaryPdfs: PdfFile[];
+  raioXPdfs?: PdfFile[];
   videoUrls?: VideoFile[];
   mindMapUrl?: string;
   bankProfilePdfs?: BankProfilePdf[];
@@ -108,6 +109,7 @@ export interface Topic {
   description?: string;
   fullPdfs: PdfFile[];
   summaryPdfs: PdfFile[];
+  raioXPdfs?: PdfFile[];
   videoUrls?: VideoFile[];
   mindMapUrl?: string;
   bankProfilePdfs?: BankProfilePdf[];

@@ -8,7 +8,7 @@ import {
     DocumentTextIcon, LightBulbIcon, VideoCameraIcon,
     FlashcardIcon, GameControllerIcon, ClipboardListIcon, SplitScreenIcon, GeminiIcon,
     XCircleIcon, ChevronDoubleLeftIcon, ArrowRightIcon, TrophyIcon, TagIcon, ClipboardCheckIcon,
-    BrainIcon, BriefcaseIcon
+    BrainIcon, BriefcaseIcon, ChartLineIcon
 } from '../../Icons';
 import { QuizView } from '../QuizView';
 import { NotesEditor } from '../NotesEditor';
@@ -57,6 +57,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const [activeTopicTab, setActiveTopicTab] = useState('');
     const [activeFullPdf, setActiveFullPdf] = useState<PdfFile | null>(null);
     const [activeSummaryPdf, setActiveSummaryPdf] = useState<PdfFile | null>(null);
+    const [activeRaioXPdf, setActiveRaioXPdf] = useState<PdfFile | null>(null);
     const [activeVideo, setActiveVideo] = useState<VideoFile | null>(null);
     const [activeBankPdf, setActiveBankPdf] = useState<BankProfilePdf | null>(null);
     const notesEditorRef = useRef<HTMLDivElement>(null);
@@ -67,8 +68,10 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const [splitRightTab, setSplitRightTab] = useState('notes');
     const [splitLeftActivePdf, setSplitLeftActivePdf] = useState<PdfFile | null>(null);
     const [splitLeftActiveSummaryPdf, setSplitLeftActiveSummaryPdf] = useState<PdfFile | null>(null);
+    const [splitLeftActiveRaioXPdf, setSplitLeftActiveRaioXPdf] = useState<PdfFile | null>(null);
     const [splitRightActivePdf, setSplitRightActivePdf] = useState<PdfFile | null>(null);
     const [splitRightActiveSummaryPdf, setSplitRightActiveSummaryPdf] = useState<PdfFile | null>(null);
+    const [splitRightActiveRaioXPdf, setSplitRightActiveRaioXPdf] = useState<PdfFile | null>(null);
     const [splitLeftActiveVideo, setSplitLeftActiveVideo] = useState<VideoFile | null>(null);
     const [splitRightActiveVideo, setSplitRightActiveVideo] = useState<VideoFile | null>(null);
     const [splitLeftActiveBankPdf, setSplitLeftActiveBankPdf] = useState<BankProfilePdf | null>(null);
@@ -81,6 +84,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const tabs = [
         { value: 'pdf', label: 'Aula', icon: DocumentTextIcon, count: currentContent.fullPdfs?.length },
         { value: 'summary', label: 'Resumo', icon: LightBulbIcon, count: currentContent.summaryPdfs?.length },
+        { value: 'raiox', label: 'Raio X', icon: ChartLineIcon, count: currentContent.raioXPdfs?.length },
         { value: 'videos', label: 'Vídeos', icon: VideoCameraIcon, count: currentContent.videoUrls?.length },
         { value: 'mindMap', label: 'Mapa Mental', icon: BrainIcon, count: currentContent.mindMapUrl ? 1 : 0 },
         { value: 'bankProfile', label: 'Perfil da Banca', icon: BriefcaseIcon, count: currentContent.bankProfilePdfs?.length },
@@ -106,12 +110,15 @@ export const TopicView: React.FC<TopicViewProps> = ({
     useEffect(() => {
         setActiveFullPdf(null);
         setActiveSummaryPdf(null);
+        setActiveRaioXPdf(null);
         setActiveVideo(null);
         setActiveBankPdf(null);
         setSplitLeftActivePdf(null);
         setSplitLeftActiveSummaryPdf(null);
+        setSplitLeftActiveRaioXPdf(null);
         setSplitRightActivePdf(null);
         setSplitRightActiveSummaryPdf(null);
+        setSplitRightActiveRaioXPdf(null);
         setSplitLeftActiveVideo(null);
         setSplitRightActiveVideo(null);
         setSplitLeftActiveBankPdf(null);
@@ -156,7 +163,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                             <Card key={i} onClick={() => setActiveFullPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                                 <div className="flex items-center space-x-3">
                                                     <DocumentTextIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
-                                                    <span className="truncate">PDF {i + 1}</span>
+                                                    <span className="truncate">{pdf.fileName}</span>
                                                 </div>
                                                 <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
                                             </Card>
@@ -211,7 +218,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                             <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                                 <div className="flex items-center space-x-3">
                                                     <DocumentTextIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
-                                                    <span className="truncate">PDF {i + 1}</span>
+                                                    <span className="truncate">{pdf.fileName}</span>
                                                 </div>
                                                 <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
                                             </Card>
@@ -226,6 +233,61 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     <div className={summaryContainerClass}>
                         <div className="p-4 flex-grow flex items-center justify-center text-gray-400">
                             <p>Nenhum PDF de resumo disponível.</p>
+                        </div>
+                    </div>
+                );
+            }
+            case 'raiox': {
+                const containerClass = 'h-full flex flex-col';
+                if (currentContent.raioXPdfs?.length === 1) {
+                    return (
+                        <div className={containerClass}>
+                            <div className="flex-grow min-h-0 w-full aspect-[4/5]">
+                                <PdfViewer file={currentContent.raioXPdfs[0]} />
+                            </div>
+                        </div>
+                    );
+                }
+                if (currentContent.raioXPdfs?.length > 1) {
+                    if (activeRaioXPdf) {
+                        return (
+                            <div className={containerClass}>
+                                <div className="p-2 flex-shrink-0">
+                                    <button onClick={() => setActiveRaioXPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-sm">
+                                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" />
+                                        Voltar para a lista de PDFs
+                                    </button>
+                                </div>
+                                <div className="flex-grow min-h-0 w-full aspect-[4/5]">
+                                    <PdfViewer file={activeRaioXPdf} />
+                                </div>
+                            </div>
+                        );
+                    } else {
+                        return (
+                            <div className={containerClass}>
+                                <div className="p-4 space-y-4">
+                                    <h3 className="text-xl font-bold">PDFs de Raio X</h3>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {currentContent.raioXPdfs.map((pdf, i) => (
+                                            <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
+                                                <div className="flex items-center space-x-3">
+                                                    <ChartLineIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
+                                                    <span className="truncate">{pdf.fileName}</span>
+                                                </div>
+                                                <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
+                                            </Card>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        );
+                    }
+                }
+                return (
+                    <div className={containerClass}>
+                        <div className="p-4 flex-grow flex items-center justify-center text-gray-400">
+                            <p>Nenhum PDF de Raio X disponível.</p>
                         </div>
                     </div>
                 );
@@ -395,6 +457,8 @@ export const TopicView: React.FC<TopicViewProps> = ({
         const setActivePdf = side === 'left' ? setSplitLeftActivePdf : setSplitRightActivePdf;
         const activeSummaryPdf = side === 'left' ? splitLeftActiveSummaryPdf : splitRightActiveSummaryPdf;
         const setActiveSummaryPdf = side === 'left' ? setSplitLeftActiveSummaryPdf : setSplitRightActiveSummaryPdf;
+        const activeRaioXPdf = side === 'left' ? splitLeftActiveRaioXPdf : splitRightActiveRaioXPdf;
+        const setActiveRaioXPdf = side === 'left' ? setSplitLeftActiveRaioXPdf : setSplitRightActiveRaioXPdf;
         const activeVideo = side === 'left' ? splitLeftActiveVideo : splitRightActiveVideo;
         const setActiveVideo = side === 'left' ? setSplitLeftActiveVideo : setSplitRightActiveVideo;
         const activeBankPdf = side === 'left' ? splitLeftActiveBankPdf : splitRightActiveBankPdf;
@@ -427,7 +491,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                     {currentContent.fullPdfs.map((pdf, i) => (
                                         <Card key={i} onClick={() => setActivePdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                             <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                            <span className="truncate text-sm mx-2 flex-grow">PDF {i + 1}</span>
+                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
                                             <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
                                         </Card>
                                     ))}
@@ -460,7 +524,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                     {currentContent.summaryPdfs.map((pdf, i) => (
                                         <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                             <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                            <span className="truncate text-sm mx-2 flex-grow">PDF {i + 1}</span>
+                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
                                             <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
                                         </Card>
                                     ))}
@@ -469,6 +533,39 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         }
                     }
                     return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum resumo.</p></div>);
+                }
+                case 'raiox': {
+                    if (currentContent.raioXPdfs?.length === 1) {
+                        return (
+                            <div className="flex flex-col h-full">
+                                <div className={containerClass}><PdfViewer file={currentContent.raioXPdfs[0]} /></div>
+                            </div>
+                        );
+                    }
+                    if (currentContent.raioXPdfs?.length > 1) {
+                        if (activeRaioXPdf) {
+                            return (
+                                <div className="flex flex-col h-full">
+                                    <div className="p-1 flex-shrink-0"><button onClick={() => setActiveRaioXPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div>
+                                    <div className={containerClass}><PdfViewer file={activeRaioXPdf} /></div>
+                                </div>
+                            );
+                        } else {
+                            return (
+                                <div className="p-2 space-y-2">
+                                    <h3 className="text-lg font-bold">PDFs de Raio X</h3>
+                                    {currentContent.raioXPdfs.map((pdf, i) => (
+                                        <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
+                                            <ChartLineIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
+                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
+                                            <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
+                                        </Card>
+                                    ))}
+                                </div>
+                            );
+                        }
+                    }
+                    return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum Raio X.</p></div>);
                 }
                 case 'notes':
                     const noteContent = studentProgress?.notesByTopic[currentContent.id] || '';

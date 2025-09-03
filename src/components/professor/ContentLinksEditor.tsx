@@ -5,7 +5,7 @@ import { TrashIcon } from '../Icons';
 type LinkItemProps = {
     item: PdfFile | VideoFile;
     index: number;
-    field: 'fullPdfs' | 'summaryPdfs' | 'videoUrls';
+    field: 'fullPdfs' | 'summaryPdfs' | 'raioXPdfs' | 'videoUrls';
     onUpdate: (index: number, subfield: 'name' | 'url' | 'fileName', value: string) => void;
     onRemove: (index: number) => void;
 };
@@ -68,19 +68,20 @@ export const ContentLinksEditor: React.FC<{
     setContent: React.Dispatch<React.SetStateAction<any>>;
 }> = ({ content, setContent }) => {
     
-    const handleAddLink = (field: 'fullPdfs' | 'summaryPdfs' | 'videoUrls') => {
+    const handleAddLink = (field: 'fullPdfs' | 'summaryPdfs' | 'raioXPdfs' | 'videoUrls') => {
         setContent((prev: Topic | SubTopic) => {
             if (field === 'videoUrls') {
                 const newVideo: VideoFile = { id: `video-${Date.now()}-${Math.random()}`, name: '', url: '' };
                 return { ...prev, videoUrls: [...(prev.videoUrls || []), newVideo] };
             } else {
                 const newPdf: PdfFile = { id: `pdf-${Date.now()}-${Math.random()}`, url: '', fileName: '' };
-                return { ...prev, [field]: [...(prev[field] || []), newPdf] };
+                const existingPdfs = (prev as any)[field] || [];
+                return { ...prev, [field]: [...existingPdfs, newPdf] };
             }
         });
     };
     
-    const handleRemoveLink = (field: 'fullPdfs' | 'summaryPdfs' | 'videoUrls', index: number) => {
+    const handleRemoveLink = (field: 'fullPdfs' | 'summaryPdfs' | 'raioXPdfs' | 'videoUrls', index: number) => {
         setContent((prev: any) => {
             const currentLinks = prev[field] || [];
             const newLinks = [...currentLinks];
@@ -89,7 +90,7 @@ export const ContentLinksEditor: React.FC<{
         });
     };
 
-    const handleUpdateLink = (field: 'fullPdfs' | 'summaryPdfs' | 'videoUrls', index: number, subfield: 'name' | 'url' | 'fileName', value: string) => {
+    const handleUpdateLink = (field: 'fullPdfs' | 'summaryPdfs' | 'raioXPdfs' | 'videoUrls', index: number, subfield: 'name' | 'url' | 'fileName', value: string) => {
         setContent((prev: any) => {
             const newContent = { ...prev };
             const newArray = [...((newContent as any)[field] as any[])];
@@ -103,11 +104,12 @@ export const ContentLinksEditor: React.FC<{
         setContent((prev: any) => ({ ...prev, tecUrl: value }));
     }
 
-    const LinkList: React.FC<{ field: 'fullPdfs' | 'summaryPdfs' | 'videoUrls' }> = ({ field }) => {
-        const items = content[field] || [];
+    const LinkList: React.FC<{ field: 'fullPdfs' | 'summaryPdfs' | 'raioXPdfs' | 'videoUrls' }> = ({ field }) => {
+        const items = (content as any)[field] || [];
         const title = {
             fullPdfs: 'PDFs da Aula Completa',
             summaryPdfs: 'PDFs de Resumo',
+            raioXPdfs: 'PDFs de Raio X',
             videoUrls: 'Vídeos da Aula'
         }[field];
 
@@ -118,9 +120,9 @@ export const ContentLinksEditor: React.FC<{
                     <button onClick={() => handleAddLink(field)} className="text-cyan-400 hover:underline text-sm">+ Adicionar</button>
                 </div>
                 <ul className="mt-2 space-y-2 text-sm">
-                    {items.map((item, index) => (
+                    {items.map((item: PdfFile | VideoFile, index: number) => (
                         <LinkItem
-                            key={(item as PdfFile | VideoFile).id || index}
+                            key={item.id || index}
                             item={item}
                             index={index}
                             field={field}
@@ -138,6 +140,7 @@ export const ContentLinksEditor: React.FC<{
         <div className="space-y-4">
             <LinkList field="fullPdfs" />
             <LinkList field="summaryPdfs" />
+            <LinkList field="raioXPdfs" />
             <LinkList field="videoUrls" />
             <div>
                 <h4 className="font-semibold text-gray-300">Caderno TEC Concursos (Opcional)</h4>
