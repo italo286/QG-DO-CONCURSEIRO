@@ -1,25 +1,25 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import * as FirebaseService from '../../services/firebaseService';
-import * as GeminiService from '../../services/geminiService';
-import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard, CourseDiscipline } from '../../types';
-import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
-import { XP_CONFIG, ALL_BADGES, calculateLevel, getLevelTitle, SRS_INTERVALS, TOPIC_BADGES } from '../../gamification';
+import * as FirebaseService from '../services/firebaseService';
+import * as GeminiService from '../services/geminiService';
+import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard, CourseDiscipline } from '../types';
+import { getLocalDateISOString, getBrasiliaDate } from '../utils';
+import { XP_CONFIG, ALL_BADGES, calculateLevel, getLevelTitle, SRS_INTERVALS, TOPIC_BADGES } from '../gamification';
 
-import { Spinner, Modal } from '../ui';
+import { Spinner, Modal } from './ui';
 import { 
     ArrowRightIcon,
-} from '../Icons';
+} from './Icons';
 
-import { XpToastDisplay } from './XpToastDisplay';
-import { BadgeAwardModal } from './BadgeAwardModal';
-import { EditProfileModal } from './EditProfileModal';
-import { StudentGamePlayerModal } from './StudentGamePlayerModal';
-import { StudentGameEditorModal } from './StudentGameEditorModal';
-import { LevelUpModal } from './LevelUpModal';
-import { NewMessageModal } from './NewMessageModal';
-import { StudentViewRouter } from './StudentViewRouter';
-import { StudentHeader } from './StudentHeader';
-import { AiAssistant } from './AiAssistant';
+import { XpToastDisplay } from './student/XpToastDisplay';
+import { BadgeAwardModal } from './student/BadgeAwardModal';
+import { EditProfileModal } from './student/EditProfileModal';
+import { StudentGamePlayerModal } from './student/StudentGamePlayerModal';
+import { StudentGameEditorModal } from './student/StudentGameEditorModal';
+import { LevelUpModal } from './student/LevelUpModal';
+import { NewMessageModal } from './student/NewMessageModal';
+import { StudentViewRouter } from './student/StudentViewRouter';
+import { StudentHeader } from './student/StudentHeader';
+import { AiAssistant } from './student/AiAssistant';
 
 const shuffle = <T,>(array: T[]): T[] => {
     const newArray = [...array];
@@ -37,6 +37,9 @@ interface StudentDashboardProps {
     isPreview?: boolean; 
     onToggleStudentView?: () => void;
 }
+
+type TopicProgress = { completed: boolean; score: number; lastAttempt: QuestionAttempt[] };
+type SubjectTopicProgress = { [topicId: string]: TopicProgress };
 
 export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onToggleStudentView }: StudentDashboardProps) => {
     // --- State Management ---
@@ -397,10 +400,6 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
         
         const correctQuestionIds = new Set<string>();
         const incorrectQuestionIds = new Set<string>();
-
-        type TopicProgress = { lastAttempt: QuestionAttempt[] };
-        type SubjectTopicProgress = { [topicId: string]: TopicProgress };
-
         const allAttempts: QuestionAttempt[] = [
             ...Object.values(studentProgress.progressByTopic).flatMap(
                 (s: SubjectTopicProgress) => Object.values(s).flatMap((t: TopicProgress) => t.lastAttempt)
@@ -473,7 +472,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
             newChallengeState.isCompleted = true;
             updateStudentProgress(newProgress, studentProgress, xpGained, "Desafio Diário Completo!");
         } else {
-            setStudentProgress(prev => {
+            setStudentProgress((prev: StudentProgress | null) => {
                 if (!prev) return null;
                 const updatedProgress = { ...prev };
                 (updatedProgress as any)[challengeKey] = newChallengeState;
@@ -607,7 +606,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
                 const reviewMode = studentProgress.dailyReviewMode || 'standard';
                 let challengeQuestions: Question[] = [];
                 if (reviewMode === 'advanced') {
-                    const subjectIdsInCourses = new Set(enrolledCourses.flatMap(c => c.disciplines.map(d => d.subjectId)));
+                    const subjectIdsInCourses = new Set(enrolledCourses.flatMap(c => c.disciplines.map((d: CourseDiscipline) => d.subjectId)));
                     let subjectsForStudent = allSubjects.filter(s => subjectIdsInCourses.has(s.id));
                     const selectedSubjectIds = studentProgress.advancedReviewSubjectIds;
                     if (selectedSubjectIds && selectedSubjectIds.length > 0) {
@@ -658,7 +657,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
                     updatesToApply.portugueseChallenge = {
                         date: todayISO,
                         generatedAtTime: preferredTimeStr,
-                        items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })),
+                        items: questions.map((q: Omit<Question, 'id'>, i: number) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })),
                         isCompleted: false,
                         attemptsMade: 0,
                         uncompletedCount,
@@ -678,7 +677,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
     
             if (shouldGenerateGlossary) {
                 console.log("[GLOSSÁRIO] Condições para gerar atendidas. Buscando termos...");
-                const allGlossaryTerms = allSubjects.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []).map(g => ({ ...g, subjectId: s.id })), ...t.subtopics.flatMap(st => (st.glossary || []).map(g => ({ ...g, subjectId: s.id })))]));
+                const allGlossaryTerms = allSubjects.flatMap((s: Subject) => s.topics.flatMap((t: Topic) => [...(t.glossary || []).map((g: GlossaryTerm) => ({ ...g, subjectId: s.id })), ...t.subtopics.flatMap((st: SubTopic) => (st.glossary || []).map((g: GlossaryTerm) => ({ ...g, subjectId: s.id })))]));
                 const uniqueGlossaryTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
                 const termsBySubject = uniqueGlossaryTerms.reduce((acc, term) => {
                     if (!acc[term.subjectId]) acc[term.subjectId] = [];
@@ -692,7 +691,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
                     const questionCount = Math.min(studentProgress.glossaryChallengeQuestionCount || 5, questionableTerms.length);
                     const challengeTerms = shuffle(questionableTerms).slice(0, questionCount);
                     const glossaryQuestions: Question[] = challengeTerms.map((term, index) => {
-                        const distractors = shuffle(termsBySubject[term.subjectId].filter(t => t.term !== term.term)).slice(0, 4).map(t => t.definition);
+                        const distractors = shuffle(termsBySubject[term.subjectId].filter((t: GlossaryTerm) => t.term !== term.term)).slice(0, 4).map((t: GlossaryTerm) => t.definition);
                         return { id: `gloss-challenge-${todayISO}-${index}`, statement: `Qual é a definição de "${term.term}"?`, options: shuffle([term.definition, ...distractors]), correctAnswer: term.definition, justification: `A definição correta para "${term.term}" é: ${term.definition}` };
                     });
     
@@ -724,7 +723,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
             console.groupEnd();
             if (needsUpdate) {
                 console.log("Atualizando progresso do aluno com novos desafios...");
-                setStudentProgress(currentProgress => {
+                setStudentProgress((currentProgress: StudentProgress | null) => {
                     if (!currentProgress) return null;
     
                     const updatedProgress = { ...currentProgress };
@@ -946,7 +945,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
             
             const subject = allSubjects.find(s => s.id === subjectId);
             if (subject) {
-                const topicContent = subject.topics.flatMap((t: Topic) => [t, ...t.subtopics]).find(item => item.id === topicId.replace('-tec', ''));
+                const topicContent = subject.topics.flatMap((t: Topic) => [t, ...t.subtopics]).find((item: Topic | SubTopic) => item.id === topicId.replace('-tec', ''));
                 const questionContent = topicContent ? 
                     [...(topicContent.questions || []), ...(topicContent.tecQuestions || [])].find(q => q.id === questionId)
                     : undefined;

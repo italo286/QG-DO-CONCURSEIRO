@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import * as GeminiService from '../../services/geminiService';
-import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard, CourseDiscipline } from '../../types';
+import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard } from '../../types';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import { XP_CONFIG, ALL_BADGES, calculateLevel, getLevelTitle, SRS_INTERVALS, TOPIC_BADGES } from '../../gamification';
 

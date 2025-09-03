@@ -4,7 +4,7 @@ import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
 import { LoginPage } from './components/auth';
 import { ProfessorDashboard } from './components/ProfessorDashboard';
-import { StudentDashboard } from './components/student/StudentDashboard';
+import { StudentDashboard } from './components/student/PaineldoAluno';
 import { Spinner } from './components/ui';
 
 export const App = () => {

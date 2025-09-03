@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button } from '../ui';
 import { TagIcon, TranslateIcon, RefreshIcon } from '../Icons';
-import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
+import { getBrasiliaDate } from '../../utils';
 
 const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
     const [timeLeft, setTimeLeft] = useState('');
