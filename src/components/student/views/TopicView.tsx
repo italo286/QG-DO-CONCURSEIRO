@@ -239,16 +239,16 @@ export const TopicView: React.FC<TopicViewProps> = ({
             }
             case 'raiox': {
                 const containerClass = 'h-full flex flex-col';
-                if (currentContent.raioXPdfs?.length === 1) {
+                if ((currentContent.raioXPdfs || []).length === 1) {
                     return (
                         <div className={containerClass}>
                             <div className="flex-grow min-h-0 w-full aspect-[4/5]">
-                                <PdfViewer file={currentContent.raioXPdfs[0]} />
+                                <PdfViewer file={currentContent.raioXPdfs![0]} />
                             </div>
                         </div>
                     );
                 }
-                if (currentContent.raioXPdfs?.length > 1) {
+                if ((currentContent.raioXPdfs || []).length > 1) {
                     if (activeRaioXPdf) {
                         return (
                             <div className={containerClass}>
@@ -269,7 +269,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                 <div className="p-4 space-y-4">
                                     <h3 className="text-xl font-bold">PDFs de Raio X</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {currentContent.raioXPdfs.map((pdf, i) => (
+                                        {(currentContent.raioXPdfs || []).map((pdf, i) => (
                                             <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                                 <div className="flex items-center space-x-3">
                                                     <ChartLineIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
@@ -535,14 +535,14 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum resumo.</p></div>);
                 }
                 case 'raiox': {
-                    if (currentContent.raioXPdfs?.length === 1) {
+                    if ((currentContent.raioXPdfs || []).length === 1) {
                         return (
                             <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.raioXPdfs[0]} /></div>
+                                <div className={containerClass}><PdfViewer file={currentContent.raioXPdfs![0]} /></div>
                             </div>
                         );
                     }
-                    if (currentContent.raioXPdfs?.length > 1) {
+                    if ((currentContent.raioXPdfs || []).length > 1) {
                         if (activeRaioXPdf) {
                             return (
                                 <div className="flex flex-col h-full">
@@ -554,7 +554,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                             return (
                                 <div className="p-2 space-y-2">
                                     <h3 className="text-lg font-bold">PDFs de Raio X</h3>
-                                    {currentContent.raioXPdfs.map((pdf, i) => (
+                                    {(currentContent.raioXPdfs || []).map((pdf, i) => (
                                         <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                             <ChartLineIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
                                             <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
