@@ -796,6 +796,16 @@ export const generateJustificationsForQuestion = async (
 
     Retorne um objeto JSON onde cada chave é o texto exato de uma alternativa e o valor é sua respectiva justificativa.`;
 
+    // Dynamically construct the 'properties' object for the schema.
+    // Each option from the question becomes a required key in the JSON response.
+    const properties: { [key: string]: { type: Type, description: string } } = {};
+    question.options.forEach(option => {
+        properties[option] = {
+            type: Type.STRING,
+            description: `A justificativa para a alternativa: "${option.slice(0, 80)}..."`
+        };
+    });
+
     const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -803,7 +813,8 @@ export const generateJustificationsForQuestion = async (
             responseMimeType: "application/json",
             responseSchema: {
                 type: Type.OBJECT,
-                description: "Um objeto com chaves sendo as alternativas e valores sendo as justificativas."
+                properties: properties,
+                required: question.options // Ensure all options have justifications
             }
         }
     });
