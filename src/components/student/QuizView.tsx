@@ -180,7 +180,7 @@ export const QuizView: React.FC<{
         setSelectedOption(null);
         setEliminatedOptions(new Set());
         if (currentIndex > 0) {
-            setCurrentIndex(prev => prev - 1);
+            setCurrentIndex(prev => prev + 1);
         }
     };
 
@@ -395,7 +395,7 @@ export const QuizView: React.FC<{
         );
     }
 
-    const { statement, options, correctAnswer, justification, imageUrl, id: questionId, optionJustifications } = questionToDisplay;
+    const { statement, options, correctAnswer, imageUrl, id: questionId, optionJustifications } = questionToDisplay;
     const isCorrect = isCurrentQuestionAnswered && attemptForCurrentQuestion.isCorrect;
     const currentJustifications = fetchedJustifications[questionId] || optionJustifications;
     
