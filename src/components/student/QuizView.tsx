@@ -70,6 +70,11 @@ export const QuizView: React.FC<{
     const quizIdRef = useRef<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
+    const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
+    const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
+    const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
+
+
     const correctCount = useMemo(() => sessionAttempts.filter(a => a.isCorrect).length, [sessionAttempts]);
     const incorrectCount = useMemo(() => sessionAttempts.length - correctCount, [sessionAttempts, correctCount]);
     
@@ -163,6 +168,7 @@ export const QuizView: React.FC<{
 
     const handleNext = () => {
         setSelectedOption(null);
+        setEliminatedOptions(new Set());
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(prev => prev + 1);
         } else {
@@ -172,6 +178,7 @@ export const QuizView: React.FC<{
     
     const handlePrevious = () => {
         setSelectedOption(null);
+        setEliminatedOptions(new Set());
         if (currentIndex > 0) {
             setCurrentIndex(prev => prev - 1);
         }
@@ -220,6 +227,32 @@ export const QuizView: React.FC<{
         } finally {
             setIsFeedbackLoading(false);
         }
+    };
+
+    const handleGenerateJustifications = async (question: Question) => {
+        setIsFetchingJustifications(question.id);
+        try {
+            const justifications = await GeminiService.generateJustificationsForQuestion(question);
+            setFetchedJustifications(prev => ({ ...prev, [question.id]: justifications }));
+        } catch (error) {
+            console.error("Failed to fetch justifications", error);
+            alert("Não foi possível gerar as justificativas. Tente novamente.");
+        } finally {
+            setIsFetchingJustifications(null);
+        }
+    };
+
+    const handleDoubleClickOption = (optionText: string) => {
+        if (isCurrentQuestionAnswered) return;
+        setEliminatedOptions(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(optionText)) {
+                newSet.delete(optionText);
+            } else {
+                newSet.add(optionText);
+            }
+            return newSet;
+        });
     };
     
     const handleCloseSummaryModal = useCallback(() => setIsSummaryModalOpen(false), []);
@@ -287,16 +320,25 @@ export const QuizView: React.FC<{
                                             {question.options.map(option => {
                                                 const isSelected = attempt.selectedAnswer === option;
                                                 const isCorrect = question.correctAnswer === option;
+                                                const justifications = fetchedJustifications[question.id] || question.optionJustifications;
                                                 return (
-                                                    <li key={option} className={`flex items-start gap-2 p-2 rounded ${isCorrect ? 'bg-green-900/50 text-green-300' : isSelected ? 'bg-red-900/50 text-red-300' : ''}`}>
-                                                        {isCorrect ? <CheckCircleIcon className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" /> : isSelected ? <XCircleIcon className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" /> : <div className="w-5 h-5 flex-shrink-0" />}
-                                                        <span dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }} />
+                                                    <li key={option} className={`flex flex-col p-2 rounded ${isCorrect ? 'bg-green-900/50 text-green-300' : isSelected ? 'bg-red-900/50 text-red-300' : 'bg-gray-700/30'}`}>
+                                                        <div className="flex items-start gap-2">
+                                                            {isCorrect ? <CheckCircleIcon className="h-5 w-5 text-green-400 mt-0.5 flex-shrink-0" /> : isSelected ? <XCircleIcon className="h-5 w-5 text-red-400 mt-0.5 flex-shrink-0" /> : <div className="w-5 h-5 flex-shrink-0" />}
+                                                            <span dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }} />
+                                                        </div>
+                                                        {justifications?.[option] && <p className="text-xs text-gray-400 mt-1 pl-7 italic">{justifications[option]}</p>}
                                                     </li>
                                                 )
                                             })}
                                         </ul>
-                                        <p className="text-xs text-cyan-400 pt-2 font-bold">Justificativa:</p>
-                                        <div className="text-xs text-gray-300 prose prose-sm prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: markdownToHtml(question.justification) }} />
+                                        {!question.optionJustifications && !fetchedJustifications[question.id] && (
+                                             <div className="text-center pt-2">
+                                                <Button onClick={() => handleGenerateJustifications(question)} disabled={isFetchingJustifications === question.id} className="text-xs py-1 px-2">
+                                                    {isFetchingJustifications === question.id ? <Spinner/> : <><GeminiIcon className="h-4 w-4 mr-1"/> Analisar com IA</>}
+                                                </Button>
+                                            </div>
+                                        )}
                                     </div>
                                 ))}
                             </div>
@@ -353,8 +395,9 @@ export const QuizView: React.FC<{
         );
     }
 
-    const { statement, options, correctAnswer, justification, imageUrl, id: questionId } = questionToDisplay;
+    const { statement, options, correctAnswer, justification, imageUrl, id: questionId, optionJustifications } = questionToDisplay;
     const isCorrect = isCurrentQuestionAnswered && attemptForCurrentQuestion.isCorrect;
+    const currentJustifications = fetchedJustifications[questionId] || optionJustifications;
     
     return (
         <>
@@ -438,6 +481,7 @@ export const QuizView: React.FC<{
                             const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion.selectedAnswer === option : selectedOption === option;
                             const isCorrectAnswer = correctAnswer === option;
                             const colorIndex = i % HIGHLIGHT_COLORS.length;
+                            const isEliminated = eliminatedOptions.has(option);
                             
                             let labelClass = 'bg-gray-700 hover:bg-gray-600';
                             if (isCurrentQuestionAnswered) {
@@ -452,8 +496,9 @@ export const QuizView: React.FC<{
                                 <button
                                     key={i}
                                     onClick={() => setSelectedOption(option)}
+                                    onDoubleClick={() => handleDoubleClickOption(option)}
                                     disabled={isCurrentQuestionAnswered}
-                                    className={`w-full text-left p-4 rounded-lg transition-colors block ${!isCurrentQuestionAnswered ? 'cursor-pointer' : ''} ${labelClass} flex items-start`}
+                                    className={`w-full text-left p-4 rounded-lg transition-all duration-200 block ${!isCurrentQuestionAnswered ? 'cursor-pointer' : ''} ${labelClass} flex items-start ${isEliminated ? 'line-through opacity-50' : ''}`}
                                 >
                                     <span className="font-semibold mr-3">{String.fromCharCode(65 + i)}.</span>
                                     <div className="prose prose-sm prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }}></div>
@@ -480,10 +525,29 @@ export const QuizView: React.FC<{
                     <div className="mt-6 p-4 bg-gray-900/50 rounded-lg animate-fade-in">
                         <p className={`font-bold text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                             {isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta.'}
-                            {!isCorrect && dailyChallengeType !== 'portuguese' && ` A resposta certa é: ${correctAnswer}`}
                         </p>
-                        <h4 className="font-bold text-cyan-400 mt-2">Justificativa:</h4>
-                        <div className="mt-1 text-gray-300 prose prose-sm prose-invert max-w-none" dangerouslySetInnerHTML={{ __html: markdownToHtml(justification) }} />
+                         {currentJustifications ? (
+                            <div className="mt-2 space-y-3">
+                                {options.map((option, i) => {
+                                    const isCorrectAnswer = correctAnswer === option;
+                                    const justificationText = currentJustifications[option];
+                                    return (
+                                        <div key={i}>
+                                            <p className={`font-semibold text-sm ${isCorrectAnswer ? 'text-green-400' : 'text-red-400'}`}>
+                                                {String.fromCharCode(65 + i)}) {isCorrectAnswer ? "Correta" : "Incorreta"}
+                                            </p>
+                                            <p className="text-xs text-gray-300 ml-2 italic">{justificationText || "Justificativa não disponível."}</p>
+                                        </div>
+                                    )
+                                })}
+                            </div>
+                        ) : (
+                             <div className="mt-2 text-center">
+                                <Button onClick={() => handleGenerateJustifications(questionToDisplay)} disabled={isFetchingJustifications === questionId} className="text-sm py-2 px-3">
+                                    {isFetchingJustifications === questionId ? <Spinner/> : <><GeminiIcon className="h-4 w-4 mr-2"/> Analisar Alternativas com IA</>}
+                                </Button>
+                            </div>
+                        )}
                     </div>
                 )}
                 

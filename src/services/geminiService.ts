@@ -52,10 +52,14 @@ const questionSchema = {
         },
         justification: {
           type: Type.STRING,
-          description: "Uma justificativa detalhada para a resposta correta, baseada diretamente no conteúdo do PDF fornecido.",
+          description: "A justificativa detalhada APENAS para a resposta CORRETA, baseada diretamente no conteúdo do PDF fornecido.",
         },
+        optionJustifications: {
+          type: Type.OBJECT,
+          description: "Um objeto contendo as justificativas para CADA uma das 5 alternativas. A chave deve ser o texto exato da alternativa, e o valor deve ser a justificativa correspondente (por que está certa ou errada)."
+        }
       },
-      required: ["statement", "options", "correctAnswer", "justification"],
+      required: ["statement", "options", "correctAnswer", "justification", "optionJustifications"],
     },
   };
   
@@ -315,7 +319,7 @@ export const generateQuestionsFromPdf = async (
     };
     
     const textPart = {
-        text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter um enunciado, 5 alternativas, a indicação da resposta correta e uma justificativa detalhada para a resposta correta, baseada no conteúdo do documento. Siga estritamente o schema JSON fornecido.`
+        text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter um enunciado, 5 alternativas, a indicação da resposta correta, uma justificativa detalhada para a resposta correta e uma justificativa para cada alternativa (correta e incorretas). Siga estritamente o schema JSON fornecido.`
     };
 
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -332,11 +336,19 @@ export const generateQuestionsFromPdf = async (
     return generatedQuestions.map((q: any) => {
         const cleanedOptions = (q.options || []).map(stripOptionPrefix);
         const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (q.optionJustifications) {
+            for (const key in q.optionJustifications) {
+                cleanedOptionJustifications[stripOptionPrefix(key)] = q.optionJustifications[key];
+            }
+        }
+        
         return {
             statement: q.statement,
             options: shuffleArray(cleanedOptions),
             correctAnswer: cleanedCorrectAnswer,
             justification: q.justification,
+            optionJustifications: cleanedOptionJustifications,
         };
     });
 
@@ -351,7 +363,7 @@ export const generateQuestionsFromText = async (
   questionCount: number = 20
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter um enunciado, 5 alternativas, a indicação da resposta correta e uma justificativa detalhada. Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
+        const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter um enunciado, 5 alternativas, a indicação da resposta correta, uma justificativa detalhada para a resposta correta e uma justificativa para cada alternativa (correta e incorretas). Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -364,14 +376,22 @@ export const generateQuestionsFromText = async (
 
         const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
         
-        return generatedQuestions.map((q: any) => {
+         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (q.optionJustifications) {
+                for (const key in q.optionJustifications) {
+                    cleanedOptionJustifications[stripOptionPrefix(key)] = q.optionJustifications[key];
+                }
+            }
+            
             return {
                 statement: q.statement,
                 options: shuffleArray(cleanedOptions),
                 correctAnswer: cleanedCorrectAnswer,
                 justification: q.justification,
+                optionJustifications: cleanedOptionJustifications,
             };
         });
     } catch (error) {
@@ -392,7 +412,7 @@ export const extractQuestionsFromTecPdf = async (
         };
         
         const textPart = {
-            text: `Analise este PDF, que contém uma lista de questões de concursos extraídas do TEC Concursos. Para cada questão no documento, extraia o enunciado (incluindo o texto de apoio, se houver), as 5 alternativas de resposta, a alternativa correta (geralmente indicada como "Gabarito: LETRA"), e o texto do comentário do professor como a justificativa. Preserve qualquer formatação de **negrito** ou __sublinhado__ no texto original, usando a sintaxe Markdown correspondente (ex: **texto em negrito** e __texto sublinhado__). Ignore cabeçalhos, rodapés e metadados como "Caderno gerado por...". Formate a saída como um array de objetos JSON, seguindo estritamente o schema fornecido. Se uma questão não tiver 5 alternativas, complete com "N/A".`
+            text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta e 5) um objeto 'optionJustifications' com uma justificativa individual para CADA alternativa, explicando por que está certa ou errada. Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
         };
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -408,11 +428,19 @@ export const extractQuestionsFromTecPdf = async (
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (q.optionJustifications) {
+                for (const key in q.optionJustifications) {
+                    cleanedOptionJustifications[stripOptionPrefix(key)] = q.optionJustifications[key];
+                }
+            }
+            
             return {
                 statement: q.statement,
                 options: shuffleArray(cleanedOptions),
                 correctAnswer: cleanedCorrectAnswer,
-                justification: q.justification
+                justification: q.justification,
+                optionJustifications: cleanedOptionJustifications,
             };
         });
 
@@ -426,7 +454,7 @@ export const extractQuestionsFromTecText = async (
     text: string,
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const prompt = `Analise este texto, que contém uma lista de questões de concursos extraídas do TEC Concursos. Para cada questão no texto, extraia o enunciado (incluindo o texto de apoio, se houver), as 5 alternativas de resposta, a alternativa correta (geralmente indicada como "Gabarito: LETRA"), e o texto do comentário do professor como a justificativa. Preserve qualquer formatação de **negrito** ou __sublinhado__ no texto original, usando a sintaxe Markdown correspondente. Ignore metadados como "Caderno gerado por...". Formate a saída como um array de objetos JSON, seguindo estritamente o schema fornecido.\n\nTexto: """${text}"""`;
+        const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta e 5) um objeto 'optionJustifications' com uma justificativa individual para CADA alternativa, explicando por que está certa ou errada. Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
@@ -441,11 +469,19 @@ export const extractQuestionsFromTecText = async (
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (q.optionJustifications) {
+                for (const key in q.optionJustifications) {
+                    cleanedOptionJustifications[stripOptionPrefix(key)] = q.optionJustifications[key];
+                }
+            }
+            
             return {
                 statement: q.statement,
                 options: shuffleArray(cleanedOptions),
                 correctAnswer: cleanedCorrectAnswer,
-                justification: q.justification
+                justification: q.justification,
+                optionJustifications: cleanedOptionJustifications,
             };
         });
 
@@ -643,7 +679,7 @@ export const getAiSummaryForText = async (text: string): Promise<string> => {
 };
 
 export const getAiQuestionForText = async (text: string): Promise<Omit<Question, 'id'>> => {
-     const prompt = `Com base no texto a seguir, crie UMA questão de múltipla escolha (com 5 alternativas) no estilo de concurso. A questão deve ser desafiadora, mas justa. Forneça a alternativa correta e uma justificativa detalhada. Formate a saída como um único objeto JSON, seguindo estritamente o schema fornecido. Texto: "${text}"`;
+     const prompt = `Com base no texto a seguir, crie UMA questão de múltipla escolha (com 5 alternativas) no estilo de concurso. A questão deve ser desafiadora, mas justa. Forneça a alternativa correta e uma justificativa detalhada para a resposta correta e para as incorretas. Formate a saída como um único objeto JSON, seguindo estritamente o schema fornecido. Texto: "${text}"`;
      
       const singleQuestionSchema = {
         type: Type.OBJECT,
@@ -664,11 +700,19 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
     const cleanedOptions = (generatedQuestion.options || []).map(stripOptionPrefix);
     const cleanedCorrectAnswer = stripOptionPrefix(generatedQuestion.correctAnswer || '');
 
+    const cleanedOptionJustifications: { [key: string]: string } = {};
+    if (generatedQuestion.optionJustifications) {
+        for (const key in generatedQuestion.optionJustifications) {
+            cleanedOptionJustifications[stripOptionPrefix(key)] = generatedQuestion.optionJustifications[key];
+        }
+    }
+
     return {
         statement: generatedQuestion.statement,
         options: shuffleArray(cleanedOptions),
         correctAnswer: cleanedCorrectAnswer,
         justification: generatedQuestion.justification,
+        optionJustifications: cleanedOptionJustifications,
     };
 };
 
@@ -739,6 +783,32 @@ export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuesti
         contents: prompt,
     });
     return response.text || "Não foi possível gerar o resumo no momento.";
+};
+
+export const generateJustificationsForQuestion = async (
+    question: Pick<Question, 'statement' | 'options' | 'correctAnswer'>
+): Promise<{ [optionText: string]: string }> => {
+    const prompt = `Dada a seguinte questão de múltipla escolha, gere uma justificativa concisa para CADA uma das alternativas, explicando por que ela está correta ou incorreta.
+    
+    Enunciado: "${question.statement}"
+    Alternativas: ${JSON.stringify(question.options)}
+    Resposta Correta: "${question.correctAnswer}"
+
+    Retorne um objeto JSON onde cada chave é o texto exato de uma alternativa e o valor é sua respectiva justificativa.`;
+
+    const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+                type: Type.OBJECT,
+                description: "Um objeto com chaves sendo as alternativas e valores sendo as justificativas."
+            }
+        }
+    });
+
+    return parseJsonResponse<{ [optionText: string]: string }>(response.text || '', 'object');
 };
 
 export const generateGameFromPdf = async (
@@ -987,6 +1057,7 @@ export const generatePortugueseChallenge = async (questionCount: number = 1): Pr
     2.  O array 'options' deve conter os 5 trechos exatos que, quando concatenados com um espaço, formam o enunciado ('statement') completo.
     3.  A 'correctAnswer' deve ser o trecho exato do array 'options' que contém o erro gramatical.
     4.  A 'justification' deve explicar claramente qual é o erro e por que está errado, citando a regra gramatical aplicável.
+    5.  O objeto 'optionJustifications' deve conter uma justificativa para cada trecho, explicando por que ele está gramaticalmente correto ou incorreto. Para a alternativa errada, a justificativa deve ser a mesma da 'justification' principal. Para as corretas, apenas afirme que estão corretas.
     Retorne um array de objetos JSON, seguindo estritamente o schema JSON fornecido.`;
      
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -1006,11 +1077,19 @@ export const generatePortugueseChallenge = async (questionCount: number = 1): Pr
         // The statement should be reconstructed from the cleaned options to ensure consistency.
         const cleanedStatement = cleanedOptions.join(' ');
         
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (q.optionJustifications) {
+            for (const key in q.optionJustifications) {
+                cleanedOptionJustifications[stripOptionPrefix(key)] = q.optionJustifications[key];
+            }
+        }
+        
         return {
             statement: cleanedStatement,
             options: cleanedOptions,
             correctAnswer: cleanedCorrectAnswer,
             justification: q.justification,
+            optionJustifications: cleanedOptionJustifications
         };
     });
 };

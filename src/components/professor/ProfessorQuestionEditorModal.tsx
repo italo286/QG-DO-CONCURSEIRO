@@ -31,13 +31,27 @@ export const ProfessorQuestionEditorModal: React.FC<ProfessorQuestionEditorModal
         const newOptions = [...editedQuestion.options];
         const oldOptionValue = editedQuestion.options[optionIndex];
         newOptions[optionIndex] = value;
+        
         const newCorrectAnswer = editedQuestion.correctAnswer === oldOptionValue ? value : editedQuestion.correctAnswer;
-        setEditedQuestion({ ...editedQuestion, options: newOptions, correctAnswer: newCorrectAnswer });
+
+        const newOptionJustifications = { ...editedQuestion.optionJustifications };
+        if (newOptionJustifications && newOptionJustifications[oldOptionValue]) {
+            newOptionJustifications[value] = newOptionJustifications[oldOptionValue];
+            delete newOptionJustifications[oldOptionValue];
+        }
+
+        setEditedQuestion({ ...editedQuestion, options: newOptions, correctAnswer: newCorrectAnswer, optionJustifications: newOptionJustifications });
     };
 
     const handleCorrectAnswerChange = (newCorrectAnswer: string) => {
         if (!editedQuestion) return;
         setEditedQuestion({ ...editedQuestion, correctAnswer: newCorrectAnswer });
+    };
+    
+    const handleOptionJustificationChange = (optionText: string, justification: string) => {
+        if (!editedQuestion) return;
+        const newOptionJustifications = { ...editedQuestion.optionJustifications, [optionText]: justification };
+        setEditedQuestion({ ...editedQuestion, optionJustifications: newOptionJustifications });
     };
 
     const handleSaveClick = () => {
@@ -66,29 +80,38 @@ export const ProfessorQuestionEditorModal: React.FC<ProfessorQuestionEditorModal
                     />
                 </div>
                  <div>
-                    <label className="text-sm font-medium text-gray-400">Alternativas (Marque a correta)</label>
-                    <div className="space-y-2 mt-1">
+                    <label className="text-sm font-medium text-gray-400">Alternativas e Justificativas</label>
+                    <div className="space-y-4 mt-1">
                         {editedQuestion.options.map((option, optionIndex) => (
-                            <div key={optionIndex} className="flex items-center space-x-2">
-                                <input
-                                    type="radio"
-                                    name="correct-answer-edit"
-                                    checked={editedQuestion.correctAnswer === option}
-                                    onChange={() => handleCorrectAnswerChange(option)}
-                                    className="h-5 w-5 text-cyan-500 bg-gray-600 border-gray-500 focus:ring-cyan-600"
-                                />
-                                <input
-                                    type="text"
-                                    value={option}
-                                    onChange={e => handleOptionChange(optionIndex, e.target.value)}
-                                    className="flex-grow bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white"
+                            <div key={optionIndex} className="p-2 bg-gray-800/60 rounded-md">
+                                <div className="flex items-center space-x-2">
+                                    <input
+                                        type="radio"
+                                        name="correct-answer-edit"
+                                        checked={editedQuestion.correctAnswer === option}
+                                        onChange={() => handleCorrectAnswerChange(option)}
+                                        className="h-5 w-5 text-cyan-500 bg-gray-600 border-gray-500 focus:ring-cyan-600"
+                                    />
+                                    <input
+                                        type="text"
+                                        value={option}
+                                        onChange={e => handleOptionChange(optionIndex, e.target.value)}
+                                        className="flex-grow bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white"
+                                    />
+                                </div>
+                                <textarea
+                                    value={editedQuestion.optionJustifications?.[option] || ''}
+                                    onChange={e => handleOptionJustificationChange(option, e.target.value)}
+                                    rows={2}
+                                    placeholder={`Justificativa para a alternativa ${String.fromCharCode(65 + optionIndex)}...`}
+                                    className="mt-2 block w-full bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white text-xs"
                                 />
                             </div>
                         ))}
                     </div>
                 </div>
                  <div>
-                    <label htmlFor="justification-edit" className="text-sm font-medium text-gray-400">Justificativa</label>
+                    <label htmlFor="justification-edit" className="text-sm font-medium text-gray-400">Justificativa da Resposta Correta (Geral)</label>
                     <textarea
                         id="justification-edit"
                         value={editedQuestion.justification}

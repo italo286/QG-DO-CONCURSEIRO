@@ -16,6 +16,7 @@ export interface Question {
   options: string[];
   correctAnswer: string;
   justification: string;
+  optionJustifications?: { [optionText: string]: string };
   imageUrl?: string;
   reportInfo?: {
       reason: string;
