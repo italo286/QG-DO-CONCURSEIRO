@@ -180,7 +180,7 @@ export const QuizView: React.FC<{
         setSelectedOption(null);
         setEliminatedOptions(new Set());
         if (currentIndex > 0) {
-            setCurrentIndex(prev => prev + 1);
+            setCurrentIndex(prev => prev - 1);
         }
     };
 
