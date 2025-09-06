@@ -75,7 +75,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     };
 
     return (
-        <header className="flex justify-between items-center mb-6 md:mb-8 flex-wrap gap-4">
+        <header className="flex justify-between items-center mb-6 md:mb-8 gap-4">
             <div className="flex items-center gap-4 flex-grow min-w-0">
                 <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md flex-shrink-0" />
                 <div className="flex-grow min-w-0">
