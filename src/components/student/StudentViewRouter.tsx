@@ -16,7 +16,6 @@ import { CourseView } from './views/CourseView';
 import { DashboardHome } from './views/DashboardHome';
 import { DailyChallengeResultsView } from './views/DailyChallengeResultsView';
 
-// FIX: Added 'daily_challenge_results' to ViewType to match the state in the parent component.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results';
 
 interface StudentViewRouterProps {
