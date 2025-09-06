@@ -426,6 +426,7 @@ export const generateQuestionsFromText = async (
 
 export const extractQuestionsFromTecPdf = async (
     pdfBase64: string,
+    generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
         const pdfPart = {
@@ -435,8 +436,12 @@ export const extractQuestionsFromTecPdf = async (
             },
         };
         
+        const justificationPromptPart = generateJustifications
+            ? "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
+            : "O campo 'optionJustifications' deve ser um array vazio.";
+        
         const textPart = {
-            text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta e 5) um array 'optionJustifications' com uma justificativa individual para CADA alternativa. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação). Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
+            text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
         };
 
         const response: GenerateContentResponse = await ai.models.generateContent({
@@ -479,9 +484,14 @@ export const extractQuestionsFromTecPdf = async (
 
 export const extractQuestionsFromTecText = async (
     text: string,
+    generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta e 5) um array 'optionJustifications' com uma justificativa individual para CADA alternativa. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação). Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
+        const justificationPromptPart = generateJustifications
+            ? "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
+            : "O campo 'optionJustifications' deve ser um array vazio.";
+
+        const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',
