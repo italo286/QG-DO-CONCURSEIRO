@@ -88,40 +88,52 @@ export const markdownToHtml = (text: string): string => {
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/__(.*?)__/g, '<u>$1</u>');
     };
-
+    
     const lines = text.split('\n');
     let html = '';
-    let inList = false;
+    let listType: 'ul' | 'ol' | null = null;
 
     for (const line of lines) {
-        const processedLine = line.trim();
-        if (processedLine.startsWith('* ') || processedLine.startsWith('- ')) {
-            if (!inList) {
+        const trimmedLine = line.trim();
+        
+        const ulMatch = trimmedLine.match(/^(\*|-)\s+(.*)/);
+        const olMatch = trimmedLine.match(/^(?:\d+\.|[a-zA-Z][.)]|[IVXLCDM]+\.)\s+(.*)/i); // Matches 1., a), I. etc. (case-insensitive for roman)
+
+        if (ulMatch) {
+            if (listType !== 'ul') {
+                if (listType) html += `</${listType}>`; // Close previous list
                 html += '<ul class="list-disc list-inside space-y-1 my-2">';
-                inList = true;
+                listType = 'ul';
             }
-            html += `<li>${processInline(processedLine.substring(2))}</li>`;
+            html += `<li>${processInline(ulMatch[2])}</li>`;
+        } else if (olMatch) {
+            if (listType !== 'ol') {
+                if (listType) html += `</${listType}>`; // Close previous list
+                html += '<ol class="list-decimal list-inside space-y-1 my-2">';
+                listType = 'ol';
+            }
+            html += `<li>${processInline(olMatch[1])}</li>`;
         } else {
-            if (inList) {
-                html += '</ul>';
-                inList = false;
+            if (listType) {
+                html += `</${listType}>`; // Close any open list
+                listType = null;
             }
-            if (processedLine) {
-                 if (processedLine.startsWith('# ')) {
-                    html += `<h1 class="text-2xl font-bold mb-4 mt-2">${processInline(processedLine.substring(2))}</h1>`;
-                } else if (processedLine.startsWith('## ')) {
-                    html += `<h2 class="text-xl font-bold mb-3 mt-2">${processInline(processedLine.substring(3))}</h2>`;
-                } else if (processedLine.startsWith('### ')) {
-                    html += `<h3 class="text-lg font-bold mb-2 mt-2">${processInline(processedLine.substring(4))}</h3>`;
+            if (trimmedLine) {
+                if (trimmedLine.startsWith('# ')) {
+                    html += `<h1 class="text-2xl font-bold mb-4 mt-2">${processInline(trimmedLine.substring(2))}</h1>`;
+                } else if (trimmedLine.startsWith('## ')) {
+                    html += `<h2 class="text-xl font-bold mb-3 mt-2">${processInline(trimmedLine.substring(3))}</h2>`;
+                } else if (trimmedLine.startsWith('### ')) {
+                    html += `<h3 class="text-lg font-bold mb-2 mt-2">${processInline(trimmedLine.substring(4))}</h3>`;
                 } else {
-                    html += `<p class="my-2">${processInline(processedLine)}</p>`;
+                    html += `<p class="my-2">${processInline(trimmedLine)}</p>`;
                 }
             }
         }
     }
-
-    if (inList) {
-        html += '</ul>';
+    
+    if (listType) {
+        html += `</${listType}>`;
     }
 
     return html;

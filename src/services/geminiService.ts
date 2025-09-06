@@ -56,7 +56,7 @@ const questionSchema = {
         },
         optionJustifications: {
           type: Type.ARRAY,
-          description: "Um array de objetos com justificativas para CADA alternativa. Cada objeto deve ter 'option' (o texto exato da alternativa) e 'justification'.",
+          description: "Um array de objetos com justificativas para CADA alternativa. Cada objeto deve ter 'option' (o texto exato da alternativa) e 'justification'. Se não for solicitado, deve ser um array vazio.",
           items: {
             type: Type.OBJECT,
             properties: {
@@ -67,7 +67,7 @@ const questionSchema = {
           }
         }
       },
-      required: ["statement", "options", "correctAnswer", "justification", "optionJustifications"],
+      required: ["statement", "options", "correctAnswer", "justification"],
     },
   };
   
@@ -316,7 +316,8 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
 
 export const generateQuestionsFromPdf = async (
   pdfBase64: string,
-  questionCount: number = 20
+  questionCount: number = 20,
+  generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
   try {
     const pdfPart = {
@@ -326,8 +327,12 @@ export const generateQuestionsFromPdf = async (
       },
     };
     
+    const justificationPromptPart = generateJustifications
+      ? "e um array 'optionJustifications'. O array 'optionJustifications' deve conter um objeto para cada uma das 5 alternativas, com as chaves 'option' (o texto da alternativa) e 'justification' (a explicação)."
+      : "O campo 'optionJustifications' deve ser um array vazio.";
+    
     const textPart = {
-        text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') e um array 'optionJustifications'. O array 'optionJustifications' deve conter um objeto para cada uma das 5 alternativas, com as chaves 'option' (o texto da alternativa) e 'justification' (a explicação). Siga estritamente o schema JSON fornecido.`
+        text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.`
     };
 
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -371,10 +376,15 @@ export const generateQuestionsFromPdf = async (
 
 export const generateQuestionsFromText = async (
   text: string,
-  questionCount: number = 20
+  questionCount: number = 20,
+  generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') e um array 'optionJustifications'. O array 'optionJustifications' deve conter um objeto para cada uma das 5 alternativas, com as chaves 'option' (o texto da alternativa) e 'justification' (a explicação). Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
+        const justificationPromptPart = generateJustifications
+            ? "e um array 'optionJustifications'. O array 'optionJustifications' deve conter um objeto para cada uma das 5 alternativas, com as chaves 'option' (o texto da alternativa) e 'justification' (a explicação)."
+            : "O campo 'optionJustifications' deve ser um array vazio.";
+            
+        const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await ai.models.generateContent({
             model: 'gemini-2.5-flash',

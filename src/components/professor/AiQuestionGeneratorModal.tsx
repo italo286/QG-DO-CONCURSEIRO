@@ -130,6 +130,7 @@ export const AiQuestionGeneratorModal: React.FC<{
     const [error, setError] = useState('');
     const [generatedQuestions, setGeneratedQuestions] = useState<Omit<Question, 'id'>[]>([]);
     const [validationError, setValidationError] = useState<{ index: number; message: string } | null>(null);
+    const [generateJustifications, setGenerateJustifications] = useState(true);
 
     useEffect(() => {
         if (!isOpen) {
@@ -140,6 +141,7 @@ export const AiQuestionGeneratorModal: React.FC<{
             setGeneratedQuestions([]);
             setInputMethod('pdf');
             setValidationError(null);
+            setGenerateJustifications(true);
         }
     }, [isOpen]);
 
@@ -164,11 +166,11 @@ export const AiQuestionGeneratorModal: React.FC<{
                 const base64 = await fileToBase64(file!);
                 questions = isTecExtraction 
                     ? await GeminiService.extractQuestionsFromTecPdf(base64)
-                    : await GeminiService.generateQuestionsFromPdf(base64, 20);
+                    : await GeminiService.generateQuestionsFromPdf(base64, 20, generateJustifications);
             } else { // 'text'
                 questions = isTecExtraction
                     ? await GeminiService.extractQuestionsFromTecText(inputText)
-                    : await GeminiService.generateQuestionsFromText(inputText, 20);
+                    : await GeminiService.generateQuestionsFromText(inputText, 20, generateJustifications);
             }
             setGeneratedQuestions(questions);
         } catch (e: any) {
@@ -237,6 +239,22 @@ export const AiQuestionGeneratorModal: React.FC<{
                         className="block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"
                     />
                 )}
+
+                {!isTecExtraction && (
+                    <div className="flex items-center space-x-2 pt-2">
+                        <input
+                            type="checkbox"
+                            id="gen-justifications"
+                            checked={generateJustifications}
+                            onChange={(e) => setGenerateJustifications(e.target.checked)}
+                            className="h-4 w-4 rounded text-cyan-500 bg-gray-700 border-gray-600 focus:ring-cyan-600"
+                        />
+                        <label htmlFor="gen-justifications" className="text-sm text-gray-300 cursor-pointer">
+                            Gerar justificativas detalhadas para cada alternativa
+                        </label>
+                    </div>
+                )}
+
 
                 <div className="text-center">
                     <Button onClick={handleGenerate} disabled={isGenerateDisabled}>
