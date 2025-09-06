@@ -525,10 +525,6 @@ export const QuizView: React.FC<{
                 )}
 
                 <div className="flex justify-center items-center mt-6 space-x-4">
-                    <Button onClick={handlePrevious} disabled={currentIndex === 0} className="bg-gray-600 hover:bg-gray-500">
-                        <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
-                    </Button>
-
                     {!showResults && (
                         <Button
                             onClick={handleGoToLastAnswered}
@@ -539,7 +535,9 @@ export const QuizView: React.FC<{
                             Última Respondida
                         </Button>
                     )}
-
+                    <Button onClick={handlePrevious} disabled={currentIndex === 0} className="bg-gray-600 hover:bg-gray-500">
+                        <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
+                    </Button>
                     {!isCurrentQuestionAnswered ? (
                         <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
                     ) : (

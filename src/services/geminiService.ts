@@ -1,4 +1,4 @@
-import { GoogleGenAI, Type, Chat } from "@google/genai";
+import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
@@ -368,7 +368,8 @@ export const generateQuestionsFromPdf = async (
         text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.`
     };
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
         config: {
@@ -419,7 +420,8 @@ export const generateQuestionsFromText = async (
             
         const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
 
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -477,7 +479,8 @@ export const extractQuestionsFromTecPdf = async (
             text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
         };
 
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart, pdfPart] },
             config: {
@@ -526,7 +529,8 @@ export const extractQuestionsFromTecText = async (
 
         const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
 
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -607,7 +611,8 @@ export const generateSmartReview = async (
             `
         };
 
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: {
@@ -633,7 +638,8 @@ export const generateTopicsFromText = async (
             text: `A partir do texto a seguir, que é um índice ou resumo de material de estudo para concurso, extraia os principais tópicos e seus respectivos subtópicos. Para cada tópico e subtópico, forneça um nome e uma breve descrição. Se um tópico não tiver subtópicos evidentes, retorne um array 'subtopics' vazio para ele. Formate a saída como um array JSON, seguindo estritamente o schema fornecido. Texto: """${text}"""`
         };
 
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
             config: {
@@ -675,7 +681,8 @@ export const generateFlashcardsFromPdf = async (
         text: `Com base no conteúdo deste documento PDF, identifique os principais termos, conceitos e suas definições. Gere um array JSON de flashcards para estudo. Cada flashcard deve ter uma frente ('front') com o termo/conceito e um verso ('back') com a definição clara e concisa. Siga estritamente o schema JSON fornecido.`
     };
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
         config: {
@@ -720,7 +727,8 @@ export const analyzeStudentDifficulties = async (
 
         const prompt = `Como um tutor especialista em concursos, analise o seguinte conjunto de erros cometidos por uma turma de alunos. Identifique os padrões de dificuldade, os tópicos mais problemáticos e os tipos de erro mais comuns (ex: erro de interpretação, confusão entre conceitos, falta de atenção). Forneça um resumo conciso e acionável para o professor, com sugestões de como abordar esses pontos fracos. Formate a resposta em markdown. Dados dos erros: ${JSON.stringify(dataForAnalysis)}`;
         
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
         }));
@@ -735,7 +743,8 @@ export const analyzeStudentDifficulties = async (
 
 export const getAiExplanationForText = async (text: string): Promise<string> => {
     const prompt = `Explique o seguinte texto de forma clara e didática, como se fosse para um aluno de concurso que está vendo o assunto pela primeira vez. Use analogias e exemplos simples, se possível. Formate a resposta em markdown. Texto: "${text}"`;
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
@@ -744,7 +753,8 @@ export const getAiExplanationForText = async (text: string): Promise<string> => 
 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
     const prompt = `Resuma o seguinte texto em pontos-chave (bullet points), focando nos conceitos mais importantes para memorização em um concurso. Formate a resposta em markdown. Texto: "${text}"`;
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
@@ -760,7 +770,8 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
         required: questionSchema.items.required,
     };
      
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -804,7 +815,8 @@ export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat 
 export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions: Question[]): Promise<Omit<Flashcard, 'id'>[]> => {
     const prompt = `Analise a lista de questões que um aluno errou. Para cada questão, crie um flashcard que ajude a solidificar o conhecimento correto. A frente do flashcard deve ser uma pergunta direta ou um termo-chave, e o verso deve ser a resposta ou definição concisa. Foque no "porquê" da resposta correta. Retorne um array de objetos JSON de flashcards, seguindo estritamente o schema fornecido. Questões erradas: ${JSON.stringify(incorrectQuestions)}`;
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -819,7 +831,8 @@ export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions:
 
 export const generateQuizFeedback = async (questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
     const prompt = `Você é um tutor de IA. Analise o desempenho do aluno neste quiz. Forneça um feedback construtivo e motivacional. Identifique os padrões de erro (se houver) e dê dicas de estudo personalizadas com base nas questões erradas. Formate a resposta em markdown. Dados do Quiz: Questões: ${JSON.stringify(questions)}, Respostas do Aluno: ${JSON.stringify(attempts)}`;
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
@@ -830,7 +843,8 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
   const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
   const textPart = { text: "Analise o conteúdo deste edital de concurso público e extraia as informações estruturadas conforme o schema JSON fornecido. Preencha todos os campos da forma mais completa e precisa possível." };
   
-  const response = await retryWithBackoff(() => ai.models.generateContent({
+  // FIX: Added explicit type GenerateContentResponse to the response object.
+  const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [textPart, pdfPart] },
     config: {
@@ -853,7 +867,8 @@ export const analyzeEditalFromUrl = async (_url: string): Promise<EditalInfo> =>
 
 export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuestions: Question[]): Promise<string> => {
     const prompt = `Como um tutor de IA, analise as seguintes questões que um aluno errou. Crie um resumo conciso dos principais tópicos e conceitos que o aluno precisa revisar, com base nessas questões. Formate a resposta em markdown. Questões erradas: ${JSON.stringify(incorrectQuestions.map(q => ({ statement: q.statement, justification: q.justification })))}`;
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
@@ -881,7 +896,8 @@ export const generateJustificationsForQuestion = async (
         };
     });
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -938,7 +954,8 @@ export const generateGameFromPdf = async (
     }
     
     try {
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [{text: prompt}, pdfPart] },
             config: {
@@ -991,7 +1008,8 @@ export const generateGameFromText = async (
     }
     
     try {
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -1012,7 +1030,8 @@ export const generateAllGamesFromText = async (text: string): Promise<Omit<MiniG
     const prompt = `A partir do texto fornecido, gere dados para o maior número possível de tipos de jogos diferentes. Se um tipo de jogo não for aplicável ao texto, omita-o da resposta. Dê um nome criativo para cada jogo gerado, baseado no conteúdo. Retorne um objeto JSON seguindo o schema fornecido. Texto: """${text}"""`;
     
     try {
-        const response = await retryWithBackoff(() => ai.models.generateContent({
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
             config: {
@@ -1094,7 +1113,8 @@ export const generateAdaptiveStudyPlan = async (
         \`\`\`
     `;
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -1124,7 +1144,8 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
         text: `Analise este documento PDF e extraia os principais termos técnicos, jargões ou conceitos chave e suas respectivas definições. Formate a saída como um array JSON de objetos, onde cada objeto contém as chaves 'term' e 'definition'. A definição deve ser clara e concisa, baseada no contexto fornecido no documento.`
     };
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
         config: {
@@ -1146,7 +1167,8 @@ export const generatePortugueseChallenge = async (questionCount: number = 1): Pr
     5.  O objeto 'optionJustifications' deve conter uma justificativa para cada trecho, explicando por que ele está gramaticalmente correto ou incorreto. Para a alternativa errada, a justificativa deve ser a mesma da 'justification' principal. Para as corretas, apenas afirme que estão corretas.
     Retorne um array de objetos JSON, seguindo estritamente o schema JSON fornecido.`;
      
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
@@ -1203,7 +1225,8 @@ export const analyzeTopicFrequencies = async (
         Retorne um array de objetos JSON, onde cada objeto contém o 'id' do tópico/subtópico e a 'frequency' correspondente. Siga estritamente o schema fornecido.
     `;
 
-    const response = await retryWithBackoff(() => ai.models.generateContent({
+    // FIX: Added explicit type GenerateContentResponse to the response object.
+    const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
