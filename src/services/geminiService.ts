@@ -1,3 +1,4 @@
+
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
@@ -461,7 +462,7 @@ export const generateQuestionsFromText = async (
 
 export const extractQuestionsFromTecPdf = async (
     pdfBase64: string,
-    generateJustifications: boolean
+    _generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
         const pdfPart = {
@@ -471,15 +472,12 @@ export const extractQuestionsFromTecPdf = async (
             },
         };
         
-        const justificationPromptPart = generateJustifications
-            ? "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
-            : "O campo 'optionJustifications' deve ser um array vazio.";
+        const justificationPromptPart = "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação).";
         
         const textPart = {
             text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
         };
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart, pdfPart] },
@@ -520,16 +518,13 @@ export const extractQuestionsFromTecPdf = async (
 
 export const extractQuestionsFromTecText = async (
     text: string,
-    generateJustifications: boolean
+    _generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const justificationPromptPart = generateJustifications
-            ? "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
-            : "O campo 'optionJustifications' deve ser um array vazio.";
+        const justificationPromptPart = "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação).";
 
         const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -1101,19 +1096,24 @@ export const generateAdaptiveStudyPlan = async (
         2.  Distribua de 2 a 3 tópicos por dia entre as datas fornecidas em 'futureDates'. Evite colocar muitos tópicos do mesmo assunto no mesmo dia.
         3.  Tópicos já concluídos com score alto (acima de 0.9) devem ter baixa prioridade.
         4.  Retorne a resposta como um objeto JSON. As chaves devem ser as datas no formato 'YYYY-MM-DD', e os valores devem ser um array de IDs de tópicos (strings).
-        5.  Não agende estudos para sábado e domingo, a menos que seja estritamente necessário para cobrir os tópicos priorizados.
+        5.  Não agende estudos para sábado e domingo, a menos que seja estritamente necessário para cobrir os tópicos com baixa performance.
 
-        Exemplo de Saída:
+        SCHEMA:
         \`\`\`json
         {
-          "2024-08-20": ["topicId1", "topicId2"],
-          "2024-08-21": ["topicId3", "topicId4", "topicId5"],
-          ...
+            "type": "OBJECT",
+            "properties": {
+                "${futureDates[0]}": { "type": "ARRAY", "items": { "type": "STRING" } },
+                "${futureDates[1]}": { "type": "ARRAY", "items": { "type": "STRING" } }
+            },
+            "additionalProperties": {
+                "type": "ARRAY",
+                "items": { "type": "STRING" }
+            }
         }
         \`\`\`
     `;
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1122,29 +1122,14 @@ export const generateAdaptiveStudyPlan = async (
         }
     }));
 
-    const generatedPlan = parseJsonResponse<StudyPlan['plan']>(response.text || '', 'object');
-    // Simple validation
-    for (const date in generatedPlan) {
-        if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Array.isArray(generatedPlan[date])) {
-            throw new Error("Formato do plano de estudos inválido retornado pela IA.");
-        }
-    }
-    return generatedPlan;
+    return parseJsonResponse<StudyPlan['plan']>(response.text || '', 'object');
 };
 
-export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<GlossaryTerm[]> => {
-    const pdfPart = {
-      inlineData: {
-        mimeType: 'application/pdf',
-        data: pdfBase64,
-      },
-    };
-    
-    const textPart = {
-        text: `Analise este documento PDF e extraia os principais termos técnicos, jargões ou conceitos chave e suas respectivas definições. Formate a saída como um array JSON de objetos, onde cada objeto contém as chaves 'term' e 'definition'. A definição deve ser clara e concisa, baseada no contexto fornecido no documento.`
-    };
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
+export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<GlossaryTerm[]> => {
+    const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
+    const textPart = { text: "Analise este documento PDF e extraia os termos chave e suas definições para criar um glossário. Formate a saída como um array JSON, seguindo estritamente o schema." };
+
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
@@ -1157,17 +1142,21 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     return parseJsonResponse<GlossaryTerm[]>(response.text || '', 'array');
 };
 
-export const generatePortugueseChallenge = async (questionCount: number = 1): Promise<Omit<Question, 'id'>[]> => {
-    const prompt = `Crie ${questionCount === 1 ? 'UMA questão' : `${questionCount} questões`} de múltipla escolha para testar o conhecimento de gramática da língua portuguesa, focando em erros comuns em concursos.
-    Para cada questão:
-    1.  O enunciado ('statement') deve ser uma frase completa que, quando lida, parece natural. Esta frase será composta por 5 trechos e um deles conterá um erro sutil de gramática (concordância, regência, crase, pontuação, etc.).
-    2.  O array 'options' deve conter os 5 trechos exatos que, quando concatenados com um espaço, formam o enunciado ('statement') completo.
-    3.  A 'correctAnswer' deve ser o trecho exato do array 'options' que contém o erro gramatical.
-    4.  A 'justification' deve explicar claramente qual é o erro e por que está errado, citando a regra gramatical aplicável.
-    5.  O objeto 'optionJustifications' deve conter uma justificativa para cada trecho, explicando por que ele está gramaticalmente correto ou incorreto. Para a alternativa errada, a justificativa deve ser a mesma da 'justification' principal. Para as corretas, apenas afirme que estão corretas.
-    Retorne um array de objetos JSON, seguindo estritamente o schema JSON fornecido.`;
-     
-    // FIX: Added explicit type GenerateContentResponse to the response object.
+export const generatePortugueseChallenge = async (questionCount: number): Promise<Omit<Question, 'id'>[]> => {
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
+    1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
+    2. A frase deve ser dividida em 5 partes (alternativas).
+    3. A alternativa correta é o trecho que contém o erro.
+    4. A justificativa deve explicar claramente qual é o erro e como corrigi-lo.
+    
+    Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
+    Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
+    Resposta Correta: "que aguardavam"
+    Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
+
+    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+    `;
+    
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1177,71 +1166,50 @@ export const generatePortugueseChallenge = async (questionCount: number = 1): Pr
         }
     }));
 
-    const questions = parseJsonResponse<any[]>(response.text || '', 'array');
-    
-    return questions.map(q => {
-        const cleanedOptions = (q.options || []).map(stripOptionPrefix);
-        const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
-        // The statement should be reconstructed from the cleaned options to ensure consistency.
-        const cleanedStatement = cleanedOptions.join(' ');
-        
-        const cleanedOptionJustifications: { [key: string]: string } = {};
-        if (Array.isArray(q.optionJustifications)) {
-            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
-                if (item.option && item.justification) {
-                    cleanedOptionJustifications[stripOptionPrefix(item.option)] = item.justification;
-                }
-            });
-        }
-        
-        return {
-            statement: cleanedStatement,
-            options: cleanedOptions,
-            correctAnswer: cleanedCorrectAnswer,
-            justification: q.justification,
-            optionJustifications: cleanedOptionJustifications
-        };
-    });
+    const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+
+    // Unlike other quizzes, the order of options MATTERS here. So, no shuffling.
+    return generatedQuestions.map((q: any) => ({
+        statement: q.statement,
+        options: q.options, 
+        correctAnswer: q.correctAnswer,
+        justification: q.justification,
+        optionJustifications: {},
+    }));
 };
 
 export const analyzeTopicFrequencies = async (
     analysisText: string,
-    topics: { id: string; name: string }[]
+    topics: { id: string, name: string }[]
 ): Promise<{ [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' }> => {
     const prompt = `
-        Analise o seguinte texto, que contém estatísticas sobre a frequência de tópicos em provas de concurso.
-        Com base nesse texto, classifique cada um dos tópicos e subtópicos fornecidos na lista JSON a seguir em um dos quatro níveis de frequência: 'alta', 'media', 'baixa', ou 'nenhuma'.
-
+        Analise o seguinte texto, que contém estatísticas de frequência de tópicos em provas de concurso.
+        Com base nesse texto, classifique cada um dos tópicos da lista fornecida como 'alta', 'media', 'baixa' ou 'nenhuma' frequência.
+        
         Texto para análise:
-        """
-        ${analysisText}
-        """
+        """${analysisText}"""
 
-        Lista de Tópicos/Subtópicos para classificar (use o 'id' para mapeamento na resposta):
-        """
+        Lista de tópicos para classificar (JSON):
         ${JSON.stringify(topics)}
-        """
 
-        Retorne um array de objetos JSON, onde cada objeto contém o 'id' do tópico/subtópico e a 'frequency' correspondente. Siga estritamente o schema fornecido.
+        Retorne um array JSON contendo objetos, cada um com o 'id' do tópico e sua 'frequency' classificada.
+        Siga estritamente o schema JSON fornecido.
     `;
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
         config: {
-            responseMimeType: "application/json",
-            responseSchema: frequencyAnalysisSchema,
+            responseMimeType: 'application/json',
+            responseSchema: frequencyAnalysisSchema
         }
     }));
     
-    const frequencyArray = parseJsonResponse<{id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma'}[]>(response.text || '', 'array');
+    const results = parseJsonResponse<{ id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma' }[]>(response.text || '', 'array');
     
     const frequencyMap: { [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' } = {};
-    frequencyArray.forEach(item => {
-        if (['alta', 'media', 'baixa', 'nenhuma'].includes(item.frequency)) {
-            frequencyMap[item.id] = item.frequency;
-        }
+    results.forEach(item => {
+        frequencyMap[item.id] = item.frequency;
     });
 
     return frequencyMap;
