@@ -73,6 +73,7 @@ export const QuizView: React.FC<{
     const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
     const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
     const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
+    const [lastAnsweredIndex, setLastAnsweredIndex] = useState<number | null>(null);
 
 
     const correctCount = useMemo(() => sessionAttempts.filter(a => a.isCorrect).length, [sessionAttempts]);
@@ -112,6 +113,7 @@ export const QuizView: React.FC<{
             setTimeLeft(durationInSeconds);
             setCurrentIndex(0);
             setReportedQuestions(new Set());
+            setLastAnsweredIndex(null);
         }
     }, [questions, initialAttempts, durationInSeconds]);
 
@@ -150,6 +152,7 @@ export const QuizView: React.FC<{
         };
         
         setSessionAttempts(prev => [...prev, newAttempt]);
+        setLastAnsweredIndex(currentIndex);
         onSaveAttempt(newAttempt);
 
         if (isCorrect) {
@@ -410,8 +413,16 @@ export const QuizView: React.FC<{
                         </div>
                     </div>
                 )}
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4 flex-wrap gap-x-4">
                     <h2 className="text-xl font-bold">{quizTitle}</h2>
+                    {lastAnsweredIndex !== null && lastAnsweredIndex !== currentIndex && !isCurrentQuestionAnswered && (
+                        <button 
+                            onClick={() => setCurrentIndex(lastAnsweredIndex)} 
+                            className="text-xs text-cyan-400 hover:underline"
+                        >
+                            Ir para a última respondida (Q{lastAnsweredIndex + 1})
+                        </button>
+                    )}
                     <div className="text-right">
                         <p className="font-semibold">{currentIndex + 1} / {questions.length}</p>
                         {durationInSeconds !== undefined && timeLeft !== undefined && (
