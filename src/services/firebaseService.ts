@@ -101,7 +101,7 @@ export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subj
         callback(Object.values(allSubjects));
     };
 
-    chunks.forEach((chunk, index) => {
+    chunks.forEach((chunk) => {
         const subjectsRef = db.collection('subjects');
         const q = subjectsRef.where('teacherId', 'in', chunk);
         const unsub = q.onSnapshot((querySnapshot) => {
