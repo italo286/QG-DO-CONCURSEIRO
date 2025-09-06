@@ -7,12 +7,14 @@ export const Spinner: React.FC = () => (
     </div>
 );
 
-export const Button: React.FC<{ onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; className?: string; type?: 'button' | 'submit'; disabled?: boolean }> = 
-({ onClick, children, className = '', type = 'button', disabled = false }) => (
+// FIX: Added 'title' to the component's props to allow passing the HTML title attribute.
+export const Button: React.FC<{ onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; className?: string; type?: 'button' | 'submit'; disabled?: boolean; title?: string; }> = 
+({ onClick, children, className = '', type = 'button', disabled = false, title }) => (
     <button
         type={type}
         onClick={onClick}
         disabled={disabled}
+        title={title}
         className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
         {children}

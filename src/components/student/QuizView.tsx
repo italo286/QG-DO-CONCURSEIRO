@@ -73,7 +73,6 @@ export const QuizView: React.FC<{
     const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
     const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
     const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
-    const [lastAnsweredIndex, setLastAnsweredIndex] = useState<number | null>(null);
 
 
     const correctCount = useMemo(() => sessionAttempts.filter(a => a.isCorrect).length, [sessionAttempts]);
@@ -113,7 +112,6 @@ export const QuizView: React.FC<{
             setTimeLeft(durationInSeconds);
             setCurrentIndex(0);
             setReportedQuestions(new Set());
-            setLastAnsweredIndex(null);
         }
     }, [questions, initialAttempts, durationInSeconds]);
 
@@ -152,7 +150,6 @@ export const QuizView: React.FC<{
         };
         
         setSessionAttempts(prev => [...prev, newAttempt]);
-        setLastAnsweredIndex(currentIndex);
         onSaveAttempt(newAttempt);
 
         if (isCorrect) {
@@ -184,6 +181,22 @@ export const QuizView: React.FC<{
         setEliminatedOptions(new Set());
         if (currentIndex > 0) {
             setCurrentIndex(prev => prev - 1);
+        }
+    };
+
+    const handleGoToLastAnswered = () => {
+        const answeredQuestionIds = new Set(sessionAttempts.map(a => a.questionId));
+        if (answeredQuestionIds.size === 0) return;
+
+        for (let i = questions.length - 1; i >= 0; i--) {
+            if (answeredQuestionIds.has(questions[i].id)) {
+                if (i !== currentIndex) {
+                    setCurrentIndex(i);
+                    setSelectedOption(null);
+                    setEliminatedOptions(new Set());
+                }
+                return; 
+            }
         }
     };
 
@@ -415,14 +428,6 @@ export const QuizView: React.FC<{
                 )}
                 <div className="flex justify-between items-center mb-4 flex-wrap gap-x-4">
                     <h2 className="text-xl font-bold">{quizTitle}</h2>
-                    {lastAnsweredIndex !== null && lastAnsweredIndex !== currentIndex && !isCurrentQuestionAnswered && (
-                        <button 
-                            onClick={() => setCurrentIndex(lastAnsweredIndex)} 
-                            className="text-xs text-cyan-400 hover:underline"
-                        >
-                            Ir para a última respondida (Q{lastAnsweredIndex + 1})
-                        </button>
-                    )}
                     <div className="text-right">
                         <p className="font-semibold">{currentIndex + 1} / {questions.length}</p>
                         {durationInSeconds !== undefined && timeLeft !== undefined && (
@@ -523,6 +528,18 @@ export const QuizView: React.FC<{
                     <Button onClick={handlePrevious} disabled={currentIndex === 0} className="bg-gray-600 hover:bg-gray-500">
                         <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
                     </Button>
+
+                    {!showResults && (
+                        <Button
+                            onClick={handleGoToLastAnswered}
+                            disabled={sessionAttempts.length === 0}
+                            className="bg-gray-600 hover:bg-gray-500 text-sm py-2 px-4"
+                            title="Ir para a última questão respondida"
+                        >
+                            Última Respondida
+                        </Button>
+                    )}
+
                     {!isCurrentQuestionAnswered ? (
                         <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
                     ) : (
