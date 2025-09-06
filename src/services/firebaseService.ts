@@ -1,5 +1,6 @@
 import { db, storage, firebase } from '../firebaseConfig';
-import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic } from '../types';
+// FIX: Imported Question type to resolve reference error.
+import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic, Question } from '../types';
 
 type Unsubscribe = () => void;
 // type Timestamp = firebase.firestore.Timestamp; // This was being used incorrectly as timestamps are stored as numbers
@@ -87,12 +88,41 @@ export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subj
         callback([]);
         return () => {}; // Return a no-op unsubscribe function
     }
-    const subjectsRef = db.collection('subjects');
-    const q = subjectsRef.where('teacherId', 'in', teacherIds);
-     return q.onSnapshot((querySnapshot) => {
-        const subjects = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
-        callback(subjects);
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < teacherIds.length; i += 10) {
+        chunks.push(teacherIds.slice(i, i + 10));
+    }
+
+    const allSubjects: { [id: string]: Subject } = {};
+    const unsubs: Unsubscribe[] = [];
+
+    const processAndCallback = () => {
+        callback(Object.values(allSubjects));
+    };
+
+    chunks.forEach((chunk, index) => {
+        const subjectsRef = db.collection('subjects');
+        const q = subjectsRef.where('teacherId', 'in', chunk);
+        const unsub = q.onSnapshot((querySnapshot) => {
+            // Remove old subjects from this chunk to handle deletions
+            Object.keys(allSubjects).forEach(id => {
+                const subject = allSubjects[id];
+                if (chunk.includes(subject.teacherId)) {
+                    delete allSubjects[id];
+                }
+            });
+            // Add new/updated subjects
+            querySnapshot.docs.forEach(doc => {
+                const subject = { id: doc.id, ...doc.data() } as Subject;
+                allSubjects[subject.id] = subject;
+            });
+            processAndCallback();
+        });
+        unsubs.push(unsub);
     });
+    
+    return () => unsubs.forEach(unsub => unsub());
 };
 
 export const saveSubject = async (subjectData: Omit<Subject, 'id'>): Promise<Subject> => {
@@ -128,10 +158,11 @@ export const updateSubjectQuestion = async (
         
         const newTopics = subjectData.topics.map(topic => {
             const findAndModifyQuestion = (contentItem: Topic | SubTopic): Topic | SubTopic | null => {
-                if (contentItem.id !== topicId) return null;
+                const originalTopicId = topicId.replace('-tec', '');
+                if (contentItem.id !== originalTopicId) return null;
 
                 const questionListKey = isTec ? 'tecQuestions' : 'questions';
-                const questions = contentItem[questionListKey];
+                const questions = contentItem[questionListKey as keyof typeof contentItem] as Question[] | undefined;
                 if (!questions) return null;
 
                 const questionIndex = questions.findIndex(q => q.id === questionId);
@@ -364,17 +395,23 @@ export const listenToMessagesForTeachers = (teacherIds: string[], callback: (mes
 export const listenToMessagesForStudent = (studentId: string, teacherIds: string[], callback: (messages: TeacherMessage[]) => void): Unsubscribe => {
     const messagesRef = db.collection('messages');
     
+    // Listener for direct messages to the student
     const studentMessagesQ = messagesRef.where('studentId', '==', studentId);
-    
-    const broadcastMessagesQ = teacherIds.length > 0 
-        ? messagesRef.where('studentId', '==', null).where('teacherId', 'in', teacherIds)
-        : null;
+
+    // Chunking logic for broadcast messages
+    const chunks: string[][] = [];
+    if (teacherIds.length > 0) {
+        for (let i = 0; i < teacherIds.length; i += 10) {
+            chunks.push(teacherIds.slice(i, i + 10));
+        }
+    }
 
     let studentMessages: TeacherMessage[] = [];
-    let broadcastMessages: TeacherMessage[] = [];
+    const broadcastMessagesByChunk: { [key: number]: TeacherMessage[] } = {};
 
     const processAndCallback = () => {
-        const combined = [...studentMessages, ...broadcastMessages];
+        const allBroadcasts = Object.values(broadcastMessagesByChunk).flat();
+        const combined = [...studentMessages, ...allBroadcasts];
         const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
         const filtered = unique.filter(msg => !msg.deletedBy?.includes(studentId) && msg.type !== 'system');
         
@@ -392,21 +429,25 @@ export const listenToMessagesForStudent = (studentId: string, teacherIds: string
         processAndCallback();
     });
 
-    let unsubBroadcast: Unsubscribe = () => {};
-    if (broadcastMessagesQ) {
-        unsubBroadcast = broadcastMessagesQ.onSnapshot(snap => {
-            broadcastMessages = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherMessage));
+    const broadcastUnsubs = chunks.map((chunk, index) => {
+        const broadcastQ = messagesRef.where('studentId', '==', null).where('teacherId', 'in', chunk);
+        return broadcastQ.onSnapshot(snap => {
+            broadcastMessagesByChunk[index] = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherMessage));
             processAndCallback();
         });
-    } else {
+    });
+    
+    // If there are no teachers, we still need to process student DMs
+    if (chunks.length === 0) {
         processAndCallback();
     }
     
     return () => {
         unsubStudent();
-        unsubBroadcast();
+        broadcastUnsubs.forEach(unsub => unsub());
     };
 };
+
 
 export const deleteMessageForUser = async (messageId: string, userId: string): Promise<void> => {
     const messageRef = db.collection('messages').doc(messageId);
