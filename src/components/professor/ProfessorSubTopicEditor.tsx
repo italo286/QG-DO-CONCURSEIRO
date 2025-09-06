@@ -102,22 +102,29 @@ export const ProfessorSubTopicEditor: React.FC<{
         setEditingSubTopic(prev => {
             if (!prev) return null;
             
-            const updateQuestions = (questions: Question[] | undefined) => {
-                if (!questions) return undefined;
-                return questions.map(q => {
+            const updatedSubTopic = { ...prev };
+    
+            // Process `questions`
+            updatedSubTopic.questions = updatedSubTopic.questions.map(q => {
+                if (q.id === questionId) {
+                    const { reportInfo, ...rest } = q;
+                    return rest;
+                }
+                return q;
+            });
+    
+            // Process `tecQuestions` only if it exists
+            if (updatedSubTopic.tecQuestions) {
+                updatedSubTopic.tecQuestions = updatedSubTopic.tecQuestions.map(q => {
                     if (q.id === questionId) {
                         const { reportInfo, ...rest } = q;
                         return rest;
                     }
                     return q;
                 });
-            };
+            }
     
-            return {
-                ...prev,
-                questions: updateQuestions(prev.questions) as Question[],
-                tecQuestions: updateQuestions(prev.tecQuestions)
-            };
+            return updatedSubTopic;
         });
     };
 
