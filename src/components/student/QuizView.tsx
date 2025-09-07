@@ -31,6 +31,10 @@ const PORTUGUESE_HIGHLIGHT_COLORS = [
     'bg-pink-500/30',
 ];
 
+const isInsideWebView = () => {
+    return window.Android && typeof window.Android.downloadPdf === 'function';
+};
+
 export const QuizView: React.FC<{
     questions: Question[];
     initialAttempts: QuestionAttempt[];
@@ -275,24 +279,27 @@ export const QuizView: React.FC<{
     const handleCloseFeedbackModal = useCallback(() => setIsFeedbackModalOpen(false), []);
     
     const handleGeneratePdf = async () => {
-        if (questions.length === 0) {
-            alert("Este quiz não possui questões para gerar um PDF.");
-            return;
-        }
         setIsGeneratingPdf(true);
         try {
             const topicName = quizTitle.replace(/^(Questões de Conteúdo: |Questões Extraídas?: )/, '');
             const dataUri = generateQuestionsPdf(questions, topicName, subjectName);
+    
             if (dataUri) {
-                const link = document.createElement('a');
-                link.href = dataUri;
-                link.download = `${topicName}.pdf`;
-                document.body.appendChild(link);
-                link.click();
-                document.body.removeChild(link);
+                if (isInsideWebView()) {
+                    const base64Data = dataUri.split(',')[1];
+                    const fileName = `${topicName}.pdf`;
+                    window.Android!.downloadPdf(base64Data, fileName);
+                } else {
+                    const link = document.createElement('a');
+                    link.href = dataUri;
+                    link.download = `${topicName}.pdf`;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                }
             }
         } catch (error) {
-            console.error("Failed to generate PDF:", error);
+            console.error("Erro ao gerar PDF:", error);
             alert("Ocorreu um erro ao gerar o PDF.");
         } finally {
             setIsGeneratingPdf(false);

@@ -311,5 +311,8 @@ declare global {
   interface Window {
     customGoBack?: () => boolean; 
     androidGoBack?: () => boolean;
+    Android?: {
+      downloadPdf: (base64Data: string, fileName: string) => void;
+    };
   }
 }
