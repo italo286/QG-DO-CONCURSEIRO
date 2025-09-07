@@ -1224,13 +1224,18 @@ export const generatePortugueseChallenge = async (questionCount: number): Promis
     const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
     1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
     2. A frase deve ser dividida em 5 partes (alternativas).
-    3. A alternativa correta é o trecho que contém o erro.
-    4. A justificativa deve explicar claramente qual é o erro e como corrigi-lo.
+    3. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    4. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+    5. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
     
     Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
     Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
     Resposta Correta: "que aguardavam"
     Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
+    OptionJustifications: [
+        { "option": "A multidão,", "justification": "Este trecho não contém erros." },
+        { "option": "que aguardavam", "justification": "O verbo 'aguardar' deveria estar no singular ('aguardava') para concordar com 'A multidão'." }
+    ]
 
     Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
     `;
@@ -1247,14 +1252,24 @@ export const generatePortugueseChallenge = async (questionCount: number): Promis
 
     const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
 
-    // Unlike other quizzes, the order of options MATTERS here. So, no shuffling.
-    return generatedQuestions.map((q: any) => ({
-        statement: q.statement,
-        options: q.options, 
-        correctAnswer: q.correctAnswer,
-        justification: q.justification,
-        optionJustifications: {},
-    }));
+    return generatedQuestions.map((q: any) => {
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (Array.isArray(q.optionJustifications)) {
+            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                if (item.option && item.justification) {
+                    cleanedOptionJustifications[item.option] = item.justification;
+                }
+            });
+        }
+        
+        return {
+            statement: q.statement,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            justification: q.justification,
+            optionJustifications: cleanedOptionJustifications,
+        };
+    });
 };
 
 export const analyzeTopicFrequencies = async (

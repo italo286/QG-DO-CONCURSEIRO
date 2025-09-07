@@ -3,6 +3,14 @@ import { PdfFile } from '../../types';
 import { XCircleIcon, DownloadIcon, ArrowsExpandIcon } from '../Icons';
 import { parseGoogleDriveUrl } from '../../utils';
 
+// Função para verificar se está rodando na WebView
+// Você pode colocar isso em um arquivo de utilitários
+const isInsideWebView = () => {
+    // A WebView do Android por padrão inclui "; wv" no User Agent
+    return /; wv\)/.test(navigator.userAgent);
+};
+
+
 export const PdfViewer: React.FC<{ file: PdfFile }> = ({ file }) => {
     if (!file.url) {
         return (
@@ -26,11 +34,15 @@ export const PdfViewer: React.FC<{ file: PdfFile }> = ({ file }) => {
         ? googleDriveUrls.downloadUrl
         : file.url;
 
+    // Não precisamos mais da fullscreenUrl, pois vamos esconder o botão
     const fullscreenUrl = googleDriveUrls
         ? googleDriveUrls.embedUrl
         : file.url;
 
     const displayedFileName = file.fileName;
+
+    // Variavel para controlar a visibilidade do botão
+    const showFullscreenButton = !isInsideWebView();
 
     return (
         <div className="bg-gray-900 rounded-lg h-full flex flex-col">
@@ -43,10 +55,16 @@ export const PdfViewer: React.FC<{ file: PdfFile }> = ({ file }) => {
                         <DownloadIcon className="h-5 w-5" />
                         <span className="sr-only">Baixar PDF</span>
                     </a>
-                    <a href={fullscreenUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white" title="Abrir em nova aba">
-                        <ArrowsExpandIcon className="h-5 w-5" />
-                        <span className="sr-only">Abrir em nova aba</span>
-                    </a>
+                    
+                    {/* // --- ALTERAÇÃO AQUI --- // */}
+                    {/* // O botão só será renderizado se não estiver na WebView */}
+                    {showFullscreenButton && (
+                         <a href={fullscreenUrl} target="_blank" rel="noopener noreferrer" className="p-2 text-gray-400 hover:text-white" title="Abrir em nova aba">
+                            <ArrowsExpandIcon className="h-5 w-5" />
+                            <span className="sr-only">Abrir em nova aba</span>
+                        </a>
+                    )}
+
                 </div>
             </div>
             <div className="flex-grow min-h-0">

@@ -344,7 +344,10 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
 
             if (score >= 0.6) { // 60% to pass
                 challenge.isCompleted = true;
-                addXp(XP_CONFIG.DAILY_CHALLENGE_COMPLETE, 'Desafio Diário Concluído!');
+                const xpAmount = XP_CONFIG.DAILY_CHALLENGE_COMPLETE;
+                newProgress.xp = (newProgress.xp || 0) + xpAmount;
+                setXpToasts(prev => [...prev, { id: Date.now(), amount: xpAmount, message: 'Desafio Diário Concluído!' }]);
+                setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
             }
             setDailyChallengeResults({ questions: challenge.items, sessionAttempts: finalAttempts });
             changeView('daily_challenge_results');
