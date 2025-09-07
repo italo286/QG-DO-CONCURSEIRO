@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
@@ -460,6 +459,81 @@ export const generateQuestionsFromText = async (
     }
 };
 
+export const generateCustomQuizQuestions = async (params: {
+    source: { type: 'theme'; content: string } | { type: 'text'; content: string } | { type: 'pdf'; content: string };
+    questionCount: number;
+    questionType: 'multiple_choice' | 'true_false';
+    numAlternatives?: number;
+    difficulty: 'Fácil' | 'Médio' | 'Difícil' | 'Misto';
+}): Promise<Omit<Question, 'id'>[]> => {
+    try {
+        const { source, questionCount, questionType, numAlternatives, difficulty } = params;
+
+        const optionsDescription = questionType === 'true_false'
+            ? "exatamente 2 alternativas ('Certo', 'Errado')"
+            : `exatamente ${numAlternatives || 5} alternativas de resposta`;
+
+        let contents: any;
+
+        const basePrompt = `Aja como um especialista em criar provas para concursos públicos. Gere um array JSON de ${questionCount} questões do tipo "${questionType === 'true_false' ? 'Certo ou Errado' : 'Múltipla Escolha'}" no nível de dificuldade "${difficulty}". As questões devem ser bem elaboradas, no estilo de concurso, e com alternativas plausíveis que testem o conhecimento do candidato. Cada questão deve ter: um enunciado claro, ${optionsDescription}, a resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification'), e um array 'optionJustifications' com justificativas para CADA alternativa. Siga estritamente o schema JSON fornecido.`;
+
+        if (source.type === 'theme') {
+            const prompt = `${basePrompt} O tema das questões deve ser: "${source.content}".`;
+            contents = prompt;
+        } else {
+            const sourcePrompt = `Com base no conteúdo do ${source.type === 'pdf' ? 'documento PDF' : 'texto'} a seguir, ${basePrompt.toLowerCase()}`;
+            if (source.type === 'pdf') {
+                contents = { parts: [{ text: sourcePrompt }, { inlineData: { mimeType: 'application/pdf', data: source.content } }] };
+            } else { // text
+                contents = `${sourcePrompt}\n\nTexto: """${source.content}"""`;
+            }
+        }
+        
+        const customQuestionSchema = JSON.parse(JSON.stringify(questionSchema)); // Deep copy
+        if (questionType === 'multiple_choice' && numAlternatives) {
+            customQuestionSchema.items.properties.options.description = `Um array com exatamente ${numAlternatives} alternativas de resposta.`;
+        }
+
+        // FIX: Added explicit type GenerateContentResponse to the response object.
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: contents,
+            config: {
+                responseMimeType: "application/json",
+                responseSchema: customQuestionSchema,
+            }
+        }));
+
+        const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+
+        return generatedQuestions.slice(0, questionCount).map((q: any) => {
+            const cleanedOptions = (q.options || []).map(stripOptionPrefix);
+            const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
+            
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (Array.isArray(q.optionJustifications)) {
+                q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                    if (item.option && item.justification) {
+                        cleanedOptionJustifications[stripOptionPrefix(item.option)] = item.justification;
+                    }
+                });
+            }
+            
+            return {
+                statement: q.statement,
+                options: shuffleArray(cleanedOptions),
+                correctAnswer: cleanedCorrectAnswer,
+                justification: q.justification,
+                optionJustifications: cleanedOptionJustifications,
+            };
+        });
+
+    } catch (error) {
+        console.error("Erro ao gerar questões personalizadas com a IA:", error);
+        throw new Error("Não foi possível gerar as questões. A API pode estar sobrecarregada ou os parâmetros são inválidos. Tente novamente.");
+    }
+};
+
 export const extractQuestionsFromTecPdf = async (
     pdfBase64: string,
     _generateJustifications: boolean
@@ -478,6 +552,7 @@ export const extractQuestionsFromTecPdf = async (
             text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
         };
 
+        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart, pdfPart] },
@@ -525,6 +600,7 @@ export const extractQuestionsFromTecText = async (
 
         const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
 
+        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -1114,6 +1190,7 @@ export const generateAdaptiveStudyPlan = async (
         \`\`\`
     `;
 
+    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1130,6 +1207,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const textPart = { text: "Analise este documento PDF e extraia os termos chave e suas definições para criar um glossário. Formate a saída como um array JSON, seguindo estritamente o schema." };
 
+    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
@@ -1157,6 +1235,7 @@ export const generatePortugueseChallenge = async (questionCount: number): Promis
     Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
     `;
     
+    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1196,6 +1275,7 @@ export const analyzeTopicFrequencies = async (
         Siga estritamente o schema JSON fornecido.
     `;
 
+    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,

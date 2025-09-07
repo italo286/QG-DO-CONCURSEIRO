@@ -4,7 +4,7 @@ import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
 import { LoginPage } from './components/auth';
 import { ProfessorDashboard } from './components/ProfessorDashboard';
-import { StudentDashboard } from './components/student/PaineldoAluno';
+import { PaineldoAluno } from './components/student/PaineldoAluno';
 import { Spinner } from './components/ui';
 
 export const App = () => {
@@ -67,7 +67,7 @@ export const App = () => {
     }
     
     if (isStudentView && currentUser.role === 'professor') {
-        return <StudentDashboard 
+        return <PaineldoAluno 
             user={currentUser} 
             onLogout={() => {}} 
             onUpdateUser={() => {}} 
@@ -80,5 +80,5 @@ export const App = () => {
         return <ProfessorDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
     }
     
-    return <StudentDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
+    return <PaineldoAluno user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
 };

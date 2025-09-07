@@ -180,6 +180,15 @@ export interface DailyChallenge<T> {
     sessionAttempts?: QuestionAttempt[];
 }
 
+export interface CustomQuiz {
+  id: string;
+  name: string;
+  questions: Question[];
+  isCompleted: boolean;
+  attempts?: QuestionAttempt[];
+  createdAt: number; // timestamp
+}
+
 export interface StudentProgress {
   studentId: string;
   progressByTopic: {
@@ -205,6 +214,7 @@ export interface StudentProgress {
       }
   };
   customGames: MiniGame[];
+  customQuizzes?: CustomQuiz[];
   targetCargoByCourse?: { [courseId: string]: string; };
   aiGeneratedFlashcards?: Flashcard[];
   srsFlashcardData?: {

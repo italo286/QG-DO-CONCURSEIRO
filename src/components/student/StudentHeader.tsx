@@ -3,8 +3,7 @@ import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
 import { LogoutIcon, PencilIcon, UserCircleIcon, ChevronDownIcon } from '../Icons';
 
-// FIX: Added 'daily_challenge_results' to ViewType to match the state in StudentDashboard.tsx
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
 interface StudentHeaderProps {
     user: User;
@@ -39,6 +38,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const navigationItems = [
         { label: 'Início', view: 'dashboard' as const },
         { label: 'Revisões', view: 'reviews' as const },
+        { label: 'Questões', view: 'custom_quiz_list' as const },
         { label: 'Cronograma', view: 'schedule' as const },
         { label: 'Jogos', view: 'games' as const },
         { label: 'Desempenho', view: 'performance' as const },
@@ -66,10 +66,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             case 'schedule': return 'Meu Cronograma';
             case 'games': return 'Meus Jogos';
             case 'performance': return 'Meu Desempenho';
-            // FIX: Added cases for more specific views to improve header text.
             case 'review_quiz': return 'Sessão de Revisão';
             case 'daily_challenge_quiz': return 'Desafio Diário';
             case 'daily_challenge_results': return 'Resultados do Desafio';
+            case 'custom_quiz_list': return 'Minhas Questões';
+            case 'custom_quiz_player': return 'Quiz Personalizado';
             default: return 'QG do Concurseiro';
         }
     };

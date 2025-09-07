@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt
+    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz
 } from '../../types';
 import { getLocalDateISOString } from '../../utils';
 
@@ -15,8 +15,9 @@ import { SubjectView } from './views/SubjectView';
 import { CourseView } from './views/CourseView';
 import { DashboardHome } from './views/DashboardHome';
 import { DailyChallengeResultsView } from './views/DailyChallengeResultsView';
+import { CustomQuizListView } from './views/CustomQuizListView';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
 interface StudentViewRouterProps {
     view: ViewType;
@@ -41,6 +42,7 @@ interface StudentViewRouterProps {
     isSplitView: boolean;
     isSidebarCollapsed: boolean;
     quizInstanceKey: number;
+    activeCustomQuiz: CustomQuiz | null;
 
     // Callbacks
     onAcknowledgeMessage: (messageId: string) => void;
@@ -79,6 +81,11 @@ interface StudentViewRouterProps {
     handleGameError: () => void;
     onReportQuestion: (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => void;
     onCloseDailyChallengeResults: () => void;
+    onOpenCreator: () => void;
+    onStartQuiz: (quiz: CustomQuiz) => void;
+    onDeleteQuiz: (quizId: string) => void;
+    saveCustomQuizAttempt: (attempt: QuestionAttempt) => void;
+    handleCustomQuizComplete: (finalAttempts: QuestionAttempt[]) => void;
 }
 
 export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
@@ -95,7 +102,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         const correctQuestionIds = new Set<string>();
         const incorrectQuestionIds = new Set<string>();
         const allAttempts = [
-            ...Object.values(props.studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt)),
+            ...Object.values(props.studentProgress.progressByTopic).flatMap((s: any) => Object.values(s).flatMap((t: any) => t.lastAttempt)),
             ...props.studentProgress.reviewSessions.flatMap(r => r.attempts || [])
         ];
         allAttempts.forEach(attempt => {
@@ -188,6 +195,26 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
         case 'games':
             return <GamesView {...props} />;
+        case 'custom_quiz_list':
+            return <CustomQuizListView 
+                studentProgress={props.studentProgress}
+                onStartQuiz={props.onStartQuiz}
+                onDeleteQuiz={props.onDeleteQuiz}
+                onOpenCreator={props.onOpenCreator}
+            />;
+        case 'custom_quiz_player':
+            if (!props.activeCustomQuiz) return null;
+            return <QuizView
+                key={props.quizInstanceKey}
+                questions={props.activeCustomQuiz.questions}
+                initialAttempts={props.activeCustomQuiz.attempts || []}
+                onSaveAttempt={props.saveCustomQuizAttempt}
+                onComplete={props.handleCustomQuizComplete}
+                onBack={() => props.setView('custom_quiz_list')}
+                quizTitle={props.activeCustomQuiz.name}
+                subjectName="Quiz Personalizado"
+                onAddBonusXp={props.onAddBonusXp}
+            />;
         default:
             return <DashboardHome {...props} />;
     }

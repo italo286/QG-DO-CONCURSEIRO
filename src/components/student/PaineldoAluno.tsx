@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import * as GeminiService from '../../services/geminiService';
-import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard } from '../../types';
+import { User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Badge, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, MessageReply, GlossaryTerm, Flashcard, CustomQuiz } from '../../types';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import { XP_CONFIG, ALL_BADGES, calculateLevel, getLevelTitle, SRS_INTERVALS, TOPIC_BADGES } from '../../gamification';
 
@@ -20,6 +20,7 @@ import { NewMessageModal } from './NewMessageModal';
 import { StudentViewRouter } from './StudentViewRouter';
 import { StudentHeader } from './StudentHeader';
 import { AiAssistant } from './AiAssistant';
+import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 
 const shuffle = <T,>(array: T[]): T[] => {
     const newArray = [...array];
@@ -30,7 +31,7 @@ const shuffle = <T,>(array: T[]): T[] => {
     return newArray;
 };
 
-interface StudentDashboardProps {
+interface PaineldoAlunoProps {
     user: User; 
     onLogout: () => void; 
     onUpdateUser: (user: User) => void;
@@ -38,7 +39,9 @@ interface StudentDashboardProps {
     onToggleStudentView?: () => void;
 }
 
-export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onToggleStudentView }: StudentDashboardProps) => {
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
+
+export const PaineldoAluno = ({ user, onLogout, onUpdateUser, isPreview, onToggleStudentView }: PaineldoAlunoProps) => {
     // --- State Management ---
     const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
     const [allStudents, setAllStudents] = useState<User[]>([]);
@@ -51,7 +54,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
     const [teacherProfiles, setTeacherProfiles] = useState<User[]>([]);
     
     // --- View & Selection State ---
-    const [view, setView] = useState<'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results'>('dashboard');
+    const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -60,7 +63,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
     const [quizInstanceKey, setQuizInstanceKey] = useState(0);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
-
+    const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
 
     // --- UI State & Modals ---
     const [isGeneratingReview, setIsGeneratingReview] = useState(false);
@@ -69,6 +72,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame; topicId: string; } | null>(null);
     const [editingCustomGame, setEditingCustomGame] = useState<MiniGame | null>(null);
     const [isCustomGameModalOpen, setIsCustomGameModalOpen] = useState(false);
+    const [isQuizCreatorModalOpen, setIsQuizCreatorModalOpen] = useState(false);
     const [xpToasts, setXpToasts] = useState<{ id: number; amount: number; message?: string }[]>([]);
     const [isChatModalOpen, setIsChatModalOpen] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
@@ -396,13 +400,9 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
         
         const correctQuestionIds = new Set<string>();
         const incorrectQuestionIds = new Set<string>();
-
-        type TopicProgress = { lastAttempt: QuestionAttempt[] };
-        type SubjectTopicProgress = { [topicId: string]: TopicProgress };
-
         const allAttempts: QuestionAttempt[] = [
             ...Object.values(studentProgress.progressByTopic).flatMap(
-                (s: SubjectTopicProgress) => Object.values(s).flatMap((t: TopicProgress) => t.lastAttempt)
+                (s: { [key: string]: { lastAttempt: QuestionAttempt[] } }) => Object.values(s).flatMap(t => t.lastAttempt)
             ),
             ...studentProgress.reviewSessions.flatMap((r: ReviewSession) => r.attempts || [])
         ];
@@ -472,7 +472,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
             newChallengeState.isCompleted = true;
             updateStudentProgress(newProgress, studentProgress, xpGained, "Desafio Diário Completo!");
         } else {
-            setStudentProgress(prev => {
+            setStudentProgress((prev: StudentProgress | null) => {
                 if (!prev) return null;
                 const updatedProgress = { ...prev };
                 (updatedProgress as any)[challengeKey] = newChallengeState;
@@ -765,6 +765,9 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
         } else if (view === 'subject') {
             setView('course');
             setSelectedSubject(null);
+        } else if (view === 'custom_quiz_player') {
+            setView('custom_quiz_list');
+            setActiveCustomQuiz(null);
         } else {
             setView('dashboard');
             setSelectedCourse(null);
@@ -772,6 +775,7 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
             setSelectedTopic(null);
             setSelectedSubtopic(null);
             setSelectedReview(null);
+            setActiveCustomQuiz(null);
         }
     };
 
@@ -969,6 +973,77 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
         }
     };
     
+    // --- Custom Quiz Handlers ---
+    const handleSaveCustomQuiz = (quiz: CustomQuiz) => {
+        if (isPreview || !studentProgress) return;
+        const newProgress = {
+            ...studentProgress,
+            customQuizzes: [...(studentProgress.customQuizzes || []), quiz]
+        };
+        updateStudentProgress(newProgress, studentProgress);
+        showXpToast(0, `Quiz "${quiz.name}" criado!`);
+    };
+
+    const handleDeleteCustomQuiz = (quizId: string) => {
+        if (isPreview || !studentProgress || !window.confirm("Tem certeza que deseja apagar este quiz?")) return;
+        const newProgress = {
+            ...studentProgress,
+            customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId)
+        };
+        updateStudentProgress(newProgress, studentProgress);
+        showXpToast(0, `Quiz apagado.`);
+    };
+
+    const handleStartCustomQuiz = (quiz: CustomQuiz) => {
+        if (isPreview) return;
+        // If redoing, reset progress
+        const quizToStart = quiz.isCompleted ? { ...quiz, isCompleted: false, attempts: [] } : quiz;
+        setActiveCustomQuiz(quizToStart);
+        setQuizInstanceKey(prev => prev + 1); // Force remount of QuizView
+        setView('custom_quiz_player');
+    };
+
+    const saveCustomQuizAttempt = (attempt: QuestionAttempt) => {
+        if (isPreview || !studentProgress || !activeCustomQuiz) return;
+        
+        let currentAttempts = activeCustomQuiz.attempts || [];
+        const attemptIndex = currentAttempts.findIndex(a => a.questionId === attempt.questionId);
+        if (attemptIndex > -1) {
+            currentAttempts[attemptIndex] = attempt;
+        } else {
+            currentAttempts.push(attempt);
+        }
+        
+        const updatedQuiz = { ...activeCustomQuiz, attempts: currentAttempts };
+        setActiveCustomQuiz(updatedQuiz); // Update local state for the current session
+
+        // Also update the master list in studentProgress
+        const newProgress = {
+            ...studentProgress,
+            customQuizzes: (studentProgress.customQuizzes || []).map(q => q.id === updatedQuiz.id ? updatedQuiz : q)
+        };
+        
+        FirebaseService.saveStudentProgress(newProgress); 
+        setStudentProgress(newProgress);
+    };
+
+    const handleCustomQuizComplete = (finalAttempts: QuestionAttempt[]) => {
+        if (isPreview || !studentProgress || !activeCustomQuiz) return;
+
+        const correctCount = finalAttempts.filter(a => a.isCorrect).length;
+        const xpGained = correctCount * 5;
+
+        const updatedQuiz = { ...activeCustomQuiz, attempts: finalAttempts, isCompleted: true };
+        const newProgress = {
+            ...studentProgress,
+            xp: studentProgress.xp + xpGained,
+            customQuizzes: (studentProgress.customQuizzes || []).map(q => q.id === updatedQuiz.id ? updatedQuiz : q)
+        };
+        
+        updateStudentProgress(newProgress, studentProgress, xpGained, `Quiz concluído!`);
+    };
+
+
     if (isLoading || !studentProgress) {
         return <div className="min-h-screen flex items-center justify-center"><Spinner /></div>
     }
@@ -1056,12 +1131,23 @@ export const StudentDashboard = ({ user, onLogout, onUpdateUser, isPreview, onTo
                     onReportQuestion={handleReportQuestion}
                     dailyChallengeResults={dailyChallengeResults}
                     onCloseDailyChallengeResults={handleCloseDailyChallengeResults}
+                    activeCustomQuiz={activeCustomQuiz}
+                    onOpenCreator={() => setIsQuizCreatorModalOpen(true)}
+                    onStartQuiz={handleStartCustomQuiz}
+                    onDeleteQuiz={handleDeleteCustomQuiz}
+                    saveCustomQuizAttempt={saveCustomQuizAttempt}
+                    handleCustomQuizComplete={handleCustomQuizComplete}
                 />
             </main>
             
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={handleProfileSave} />
             {playingGame && <StudentGamePlayerModal isOpen={!!playingGame} onClose={() => setPlayingGame(null)} game={playingGame.game} onGameComplete={handleGameComplete} onGameError={handleGameError} />}
             {isCustomGameModalOpen && <StudentGameEditorModal isOpen={isCustomGameModalOpen} onClose={() => setIsCustomGameModalOpen(false)} game={editingCustomGame} onSave={handleCustomGameSave} />}
+            <StudentCustomQuizCreatorModal 
+                isOpen={isQuizCreatorModalOpen} 
+                onClose={() => setIsQuizCreatorModalOpen(false)}
+                onSave={handleSaveCustomQuiz}
+            />
             <NewMessageModal 
                 isOpen={isNewMessageModalOpen}
                 onClose={() => setIsNewMessageModalOpen(false)}
