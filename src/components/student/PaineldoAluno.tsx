@@ -52,6 +52,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [quizToDeleteId, setQuizToDeleteId] = useState<string | null>(null);
+    const [gameToDeleteId, setGameToDeleteId] = useState<string | null>(null);
     
     const [levelUpInfo, setLevelUpInfo] = useState<{ level: number; title: string } | null>(null);
     const [awardedBadges, setAwardedBadges] = useState<any[]>([]);
@@ -75,6 +76,11 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         if (!quizToDeleteId || !studentProgress?.customQuizzes) return null;
         return studentProgress.customQuizzes.find(q => q.id === quizToDeleteId);
     }, [quizToDeleteId, studentProgress]);
+
+    const gameInfoForDeleteModal = useMemo(() => {
+        if (!gameToDeleteId || !studentProgress?.customGames) return null;
+        return studentProgress.customGames.find(g => g.id === gameToDeleteId);
+    }, [gameToDeleteId, studentProgress]);
 
     useEffect(() => { if (!isSplitView) { setIsSidebarCollapsed(false); } }, [isSplitView]);
     
@@ -485,6 +491,17 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setQuizToDeleteId(null);
     }, [studentProgress, quizToDeleteId, handleUpdateStudentProgress]);
     
+    const handleDeleteCustomGame = useCallback((gameId: string) => {
+        setGameToDeleteId(gameId);
+    }, []);
+
+    const confirmDeleteGame = useCallback(() => {
+        if (!studentProgress || !gameToDeleteId) return;
+        const updatedGames = (studentProgress.customGames || []).filter(g => g.id !== gameToDeleteId);
+        handleUpdateStudentProgress({ ...studentProgress, customGames: updatedGames });
+        setGameToDeleteId(null);
+    }, [studentProgress, gameToDeleteId, handleUpdateStudentProgress]);
+
     const handleToggleTopicCompletion = useCallback((subjectId: string, topicId: string, isCompleted: boolean) => {
         if (!studentProgress) return;
         const newProgress = JSON.parse(JSON.stringify(studentProgress));
@@ -596,7 +613,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     handleDailyChallengeComplete={handleDailyChallengeComplete}
                     onAddBonusXp={addXp}
                     onPlayGame={onPlayGame}
-                    onDeleteCustomGame={() => {}}
+                    onDeleteCustomGame={handleDeleteCustomGame}
                     onOpenCustomGameModal={() => {}}
                     onSelectTargetCargo={onSelectTargetCargo}
                     onNoteSave={handleNoteSave}
@@ -643,6 +660,25 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                                 Cancelar
                             </Button>
                             <Button onClick={confirmDeleteQuiz} className="bg-red-600 hover:bg-red-700">
+                                Apagar
+                            </Button>
+                        </div>
+                    </div>
+                </Modal>
+            )}
+            {gameInfoForDeleteModal && (
+                <Modal
+                    isOpen={!!gameToDeleteId}
+                    onClose={() => setGameToDeleteId(null)}
+                    title="Confirmar Exclusão"
+                >
+                    <div className="space-y-4">
+                        <p>Tem certeza que deseja apagar o jogo "{gameInfoForDeleteModal.name}"? Esta ação não pode ser desfeita.</p>
+                        <div className="flex justify-end gap-4 pt-4">
+                            <Button onClick={() => setGameToDeleteId(null)} className="bg-gray-600 hover:bg-gray-500">
+                                Cancelar
+                            </Button>
+                            <Button onClick={confirmDeleteGame} className="bg-red-600 hover:bg-red-700">
                                 Apagar
                             </Button>
                         </div>
