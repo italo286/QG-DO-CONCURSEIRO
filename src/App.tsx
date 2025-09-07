@@ -4,6 +4,7 @@ import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
 import { LoginPage } from './components/auth';
 import { ProfessorDashboard } from './components/ProfessorDashboard';
+// FIX: Corrected import to a valid component module.
 import { PaineldoAluno } from './components/student/PaineldoAluno';
 import { Spinner } from './components/ui';
 
