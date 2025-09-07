@@ -256,7 +256,9 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
             <header className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
-                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
+                    <button onClick={handleBackToDashboard} aria-label="Voltar para o início">
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
+                    </button>
                     <div>
                         <h1 className="text-3xl font-bold text-white">Painel do Professor</h1>
                         <p className="text-gray-400">Gerencie seus cursos, disciplinas e alunos.</p>
@@ -305,7 +307,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             </header>
             
             <main>
-                {view !== 'courses' && view !== 'subjects' && (
+                {view !== 'courses' && (
                     <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>

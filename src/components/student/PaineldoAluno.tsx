@@ -82,6 +82,19 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         if (newView !== 'topic') setIsSplitView(false);
         setHistory(prev => [...prev, newView]);
     };
+
+    const handleGoHome = () => {
+        setView('dashboard');
+        setHistory(['dashboard']);
+        setSelectedCourse(null);
+        setSelectedSubject(null);
+        setSelectedTopic(null);
+        setSelectedSubtopic(null);
+        setSelectedReview(null);
+        setActiveChallenge(null);
+        setDailyChallengeResults(null);
+        setActiveCustomQuiz(null);
+    };
     
     const handleBack = () => {
         if (isSplitView) {
@@ -326,6 +339,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                 selectedCourseName={selectedCourse?.name}
                 onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={handleBack}
                 isLogoutIcon={(history.length <= 1 && !isPreview)}
+                onGoHome={handleGoHome}
             />
             <main>
                 <StudentViewRouter

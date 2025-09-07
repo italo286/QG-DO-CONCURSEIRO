@@ -15,6 +15,7 @@ interface StudentHeaderProps {
     onOpenProfile: () => void;
     onLogout: () => void;
     isLogoutIcon: boolean;
+    onGoHome: () => void;
 }
 
 export const StudentHeader: React.FC<StudentHeaderProps> = ({
@@ -27,6 +28,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     onOpenProfile,
     onLogout,
     isLogoutIcon,
+    onGoHome,
 }) => {
     const [isNavOpen, setIsNavOpen] = useState(false);
     const navRef = useRef<HTMLDivElement>(null);
@@ -78,7 +80,9 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     return (
         <header className="flex justify-between items-center mb-6 md:mb-8 gap-4">
             <div className="flex items-center gap-4 flex-grow min-w-0">
-                <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md flex-shrink-0" />
+                <button onClick={onGoHome} aria-label="Voltar para o painel inicial">
+                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md flex-shrink-0" />
+                </button>
                 <div className="flex-grow min-w-0">
                     <h1 className="text-2xl md:text-3xl font-bold text-white truncate">{getHeaderText()}</h1>
                     <div className="w-full mt-2">
