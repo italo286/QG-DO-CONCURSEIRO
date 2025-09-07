@@ -21,6 +21,7 @@ import { AiAssistant } from './AiAssistant';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 import { calculateLevel, getLevelTitle, XP_CONFIG, ALL_BADGES, SRS_INTERVALS } from '../../gamification';
 import { getLocalDateISOString } from '../../utils';
+import { ArrowRightIcon } from '../Icons';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
@@ -102,24 +103,33 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             return;
         }
 
-        const isLoggingOut = history.length <= 1 && !isPreview;
-        if (isLoggingOut) {
-            onLogout(); // This will use the prop from App.tsx
-            return;
-        }
-
         if (history.length > 1) {
             const newHistory = [...history];
             newHistory.pop();
             const prevView = newHistory[newHistory.length - 1];
-            if (prevView === 'dashboard') { setSelectedCourse(null); setSelectedSubject(null); setSelectedTopic(null); setSelectedSubtopic(null); } 
-            else if (prevView === 'course') { setSelectedSubject(null); setSelectedTopic(null); setSelectedSubtopic(null); } 
-            else if (prevView === 'subject') { setSelectedTopic(null); setSelectedSubtopic(null); }
-             else if (view === 'custom_quiz_player') { setView('custom_quiz_list'); return; }
+            
+            // Reset state when going back to broader views
+            if (prevView === 'dashboard') {
+                setSelectedCourse(null);
+                setSelectedSubject(null);
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            } else if (prevView === 'course') {
+                setSelectedSubject(null);
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            } else if (prevView === 'subject') {
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            }
+
             setView(prevView);
             setHistory(newHistory);
         } else if (isPreview && onToggleStudentView) {
             onToggleStudentView();
+        } else {
+            // Fallback to home if back is pressed at the root view
+            handleGoHome();
         }
     };
     
@@ -328,6 +338,32 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         handleUpdateStudentProgress(newProgress);
     };
 
+    const handleStartQuiz = useCallback((quiz: CustomQuiz) => {
+        if (!studentProgress) return;
+
+        let quizToStart = quiz;
+        
+        // If the quiz is being redone, reset its state
+        if (quiz.isCompleted) {
+            quizToStart = {
+                ...quiz,
+                isCompleted: false,
+                attempts: [],
+            };
+    
+            const updatedQuizzes = (studentProgress.customQuizzes || []).map(q =>
+                q.id === quiz.id ? quizToStart : q
+            );
+            const newProgress = { ...studentProgress, customQuizzes: updatedQuizzes };
+            
+            handleUpdateStudentProgress(newProgress);
+        }
+        
+        setActiveCustomQuiz(quizToStart);
+        setQuizInstanceKey(Date.now());
+        changeView('custom_quiz_player');
+    }, [studentProgress, handleUpdateStudentProgress]);
+
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900">Erro ao carregar dados do aluno.</div>;
 
@@ -337,11 +373,16 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                 user={user} studentProgress={studentProgress} view={view} onSetView={changeView}
                 selectedTopicName={selectedSubtopic?.name || selectedTopic?.name}
                 selectedCourseName={selectedCourse?.name}
-                onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={handleBack}
-                isLogoutIcon={(history.length <= 1 && !isPreview)}
+                onOpenProfile={() => setIsProfileModalOpen(true)} 
+                onLogout={onLogout}
                 onGoHome={handleGoHome}
             />
             <main>
+                {view !== 'dashboard' && (
+                    <button onClick={handleBack} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    </button>
+                )}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress}
                     enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject}
@@ -384,7 +425,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onReportQuestion={onReportQuestion}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
                     onOpenCreator={handleOpenCustomQuizCreator}
-                    onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); changeView('custom_quiz_player'); }}
+                    onStartQuiz={handleStartQuiz}
                     onDeleteQuiz={handleDeleteCustomQuiz}
                     saveCustomQuizAttempt={() => {}}
                     handleCustomQuizComplete={() => {}}

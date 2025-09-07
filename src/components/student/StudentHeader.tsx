@@ -14,7 +14,6 @@ interface StudentHeaderProps {
     onSetView: (view: ViewType) => void;
     onOpenProfile: () => void;
     onLogout: () => void;
-    isLogoutIcon: boolean;
     onGoHome: () => void;
 }
 
@@ -27,7 +26,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     onSetView,
     onOpenProfile,
     onLogout,
-    isLogoutIcon,
     onGoHome,
 }) => {
     const [isNavOpen, setIsNavOpen] = useState(false);
@@ -128,7 +126,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 </button>
                 <button onClick={onLogout} className="flex items-center text-sm text-cyan-400 hover:text-cyan-300">
                     <LogoutIcon className="h-5 w-5 mr-1" aria-hidden="true" />
-                    {isLogoutIcon ? 'Sair' : 'Voltar'}
+                    Sair
                 </button>
             </div>
         </header>
