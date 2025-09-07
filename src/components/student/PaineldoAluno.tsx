@@ -379,7 +379,10 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             />
             <main>
                 {view !== 'dashboard' && (
-                    <button onClick={handleBack} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                    <button
+                        onClick={handleBack}
+                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-cyan-700 hover:bg-cyan-800 focus:outline-none mb-6"
+                    >
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}

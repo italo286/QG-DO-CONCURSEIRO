@@ -180,7 +180,7 @@ export const StudentCustomQuizCreatorModal: React.FC<StudentCustomQuizCreatorMod
                         <h3 className="text-lg font-semibold">{generatedQuestions.length} questões foram geradas!</h3>
                         <p className="text-sm text-gray-400">Clique em "Salvar Quiz" para adicioná-lo à sua lista.</p>
                         <div className="pt-4 flex justify-end">
-                            <Button onClick={handleSave} disabled={!quizName.trim()}>Salvar Quiz</Button>
+                            <Button onClick={handleSave}>Salvar Quiz</Button>
                         </div>
                     </div>
                 )}
