@@ -306,3 +306,10 @@ export interface ChatMessage {
     role: 'user' | 'model';
     text: string;
 }
+
+declare global {
+  interface Window {
+    customGoBack?: () => boolean; 
+    androidGoBack?: () => boolean;
+  }
+}

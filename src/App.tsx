@@ -8,6 +8,13 @@ import { ProfessorDashboard } from './components/ProfessorDashboard';
 import { PaineldoAluno } from './components/student/PaineldoAluno';
 import { Spinner } from './components/ui';
 
+window.androidGoBack = () => {
+  if (window.customGoBack && typeof window.customGoBack === 'function') {
+    return window.customGoBack();
+  }
+  return false;
+};
+
 export const App = () => {
     const [currentUser, setCurrentUser] = useState<User | null>(null);
     const [isLoading, setIsLoading] = useState(true);

@@ -77,11 +77,33 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
         }
     };
 
-    const handleBackToDashboard = () => {
+    const handleBackToDashboard = useCallback(() => {
         setSelectedCourse(null);
         setSelectedSubject(null);
         setView('courses');
-    };
+    }, []);
+
+    const handleBack = useCallback((): boolean => {
+        if (view !== 'courses') {
+            if (view.startsWith('edit_')) {
+                setView(view.endsWith('course') ? 'courses' : 'subjects');
+            } else {
+                handleBackToDashboard();
+            }
+            return true;
+        }
+        return false;
+    }, [view, handleBackToDashboard]);
+
+    useEffect(() => {
+        window.customGoBack = handleBack;
+        return () => {
+            if (window.customGoBack === handleBack) {
+                window.customGoBack = undefined;
+            }
+        };
+    }, [handleBack]);
+
 
     const handleSaveNewCourse = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -308,7 +330,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             
             <main>
                 {view !== 'courses' && (
-                    <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                    <button onClick={handleBack} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}

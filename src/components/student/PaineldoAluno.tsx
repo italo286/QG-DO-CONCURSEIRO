@@ -103,10 +103,10 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setActiveCustomQuiz(null);
     };
     
-    const handleBack = () => {
+    const handleBack = useCallback((): boolean => {
         if (isSplitView) {
             setIsSplitView(false);
-            return;
+            return true;
         }
 
         if (history.length > 1) {
@@ -131,13 +131,26 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
 
             setView(prevView);
             setHistory(newHistory);
-        } else if (isPreview && onToggleStudentView) {
-            onToggleStudentView();
-        } else {
-            // Fallback to home if back is pressed at the root view
-            handleGoHome();
+            return true;
         }
-    };
+
+        if (isPreview && onToggleStudentView) {
+            onToggleStudentView();
+            return true;
+        }
+
+        return false;
+    }, [history, isSplitView, isPreview, onToggleStudentView]);
+
+    useEffect(() => {
+        window.customGoBack = handleBack;
+        return () => {
+            if (window.customGoBack === handleBack) {
+                window.customGoBack = undefined;
+            }
+        };
+    }, [handleBack]);
+
     
     const handleTopicSelect = (topic: Topic | SubTopic, parent?: Topic) => {
         if ('subtopics' in topic) { // It's a Topic
