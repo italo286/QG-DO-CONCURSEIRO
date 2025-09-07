@@ -14,6 +14,7 @@ import { LevelUpModal } from './LevelUpModal';
 import { BadgeAwardModal } from './BadgeAwardModal';
 import { XpToastDisplay } from './XpToastDisplay';
 import { StudentGamePlayerModal } from './StudentGamePlayerModal';
+// FIX: Corrected import to a valid component module.
 import { MessageThreadModal } from '../MessageThreadModal';
 import { NewMessageModal } from './NewMessageModal';
 import { AiAssistant } from './AiAssistant';
