@@ -188,9 +188,27 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     
     const handleNoteSave = (contentId: string, content: string) => { if (studentProgress) handleUpdateStudentProgress({ ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } }); };
     
-    const saveQuizProgress = (_subjectId: string, _topicId: string, attempt: QuestionAttempt) => {
+    const saveQuizProgress = (subjectId: string, topicId: string, attempt: QuestionAttempt) => {
         if (!studentProgress) return;
         const newProgress = JSON.parse(JSON.stringify(studentProgress));
+
+        // START: BUG FIX - Save individual attempt to topic progress
+        if (!newProgress.progressByTopic[subjectId]) {
+            newProgress.progressByTopic[subjectId] = {};
+        }
+        if (!newProgress.progressByTopic[subjectId][topicId]) {
+            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
+        }
+        const existingAttempts = newProgress.progressByTopic[subjectId][topicId].lastAttempt || [];
+        const attemptIndex = existingAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
+        if (attemptIndex > -1) {
+            existingAttempts[attemptIndex] = attempt;
+        } else {
+            existingAttempts.push(attempt);
+        }
+        newProgress.progressByTopic[subjectId][topicId].lastAttempt = existingAttempts;
+        // END: BUG FIX
+
         const today = getLocalDateISOString(new Date());
         newProgress.dailyActivity[today] = newProgress.dailyActivity[today] || { questionsAnswered: 0 };
         newProgress.dailyActivity[today].questionsAnswered++;
@@ -207,7 +225,18 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         if (!studentProgress) return;
         const score = attempts.length > 0 ? attempts.filter(a => a.isCorrect).length / attempts.length : 0;
         const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        
+        // START: BUG FIX - Ensure progress structure exists and save final state
+        if (!newProgress.progressByTopic[subjectId]) {
+            newProgress.progressByTopic[subjectId] = {};
+        }
+        if (!newProgress.progressByTopic[subjectId][topicId]) {
+            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
+        }
         newProgress.progressByTopic[subjectId][topicId].score = score;
+        newProgress.progressByTopic[subjectId][topicId].lastAttempt = attempts;
+        // END: BUG FIX
+        
         if (score >= 0.7 && !newProgress.progressByTopic[subjectId][topicId].completed) {
             newProgress.progressByTopic[subjectId][topicId].completed = true;
             addXp(XP_CONFIG.TOPIC_COMPLETE, 'Tópico Concluído!');
@@ -215,6 +244,117 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         handleUpdateStudentProgress(newProgress);
     };
     
+    const saveReviewProgress = (reviewId: string, attempt: QuestionAttempt) => {
+        if (!studentProgress) return;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        const reviewIndex = newProgress.reviewSessions.findIndex((r: ReviewSession) => r.id === reviewId);
+        if (reviewIndex > -1) {
+            const review = newProgress.reviewSessions[reviewIndex];
+            if (!review.attempts) review.attempts = [];
+            const attemptIndex = review.attempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
+            if(attemptIndex > -1) {
+                review.attempts[attemptIndex] = attempt;
+            } else {
+                review.attempts.push(attempt);
+            }
+        }
+        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_REVIEW_ANSWER);
+        handleUpdateStudentProgress(newProgress);
+    };
+    
+    const handleReviewQuizComplete = (reviewId: string, attempts: QuestionAttempt[]) => {
+        if (!studentProgress) return;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        const reviewIndex = newProgress.reviewSessions.findIndex((r: ReviewSession) => r.id === reviewId);
+        if (reviewIndex > -1) {
+            newProgress.reviewSessions[reviewIndex].isCompleted = true;
+            newProgress.reviewSessions[reviewIndex].attempts = attempts;
+            addXp(XP_CONFIG.REVIEW_SESSION_COMPLETE, 'Revisão Concluída!');
+        }
+        handleUpdateStudentProgress(newProgress);
+    };
+    
+    const onSaveDailyChallengeAttempt = (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => {
+        if (!studentProgress) return;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        
+        const challengeKey = `${challengeType}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+        const challenge = newProgress[challengeKey];
+
+        if (challenge) {
+            if (!challenge.sessionAttempts) challenge.sessionAttempts = [];
+            
+            const attemptIndex = challenge.sessionAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
+            if (attemptIndex > -1) {
+                challenge.sessionAttempts[attemptIndex] = attempt;
+            } else {
+                challenge.sessionAttempts.push(attempt);
+            }
+        }
+        
+        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
+        handleUpdateStudentProgress(newProgress);
+    };
+
+    const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[]) => {
+        if (!studentProgress || !activeChallenge) return;
+
+        const { type } = activeChallenge;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        const challengeKey = `${type}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+        const challenge = newProgress[challengeKey];
+
+        if (challenge) {
+            challenge.sessionAttempts = finalAttempts;
+            challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
+            const score = finalAttempts.length > 0 ? finalAttempts.filter(a => a.isCorrect).length / finalAttempts.length : 0;
+
+            if (score >= 0.6) { // 60% to pass
+                challenge.isCompleted = true;
+                addXp(XP_CONFIG.DAILY_CHALLENGE_COMPLETE, 'Desafio Diário Concluído!');
+            }
+            setDailyChallengeResults({ questions: challenge.items, sessionAttempts: finalAttempts });
+            changeView('daily_challenge_results');
+        }
+        handleUpdateStudentProgress(newProgress);
+    };
+
+    const saveCustomQuizAttempt = (attempt: QuestionAttempt) => {
+        if (!studentProgress || !activeCustomQuiz) return;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        
+        const quizIndex = (newProgress.customQuizzes || []).findIndex((q: CustomQuiz) => q.id === activeCustomQuiz.id);
+        if (quizIndex > -1) {
+            const quiz = newProgress.customQuizzes[quizIndex];
+            if (!quiz.attempts) quiz.attempts = [];
+            
+            const attemptIndex = quiz.attempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
+            if (attemptIndex > -1) {
+                quiz.attempts[attemptIndex] = attempt;
+            } else {
+                quiz.attempts.push(attempt);
+            }
+        }
+        
+        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
+        handleUpdateStudentProgress(newProgress);
+    };
+    
+    const handleCustomQuizComplete = (finalAttempts: QuestionAttempt[]) => {
+        if (!studentProgress || !activeCustomQuiz) return;
+        
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        const quizIndex = (newProgress.customQuizzes || []).findIndex((q: CustomQuiz) => q.id === activeCustomQuiz.id);
+        
+        if (quizIndex > -1) {
+            newProgress.customQuizzes[quizIndex].isCompleted = true;
+            newProgress.customQuizzes[quizIndex].attempts = finalAttempts;
+        }
+        
+        handleUpdateStudentProgress(newProgress);
+    };
+
+
     const handleStartDailyChallenge = (type: 'review' | 'glossary' | 'portuguese') => {
         if(!studentProgress) return;
         const challenge = type === 'review' ? studentProgress.reviewChallenge : type === 'glossary' ? studentProgress.glossaryChallenge : studentProgress.portugueseChallenge;
@@ -407,10 +547,10 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onFlashcardReview={(flashcardId, performance) => { if(!studentProgress) return; const newProgress = JSON.parse(JSON.stringify(studentProgress)); const srsData = newProgress.srsFlashcardData[flashcardId] || {stage: 0}; const newStage = performance === 'good' ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1); const nextReview = new Date(); nextReview.setDate(nextReview.getDate() + SRS_INTERVALS[newStage]); newProgress.srsFlashcardData[flashcardId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) }; handleUpdateStudentProgress(newProgress); }}
                     onUpdateStudentProgress={handleUpdateStudentProgress}
                     saveQuizProgress={saveQuizProgress}
-                    saveReviewProgress={() => {}}
+                    saveReviewProgress={saveReviewProgress}
                     handleTopicQuizComplete={handleTopicQuizComplete}
-                    handleReviewQuizComplete={() => {}}
-                    handleDailyChallengeComplete={() => {}}
+                    handleReviewQuizComplete={handleReviewQuizComplete}
+                    handleDailyChallengeComplete={handleDailyChallengeComplete}
                     onAddBonusXp={addXp}
                     onPlayGame={onPlayGame}
                     onDeleteCustomGame={() => {}}
@@ -422,7 +562,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     setView={changeView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={() => {}}
+                    onSaveDailyChallengeAttempt={onSaveDailyChallengeAttempt}
                     handleGameComplete={handleGameComplete}
                     handleGameError={handleGameError}
                     onReportQuestion={onReportQuestion}
@@ -430,8 +570,8 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onOpenCreator={handleOpenCustomQuizCreator}
                     onStartQuiz={handleStartQuiz}
                     onDeleteQuiz={handleDeleteCustomQuiz}
-                    saveCustomQuizAttempt={() => {}}
-                    handleCustomQuizComplete={() => {}}
+                    saveCustomQuizAttempt={saveCustomQuizAttempt}
+                    handleCustomQuizComplete={handleCustomQuizComplete}
                 />
             </main>
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
