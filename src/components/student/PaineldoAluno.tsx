@@ -20,7 +20,7 @@ import { NewMessageModal } from './NewMessageModal';
 import { AiAssistant } from './AiAssistant';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 import { calculateLevel, getLevelTitle, XP_CONFIG, ALL_BADGES, SRS_INTERVALS } from '../../gamification';
-import { getLocalDateISOString } from '../../utils';
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 import { ArrowRightIcon } from '../Icons';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
@@ -170,9 +170,20 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const handleUpdateStudentProgress = useCallback(async (newProgress: StudentProgress, fromState: StudentProgress | null = studentProgress) => {
         if (isPreview) { setStudentProgress(newProgress); return; }
         if (fromState) {
-            if (calculateLevel(newProgress.xp) > calculateLevel(fromState.xp)) setLevelUpInfo({ level: calculateLevel(newProgress.xp), title: getLevelTitle(calculateLevel(newProgress.xp)) });
-            const newlyAwardedBadges = Object.keys(ALL_BADGES).filter(id => !fromState.earnedBadgeIds.includes(id) && ALL_BADGES[id].condition(newProgress, allSubjects, allStudentProgress)).map(id => ({...ALL_BADGES[id], id}));
-            if(newlyAwardedBadges.length > 0) setAwardedBadges(prev => [...prev, ...newlyAwardedBadges]);
+            if (calculateLevel(newProgress.xp) > calculateLevel(fromState.xp)) {
+                setLevelUpInfo({ level: calculateLevel(newProgress.xp), title: getLevelTitle(calculateLevel(newProgress.xp)) });
+            }
+            
+            const newlyAwardedBadges = Object.keys(ALL_BADGES)
+                .filter(id => !(fromState.earnedBadgeIds || []).includes(id) && ALL_BADGES[id].condition(newProgress, allSubjects, allStudentProgress))
+                .map(id => ({ ...ALL_BADGES[id], id }));
+                
+            if (newlyAwardedBadges.length > 0) {
+                setAwardedBadges(prev => [...prev, ...newlyAwardedBadges]);
+                const newBadgeIds = newlyAwardedBadges.map(b => b.id);
+                // This is the fix. Add the new badges to the progress object itself.
+                newProgress.earnedBadgeIds = [...(newProgress.earnedBadgeIds || []), ...newBadgeIds];
+            }
         }
         setStudentProgress(newProgress);
         await FirebaseService.saveStudentProgress(newProgress);
@@ -209,13 +220,13 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         newProgress.progressByTopic[subjectId][topicId].lastAttempt = existingAttempts;
         // END: BUG FIX
 
-        const today = getLocalDateISOString(new Date());
+        const today = getLocalDateISOString(getBrasiliaDate());
         newProgress.dailyActivity[today] = newProgress.dailyActivity[today] || { questionsAnswered: 0 };
         newProgress.dailyActivity[today].questionsAnswered++;
         const srsData = newProgress.srsData[attempt.questionId] || { stage: 0 };
         const newStage = attempt.isCorrect ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1);
-        const nextReview = new Date();
-        nextReview.setDate(nextReview.getDate() + SRS_INTERVALS[newStage]);
+        const nextReview = getBrasiliaDate();
+        nextReview.setUTCDate(nextReview.getUTCDate() + SRS_INTERVALS[newStage]);
         newProgress.srsData[attempt.questionId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) };
         if(attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
         handleUpdateStudentProgress(newProgress);
@@ -235,7 +246,23 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         }
         newProgress.progressByTopic[subjectId][topicId].score = score;
         newProgress.progressByTopic[subjectId][topicId].lastAttempt = attempts;
-        // END: BUG FIX
+        
+        // BUG FIX: Award topic medals based on score
+        if (!newProgress.earnedTopicBadgeIds) {
+            newProgress.earnedTopicBadgeIds = {};
+        }
+        const earnedBadges = new Set(newProgress.earnedTopicBadgeIds[topicId] || []);
+        if (score === 1) {
+            earnedBadges.add('gold');
+            earnedBadges.add('silver');
+            earnedBadges.add('bronze');
+        } else if (score >= 0.9) {
+            earnedBadges.add('silver');
+            earnedBadges.add('bronze');
+        } else if (score >= 0.7) {
+            earnedBadges.add('bronze');
+        }
+        newProgress.earnedTopicBadgeIds[topicId] = Array.from(earnedBadges);
         
         if (score >= 0.7 && !newProgress.progressByTopic[subjectId][topicId].completed) {
             newProgress.progressByTopic[subjectId][topicId].completed = true;
@@ -503,6 +530,22 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setQuizInstanceKey(Date.now());
         changeView('custom_quiz_player');
     }, [studentProgress, handleUpdateStudentProgress]);
+    
+    // Callback for SRS Flashcard review
+    const onFlashcardReview = (flashcardId: string, performance: 'good' | 'bad') => {
+        if (!studentProgress) return;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        
+        // BUG FIX: Initialize srsFlashcardData if it doesn't exist
+        newProgress.srsFlashcardData = newProgress.srsFlashcardData || {};
+        
+        const srsData = newProgress.srsFlashcardData[flashcardId] || { stage: 0 };
+        const newStage = performance === 'good' ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1);
+        const nextReview = getBrasiliaDate();
+        nextReview.setUTCDate(nextReview.getUTCDate() + SRS_INTERVALS[newStage]);
+        newProgress.srsFlashcardData[flashcardId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) };
+        handleUpdateStudentProgress(newProgress);
+    };
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900">Erro ao carregar dados do aluno.</div>;
@@ -544,7 +587,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onGenerateSmartReview={onGenerateSmartReview}
                     onGenerateSrsReview={(questions) => { if(questions.length > 0) setSelectedReview({id: `srs-${Date.now()}`, name: "Revisão Diária (SRS)", type: 'srs', createdAt: Date.now(), questions, isCompleted: false}); changeView('review_quiz'); }}
                     onGenerateSmartFlashcards={onGenerateSmartFlashcards}
-                    onFlashcardReview={(flashcardId, performance) => { if(!studentProgress) return; const newProgress = JSON.parse(JSON.stringify(studentProgress)); const srsData = newProgress.srsFlashcardData[flashcardId] || {stage: 0}; const newStage = performance === 'good' ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1); const nextReview = new Date(); nextReview.setDate(nextReview.getDate() + SRS_INTERVALS[newStage]); newProgress.srsFlashcardData[flashcardId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) }; handleUpdateStudentProgress(newProgress); }}
+                    onFlashcardReview={onFlashcardReview}
                     onUpdateStudentProgress={handleUpdateStudentProgress}
                     saveQuizProgress={saveQuizProgress}
                     saveReviewProgress={saveReviewProgress}

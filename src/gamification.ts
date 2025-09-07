@@ -1,6 +1,6 @@
 import React from "react";
 import { StudentProgress, Subject } from "./types";
-import { getLocalDateISOString } from './utils';
+import { getBrasiliaDate, getLocalDateISOString } from './utils';
 import { 
     StarIcon,
     FireIcon,
@@ -62,10 +62,9 @@ export const ALL_BADGES: {
     'marathoner-50': { name: 'Maratonista', description: 'Respondeu 50 questões em um dia.', icon: FireIcon, condition: (p) => Object.values(p.dailyActivity).some((d: {questionsAnswered: number}) => d.questionsAnswered >= 50) },
     'streaker-3': { name: 'Focado', description: 'Estudou por 3 dias seguidos.', icon: BrainIcon, condition: (p) => {
         let consecutiveDays = 0;
-        const today = new Date();
         for (let i = 0; i < 3; i++) {
-            const checkDate = new Date(today);
-            checkDate.setDate(today.getDate() - i);
+            const checkDate = getBrasiliaDate(); // Get current Brasilia date
+            checkDate.setUTCDate(checkDate.getUTCDate() - i); // Set it to i days ago
             const dateStr = getLocalDateISOString(checkDate);
             if (p.dailyActivity[dateStr] && p.dailyActivity[dateStr].questionsAnswered > 0) {
                 consecutiveDays++;
@@ -77,10 +76,9 @@ export const ALL_BADGES: {
     }},
     'streaker-7': { name: 'Dedicação Diária', description: 'Estudou por 7 dias seguidos.', icon: CalendarIcon, condition: (p) => {
         let consecutiveDays = 0;
-        const today = new Date();
         for (let i = 0; i < 7; i++) {
-            const checkDate = new Date(today);
-            checkDate.setDate(today.getDate() - i);
+            const checkDate = getBrasiliaDate(); // Get current Brasilia date
+            checkDate.setUTCDate(checkDate.getUTCDate() - i); // Set it to i days ago
             const dateStr = getLocalDateISOString(checkDate);
             if (p.dailyActivity[dateStr] && p.dailyActivity[dateStr].questionsAnswered > 0) {
                 consecutiveDays++;
