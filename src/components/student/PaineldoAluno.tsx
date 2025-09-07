@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     User, Subject, Topic, SubTopic, Course, ReviewSession, Question, QuestionAttempt,
-    MiniGame, CustomQuiz, Flashcard, TeacherMessage, StudyPlan, StudentProgress
+    MiniGame, CustomQuiz, TeacherMessage, StudentProgress
 } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as GeminiService from '../../services/geminiService';
@@ -83,7 +83,17 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     };
     
     const handleBack = () => {
-        if(isSplitView) { setIsSplitView(false); return; }
+        if (isSplitView) {
+            setIsSplitView(false);
+            return;
+        }
+
+        const isLoggingOut = history.length <= 1 && !isPreview;
+        if (isLoggingOut) {
+            onLogout(); // This will use the prop from App.tsx
+            return;
+        }
+
         if (history.length > 1) {
             const newHistory = [...history];
             newHistory.pop();
@@ -154,7 +164,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     
     const handleNoteSave = (contentId: string, content: string) => { if (studentProgress) handleUpdateStudentProgress({ ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } }); };
     
-    const saveQuizProgress = (subjectId: string, topicId: string, attempt: QuestionAttempt) => {
+    const saveQuizProgress = (_subjectId: string, _topicId: string, attempt: QuestionAttempt) => {
         if (!studentProgress) return;
         const newProgress = JSON.parse(JSON.stringify(studentProgress));
         const today = getLocalDateISOString(new Date());
