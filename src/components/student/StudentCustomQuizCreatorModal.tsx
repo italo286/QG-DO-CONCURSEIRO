@@ -50,7 +50,7 @@ export const StudentCustomQuizCreatorModal: React.FC<StudentCustomQuizCreatorMod
         setIsLoading(true);
         setGeneratedQuestions(null);
 
-        let source: any;
+        let source: { type: 'theme'; content: string } | { type: 'text'; content: string } | { type: 'pdf'; content: string };
         if (sourceType === 'theme') {
             if (!theme.trim()) { setError('Por favor, digite um tema.'); setIsLoading(false); return; }
             source = { type: 'theme', content: theme };
