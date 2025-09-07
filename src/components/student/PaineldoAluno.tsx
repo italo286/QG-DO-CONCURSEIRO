@@ -68,6 +68,12 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
 
+    // FIX: Moved useMemo to the top of the component with other hooks to prevent conditional rendering errors.
+    const quizInfoForDeleteModal = useMemo(() => {
+        if (!quizToDeleteId || !studentProgress?.customQuizzes) return null;
+        return studentProgress.customQuizzes.find(q => q.id === quizToDeleteId);
+    }, [quizToDeleteId, studentProgress]);
+
     useEffect(() => { if (!isSplitView) { setIsSidebarCollapsed(false); } }, [isSplitView]);
     
     const changeView = (newView: ViewType) => {
@@ -293,7 +299,6 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const onGenerateSmartFlashcards = async (questions: Question[]) => {
         if (!studentProgress) return;
         const cards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-        // FIX: Add a unique 'id' to each generated flashcard to match the Flashcard type, resolving a type error.
         const cardsWithIds = cards.map(c => ({...c, id: `fc-ai-${Date.now()}-${Math.random()}`}));
         const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...cardsWithIds] };
         handleUpdateStudentProgress(newProgress);
@@ -301,11 +306,6 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900">Erro ao carregar dados do aluno.</div>;
-
-    const quizInfoForDeleteModal = useMemo(() => {
-        if (!quizToDeleteId || !studentProgress?.customQuizzes) return null;
-        return studentProgress.customQuizzes.find(q => q.id === quizToDeleteId);
-    }, [quizToDeleteId, studentProgress?.customQuizzes]);
 
     return (
         <div className="p-4 md:p-8 max-w-screen-2xl mx-auto">
