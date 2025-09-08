@@ -15,14 +15,6 @@ const shuffle = <T,>(array: T[]): T[] => {
     return newArray;
 };
 
-// Helper to format date as YYYY-MM-DD
-const toYYYYMMDD = (date: Date) => {
-    const y = date.getFullYear();
-    const m = String(date.getMonth() + 1).padStart(2, '0');
-    const d = String(date.getDate()).padStart(2, '0');
-    return `${y}-${m}-${d}`;
-};
-
 
 export const useStudentData = (user: User, isPreview?: boolean) => {
     const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
@@ -101,32 +93,29 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         const checkAndGenerateChallenges = async () => {
             if (isPreview || !studentProgress || allSubjects.length === 0 || enrolledCourses.length === 0) return;
 
-            // --- BLOCO DE LÓGICA DE TEMPO CORRIGIDO ---
-            const nowInBrasilia = getBrasiliaDate(); // Hora atual já em Brasília
-            const todayInBrasiliaISO = toYYYYMMDD(nowInBrasilia); // Data de hoje em Brasília (ex: "2025-09-08")
+            const now = getBrasiliaDate();
+            const todayISO = getLocalDateISOString(now);
 
             const preferredTimeStr = studentProgress.dailyChallengeTime || '06:00';
+            const [hours, minutes] = preferredTimeStr.split(':').map(Number);
+            const generationTime = getBrasiliaDate();
+            generationTime.setUTCHours(hours, minutes, 0, 0);
 
-            // Constrói a data/hora de gatilho de hoje em Brasília de forma explícita e segura
-            const triggerDateTimeString = `${todayInBrasiliaISO}T${preferredTimeStr}:00.000-03:00`;
-            const triggerTime = new Date(triggerDateTimeString);
-
-            // Se ainda não chegou a hora de gerar os desafios de hoje, pare a execução.
-            if (nowInBrasilia.getTime() < triggerTime.getTime()) {
-                console.log(`Ainda não chegou o horário de geração (${preferredTimeStr}) em Brasília.`);
-                return;
+            if (now.getTime() < generationTime.getTime()) {
+                return; // Not time yet to generate today's challenges
             }
-            // --- FIM DO BLOCO DE LÓGICA DE TEMPO CORRIGIDO ---
 
             let needsUpdate = false;
             const newProgress = JSON.parse(JSON.stringify(studentProgress));
 
             // --- Review Challenge ---
             const currentReviewChallenge = studentProgress.reviewChallenge;
-            if (!currentReviewChallenge || currentReviewChallenge.date !== todayInBrasiliaISO) {
+            if (!currentReviewChallenge || currentReviewChallenge.date !== todayISO) {
                 const mode = studentProgress.dailyReviewMode || 'standard';
                 const questionCount = studentProgress.advancedReviewQuestionCount || 5;
                 let questionsForChallenge: Question[] = [];
+
+                // FIX: Corrected type to allow for context properties (subjectId, topicId) on questions.
                 let availableQuestions: typeof allQuestionsWithContext = [];
                 const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
                 
@@ -179,14 +168,14 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 questionsForChallenge = shuffle(finalSelectionPool).slice(0, questionCount);
 
                 if (questionsForChallenge.length > 0) {
-                    newProgress.reviewChallenge = { date: todayInBrasiliaISO, items: questionsForChallenge, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentReviewChallenge && !currentReviewChallenge.isCompleted) ? (currentReviewChallenge.uncompletedCount || 0) + 1 : 0 };
+                    newProgress.reviewChallenge = { date: todayISO, items: questionsForChallenge, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentReviewChallenge && !currentReviewChallenge.isCompleted) ? (currentReviewChallenge.uncompletedCount || 0) + 1 : 0 };
                     needsUpdate = true;
                 }
             }
             
             // --- Glossary Challenge ---
             const currentGlossaryChallenge = studentProgress.glossaryChallenge;
-            if (!currentGlossaryChallenge || currentGlossaryChallenge.date !== todayInBrasiliaISO) {
+            if (!currentGlossaryChallenge || currentGlossaryChallenge.date !== todayISO) {
                 const mode = studentProgress.glossaryChallengeMode || 'standard';
                 const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
                 let availableTerms = allGlossaryTermsWithContext;
@@ -206,13 +195,13 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 if (uniqueTerms.length >= 4) {
                     const selectedTerms = shuffle(uniqueTerms).slice(0, questionCount);
                     const glossaryQuestions: Question[] = selectedTerms.map((correctTerm, index) => {
-                        const distractors = shuffle(uniqueTerms.filter(t => t.term !== correctTerm.term)).slice(0, 3).map(t => t.term);
+                        const distractors = shuffle(uniqueTerms.filter(t => t.term !== correctTerm.term)).slice(0, 4).map(t => t.term);
                         const options = shuffle([correctTerm.term, ...distractors]);
-                        return { id: `gloss-challenge-${todayInBrasiliaISO}-${index}`, statement: `Qual termo corresponde à definição: "${correctTerm.definition}"?`, options, correctAnswer: correctTerm.term, justification: `O termo correto é **${correctTerm.term}**.` };
+                        return { id: `gloss-challenge-${todayISO}-${index}`, statement: `Qual termo corresponde à definição: "${correctTerm.definition}"?`, options, correctAnswer: correctTerm.term, justification: `O termo correto é **${correctTerm.term}**.` };
                     });
 
                     if (glossaryQuestions.length > 0) {
-                        newProgress.glossaryChallenge = { date: todayInBrasiliaISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentGlossaryChallenge && !currentGlossaryChallenge.isCompleted) ? (currentGlossaryChallenge.uncompletedCount || 0) + 1 : 0 };
+                        newProgress.glossaryChallenge = { date: todayISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentGlossaryChallenge && !currentGlossaryChallenge.isCompleted) ? (currentGlossaryChallenge.uncompletedCount || 0) + 1 : 0 };
                         needsUpdate = true;
                     }
                 }
@@ -220,12 +209,12 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
 
             // --- Portuguese Challenge ---
             const currentPortugueseChallenge = studentProgress.portugueseChallenge;
-            if (!currentPortugueseChallenge || currentPortugueseChallenge.date !== todayInBrasiliaISO) {
+            if (!currentPortugueseChallenge || currentPortugueseChallenge.date !== todayISO) {
                 try {
                     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
                     const questions = await GeminiService.generatePortugueseChallenge(questionCount);
                     if (questions.length > 0) {
-                        newProgress.portugueseChallenge = { date: todayInBrasiliaISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayInBrasiliaISO}-${i}` })), isCompleted: false, attemptsMade: 0, uncompletedCount: (currentPortugueseChallenge && !currentPortugueseChallenge.isCompleted) ? (currentPortugueseChallenge.uncompletedCount || 0) + 1 : 0 };
+                        newProgress.portugueseChallenge = { date: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0, uncompletedCount: (currentPortugueseChallenge && !currentPortugueseChallenge.isCompleted) ? (currentPortugueseChallenge.uncompletedCount || 0) + 1 : 0 };
                         needsUpdate = true;
                     }
                 } catch (error) {

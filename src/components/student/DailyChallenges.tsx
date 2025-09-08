@@ -8,28 +8,18 @@ const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
     const [timeLeft, setTimeLeft] = useState('');
 
     useEffect(() => {
-        // O timer é configurado para rodar a cada segundo para manter o contador atualizado
-        const timer = setInterval(() => {
-            // --- BLOCO DE CÁLCULO DE TEMPO CORRIGIDO ---
-            const now = getBrasiliaDate(); // Hora atual já em Brasília
-
-            // Constrói a data/hora alvo de HOJE de forma explícita para evitar ambiguidades
-            // Primeiro, pegamos o dia, mês e ano da data atual em Brasília
-            const todayDateStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+        const calculateAndSetTime = () => {
+            const now = getBrasiliaDate();
             
-            // Agora, criamos a string completa com o horário e o fuso horário de Brasília (-03:00)
-            const targetDateTimeString = `${todayDateStr}T${targetTime}:00.000-03:00`;
-            let targetDate = new Date(targetDateTimeString);
-
-            // Se a hora atual já passou da hora alvo de hoje,
-            // a próxima hora alvo é a mesma hora, mas no dia de AMANHÃ.
+            const [hours, minutes] = targetTime.split(':').map(Number);
+            let targetDate = getBrasiliaDate();
+            targetDate.setUTCHours(hours, minutes, 0, 0);
+            
             if (now.getTime() > targetDate.getTime()) {
-                targetDate.setDate(targetDate.getDate() + 1);
+                targetDate.setUTCDate(targetDate.getUTCDate() + 1);
             }
 
-            // Calcula a diferença em milissegundos
             const difference = targetDate.getTime() - now.getTime();
-
             if (difference > 0) {
                 const h = Math.floor((difference / (1000 * 60 * 60)));
                 const m = Math.floor((difference / 1000 / 60) % 60);
@@ -38,10 +28,11 @@ const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
             } else {
                 setTimeLeft('00:00:00');
             }
-            // --- FIM DO BLOCO CORRIGIDO ---
-        }, 1000);
+        };
 
-        // Limpa o timer quando o componente é desmontado para evitar vazamento de memória
+        calculateAndSetTime();
+        const timer = setInterval(calculateAndSetTime, 1000);
+
         return () => clearInterval(timer);
     }, [targetTime]);
 
