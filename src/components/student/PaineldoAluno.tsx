@@ -1,11 +1,10 @@
-
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
     User, Subject, Topic, SubTopic, Course, ReviewSession, Question,
-    QuestionAttempt, MiniGame, StudentProgress, TeacherMessage, CustomQuiz, Flashcard, Badge
+    QuestionAttempt, MiniGame, StudentProgress, TeacherMessage, CustomQuiz, Badge, StudyPlan
 } from '../../types';
 import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner } from '../ui';
+import { Spinner, Button, Modal } from '../ui';
 import { StudentHeader } from './StudentHeader';
 import { StudentViewRouter } from './StudentViewRouter';
 import { EditProfileModal } from './EditProfileModal';
@@ -20,8 +19,8 @@ import { StudentGameEditorModal } from './StudentGameEditorModal';
 import { CreateCustomQuizModal } from './CreateCustomQuizModal';
 import * as FirebaseService from '../../services/firebaseService';
 import { XP_CONFIG, calculateLevel, getLevelTitle, ALL_BADGES, TOPIC_BADGES, SRS_INTERVALS } from '../../gamification';
-import { getLocalDateISOString } from '../../utils';
-import { Button } from '../ui';
+// FIX: Import 'getBrasiliaDate' to resolve reference error.
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 import { ArrowRightIcon } from '../Icons';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
@@ -49,6 +48,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     } = useStudentData(user, isPreview);
 
     const [view, setView] = useState<ViewType>('dashboard');
+    const [history, setHistory] = useState<ViewType[]>(['dashboard']);
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
@@ -94,15 +94,17 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         const newLevel = calculateLevel(newXp);
 
         setXpToasts(toasts => [...toasts, { id: Date.now(), amount, message }]);
+        setTimeout(() => setXpToasts(t => t.slice(1)), 3000);
 
         if (newLevel > currentLevel) {
             setLevelUpInfo({ newLevel, levelTitle: getLevelTitle(newLevel) });
         }
 
         const updatedProgress = { ...studentProgress, xp: newXp };
-        setStudentProgress(updatedProgress); // update state locally first
-        FirebaseService.saveStudentProgress(updatedProgress); // then save to db
-    }, [studentProgress, isPreview, setStudentProgress]);
+        // We call updateStudentProgress directly here to ensure state consistency
+        updateStudentProgress(updatedProgress, studentProgress);
+
+    }, [studentProgress, isPreview, updateStudentProgress]);
 
 
     const checkForNewBadges = useCallback((progress: StudentProgress, subjects: Subject[]) => {
@@ -128,23 +130,50 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         }
     }, [allStudentProgress, updateStudentProgress]);
     
-    // Check for badges whenever progress changes
     useEffect(() => {
         if (studentProgress && allSubjects.length > 0) {
             checkForNewBadges(studentProgress, allSubjects);
         }
     }, [studentProgress, allSubjects, checkForNewBadges]);
     
-    const handleBack = useCallback(() => {
-        switch(view) {
-            case 'course': setView('dashboard'); setSelectedCourse(null); break;
-            case 'subject': setView('course'); setSelectedSubject(null); break;
-            case 'topic': setView('subject'); setSelectedTopic(null); setSelectedSubtopic(null); break;
-            default: setView('dashboard'); break;
+     const changeView = (newView: ViewType) => {
+        setView(newView);
+        if (newView !== 'topic') setIsSplitView(false);
+        setHistory(prev => [...prev, newView]);
+    };
+
+    const handleBack = useCallback((): boolean => {
+        if (isSplitView && view === 'topic') {
+            setIsSplitView(false);
+            return true;
         }
-        return true;
-    }, [view]);
-    
+
+        if (history.length > 1) {
+            const newHistory = [...history];
+            newHistory.pop();
+            const prevView = newHistory[newHistory.length - 1];
+
+            if (prevView === 'dashboard') {
+                setSelectedCourse(null);
+                setSelectedSubject(null);
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            } else if (prevView === 'course') {
+                setSelectedSubject(null);
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            } else if (prevView === 'subject') {
+                setSelectedTopic(null);
+                setSelectedSubtopic(null);
+            }
+            
+            setView(prevView);
+            setHistory(newHistory);
+            return true;
+        }
+        return false;
+    }, [history, view, isSplitView]);
+
     useEffect(() => {
         window.customGoBack = handleBack;
         return () => { if (window.customGoBack === handleBack) window.customGoBack = undefined; };
@@ -154,52 +183,147 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const handleProfileSave = (updatedUser: User) => { onUpdateUser(updatedUser); };
     const handleLogout = () => { onLogout(); };
     
-    // ... all other handlers
     const onAcknowledgeMessage = (messageId: string) => FirebaseService.acknowledgeMessage(messageId, user.id);
-    const onCourseSelect = (course: Course) => { setSelectedCourse(course); setView('course'); };
-    const onSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); setView('subject'); };
+    const onCourseSelect = (course: Course) => { setSelectedCourse(course); changeView('course'); };
+    const onSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); changeView('subject'); };
     const onTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
         setSelectedTopic(parentTopic || topic as Topic);
         if (parentTopic) setSelectedSubtopic(topic as SubTopic);
         else setSelectedSubtopic(null);
-        setView('topic');
+        changeView('topic');
     };
     
-    const onStartReview = (session: ReviewSession) => { setSelectedReview(session); setView('review_quiz'); };
-    const onGenerateSmartReview = () => {}; // TODO
-    const onGenerateSrsReview = () => {}; // TODO
-    const onGenerateSmartFlashcards = async () => {}; // TODO
-    const onFlashcardReview = () => {}; // TODO
-    const saveQuizProgress = () => {}; // TODO
-    const saveReviewProgress = () => {}; // TODO
-    const handleTopicQuizComplete = () => {}; // TODO
-    const handleReviewQuizComplete = () => {}; // TODO
-    const handleDailyChallengeComplete = () => {}; // TODO
+    const onStartReview = (session: ReviewSession) => { setSelectedReview(session); changeView('review_quiz'); };
+    
+    const saveQuizProgress = (subjectId: string, topicId: string, attempt: QuestionAttempt) => {
+        if (!studentProgress) return;
+        const newProgress = { ...studentProgress };
+        
+        if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
+        if (!newProgress.progressByTopic[subjectId][topicId]) {
+            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
+        }
+        
+        const newAttempts = [...newProgress.progressByTopic[subjectId][topicId].lastAttempt.filter(a => a.questionId !== attempt.questionId), attempt];
+        newProgress.progressByTopic[subjectId][topicId].lastAttempt = newAttempts;
+        
+        // SRS
+        if (!newProgress.srsData) newProgress.srsData = {};
+        const srsData = newProgress.srsData[attempt.questionId] || { stage: 0, nextReviewDate: getLocalDateISOString(new Date()) };
+        srsData.stage = attempt.isCorrect ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1);
+        const interval = SRS_INTERVALS[srsData.stage];
+        const nextReview = new Date();
+        nextReview.setDate(nextReview.getDate() + interval);
+        srsData.nextReviewDate = getLocalDateISOString(nextReview);
+        newProgress.srsData[attempt.questionId] = srsData;
+        
+        // Daily Activity
+        const today = getLocalDateISOString(getBrasiliaDate());
+        if (!newProgress.dailyActivity[today]) newProgress.dailyActivity[today] = { questionsAnswered: 0 };
+        newProgress.dailyActivity[today].questionsAnswered++;
+        
+        updateStudentProgress(newProgress);
+        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
+    };
+
+    const handleTopicQuizComplete = (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => {
+        if (!studentProgress) return;
+        const correctCount = attempts.filter(a => a.isCorrect).length;
+        const score = attempts.length > 0 ? correctCount / attempts.length : 0;
+        
+        const newProgress = { ...studentProgress };
+        if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
+        newProgress.progressByTopic[subjectId][topicId] = { completed: true, score: score, lastAttempt: attempts };
+        
+        addXp(XP_CONFIG.TOPIC_COMPLETE);
+        
+        const newTopicBadges: string[] = [];
+        if (score >= 1.0) newTopicBadges.push('gold');
+        if (score >= 0.9) newTopicBadges.push('silver');
+        if (score >= 0.7) newTopicBadges.push('bronze');
+        
+        if (newTopicBadges.length > 0) {
+            if (!newProgress.earnedTopicBadgeIds) newProgress.earnedTopicBadgeIds = {};
+            const existingBadges = new Set(newProgress.earnedTopicBadgeIds[topicId] || []);
+            newTopicBadges.forEach(b => existingBadges.add(b));
+            newProgress.earnedTopicBadgeIds[topicId] = Array.from(existingBadges);
+            
+            const highestNewBadge = newTopicBadges.includes('gold') ? 'gold' : newTopicBadges.includes('silver') ? 'silver' : 'bronze';
+            const badgeInfo = TOPIC_BADGES[highestNewBadge as keyof typeof TOPIC_BADGES];
+            setNewlyEarnedBadges(prev => [...prev, {id: `topic-${topicId}-${highestNewBadge}`, ...badgeInfo}]);
+        }
+        updateStudentProgress(newProgress);
+    };
+
+    const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[]) => {
+        if (!studentProgress || !activeChallenge) return;
+        
+        const correctCount = finalAttempts.filter(a => a.isCorrect).length;
+        const passedChallenge = correctCount / activeChallenge.questions.length >= 0.6;
+        
+        const newProgress = { ...studentProgress };
+        const challengeKey = `${activeChallenge.type}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+        
+        if (newProgress[challengeKey]) {
+            newProgress[challengeKey]!.isCompleted = passedChallenge;
+            newProgress[challengeKey]!.sessionAttempts = finalAttempts;
+            newProgress[challengeKey]!.attemptsMade = (newProgress[challengeKey]!.attemptsMade || 0) + 1;
+        }
+
+        if (passedChallenge) {
+            addXp(XP_CONFIG.DAILY_CHALLENGE_COMPLETE, `Desafio Concluído! +${XP_CONFIG.DAILY_CHALLENGE_COMPLETE} XP`);
+        }
+
+        setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
+        changeView('daily_challenge_results');
+        updateStudentProgress(newProgress);
+    };
+    
     const onPlayGame = (game: MiniGame, topicId: string) => setPlayingGame({game, topicId});
-    const handleGameComplete = () => {}; // TODO
+    
+    const handleGameComplete = (gameId: string) => {
+        if (!studentProgress || !playingGame) return;
+        addXp(XP_CONFIG.MINI_GAME_COMPLETE);
+        
+        const newProgress = { ...studentProgress };
+        const topicId = playingGame.topicId;
+
+        if (!newProgress.earnedGameBadgeIds) newProgress.earnedGameBadgeIds = {};
+        if (!newProgress.earnedGameBadgeIds[topicId]) newProgress.earnedGameBadgeIds[topicId] = [];
+        if (!newProgress.earnedGameBadgeIds[topicId].includes(gameId)) {
+            newProgress.earnedGameBadgeIds[topicId].push(gameId);
+        }
+        newProgress.gamesCompletedCount = (newProgress.gamesCompletedCount || 0) + 1;
+
+        updateStudentProgress(newProgress);
+    };
+
     const handleGameError = () => addXp(-XP_CONFIG.GAME_ERROR_PENALTY);
-    const onNoteSave = () => {}; // TODO
-    const onStartDailyChallenge = () => {}; // TODO
-    const onNavigateToTopic = () => {}; // TODO
-    const onToggleTopicCompletion = () => {}; // TODO
-    const onOpenNewMessageModal = () => setIsNewMessageModalOpen(true);
+    
+    const onNoteSave = (contentId: string, content: string) => {
+        if (!studentProgress) return;
+        const newProgress = { ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } };
+        updateStudentProgress(newProgress);
+    };
+
+    const onStartDailyChallenge = (challengeType: 'review' | 'glossary' | 'portuguese') => {
+        if (!studentProgress) return;
+        const challengeKey = `${challengeType}Challenge` as const;
+        const challengeData = studentProgress[challengeKey];
+
+        if (challengeData && challengeData.items.length > 0) {
+            setActiveChallenge({
+                type: challengeType,
+                questions: challengeData.items,
+                sessionAttempts: challengeData.sessionAttempts || [],
+            });
+            setQuizInstanceKey(Date.now());
+            changeView('daily_challenge_quiz');
+        }
+    };
+    
     const onSavePlan = async (plan: StudyPlan['plan']) => { if(studentProgress) await FirebaseService.saveStudyPlanForStudent({ studentId: studentProgress.studentId, plan }); };
-    const onDeleteCustomGame = () => {}; // TODO
-    const onOpenCustomGameModal = (game: MiniGame | null) => { setEditingCustomGame(game); setIsCustomGameModalOpen(true); };
-    const onSelectTargetCargo = () => {}; // TODO
-    const onToggleSplitView = () => setIsSplitView(prev => !prev);
-    const onSetIsSidebarCollapsed = (collapsed: boolean) => setIsSidebarCollapsed(collapsed);
-    const onOpenChatModal = () => setIsChatAssistantOpen(true);
-    const onSaveDailyChallengeAttempt = () => {}; // TODO
-    const onReportQuestion = () => {}; // TODO
-    const onCloseDailyChallengeResults = () => setView('dashboard');
-    const onOpenCreator = () => setIsCustomQuizCreatorOpen(true);
-    const onStartQuiz = (quiz: CustomQuiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); };
-    const onDeleteQuiz = () => {}; // TODO
-    const saveCustomQuizAttempt = () => {}; // TODO
-    const handleCustomQuizComplete = () => {}; // TODO
-
-
+    
     if (isDataLoading || !studentProgress) {
         return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     }
@@ -219,15 +343,27 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                 user={user} 
                 studentProgress={studentProgress}
                 view={view}
-                onSetView={setView}
+                onSetView={changeView}
                 onOpenProfile={() => setIsProfileModalOpen(true)}
                 onLogout={handleLogout}
                 selectedTopicName={selectedSubtopic?.name || selectedTopic?.name}
                 selectedCourseName={selectedCourse?.name}
-                onGoHome={() => setView('dashboard')}
+                onGoHome={() => {
+                    setView('dashboard');
+                    setHistory(['dashboard']);
+                }}
             />
 
-            <main>
+            <main className="mt-6">
+                {view !== 'dashboard' && (
+                    <button
+                        onClick={handleBack}
+                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-cyan-700 hover:bg-cyan-800 focus:outline-none mb-6"
+                    >
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    </button>
+                )}
+
                 <StudentViewRouter
                     view={view}
                     isPreview={isPreview}
@@ -259,42 +395,42 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onSubjectSelect={onSubjectSelect}
                     onTopicSelect={onTopicSelect}
                     onStartDailyChallenge={onStartDailyChallenge}
-                    onNavigateToTopic={onNavigateToTopic}
-                    onToggleTopicCompletion={onToggleTopicCompletion}
-                    onOpenNewMessageModal={onOpenNewMessageModal}
+                    onNavigateToTopic={(topicId: string) => {}} // TODO
+                    onToggleTopicCompletion={(subjectId: string, topicId: string, isCompleted: boolean) => {}} // TODO
+                    onOpenNewMessageModal={() => setIsNewMessageModalOpen(true)}
                     onSavePlan={onSavePlan}
                     onStartReview={onStartReview}
-                    onGenerateSmartReview={onGenerateSmartReview}
-                    onGenerateSrsReview={onGenerateSrsReview}
-                    onGenerateSmartFlashcards={onGenerateSmartFlashcards}
-                    onFlashcardReview={onFlashcardReview}
+                    onGenerateSmartReview={() => {}} // TODO
+                    onGenerateSrsReview={() => {}} // TODO
+                    onGenerateSmartFlashcards={async () => {}} // TODO
+                    onFlashcardReview={() => {}} // TODO
                     onUpdateStudentProgress={updateStudentProgress}
                     saveQuizProgress={saveQuizProgress}
-                    saveReviewProgress={saveReviewProgress}
+                    saveReviewProgress={() => {}} // TODO
                     handleTopicQuizComplete={handleTopicQuizComplete}
-                    handleReviewQuizComplete={handleReviewQuizComplete}
+                    handleReviewQuizComplete={() => {}} // TODO
                     handleDailyChallengeComplete={handleDailyChallengeComplete}
                     onAddBonusXp={addXp}
                     onPlayGame={onPlayGame}
-                    onDeleteCustomGame={onDeleteCustomGame}
-                    onOpenCustomGameModal={onOpenCustomGameModal}
-                    onSelectTargetCargo={onSelectTargetCargo}
+                    onDeleteCustomGame={(gameId: string) => {}} // TODO
+                    onOpenCustomGameModal={(game: MiniGame | null) => { setEditingCustomGame(game); setIsCustomGameModalOpen(true); }}
+                    onSelectTargetCargo={(courseId: string, cargoName: string) => {}} // TODO
                     onNoteSave={onNoteSave}
-                    onToggleSplitView={onToggleSplitView}
+                    onToggleSplitView={() => setIsSplitView(prev => !prev)}
                     onSetIsSidebarCollapsed={setIsSidebarCollapsed}
-                    onOpenChatModal={onOpenChatModal}
-                    setView={setView}
+                    onOpenChatModal={() => setIsChatAssistantOpen(true)}
+                    setView={changeView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={onSaveDailyChallengeAttempt}
+                    onSaveDailyChallengeAttempt={() => {}} // TODO
                     handleGameComplete={handleGameComplete}
                     handleGameError={handleGameError}
-                    onReportQuestion={onReportQuestion}
-                    onCloseDailyChallengeResults={onCloseDailyChallengeResults}
-                    onOpenCreator={onOpenCreator}
-                    onStartQuiz={onStartQuiz}
-                    onDeleteQuiz={onDeleteQuiz}
-                    saveCustomQuizAttempt={saveCustomQuizAttempt}
-                    handleCustomQuizComplete={handleCustomQuizComplete}
+                    onReportQuestion={(subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => {}} // TODO
+                    onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); changeView('dashboard'); }}
+                    onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
+                    onStartQuiz={(quiz: CustomQuiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); changeView('custom_quiz_player'); }}
+                    onDeleteQuiz={(quizId: string) => {}} // TODO
+                    saveCustomQuizAttempt={() => {}} // TODO
+                    handleCustomQuizComplete={() => {}} // TODO
                 />
             </main>
             

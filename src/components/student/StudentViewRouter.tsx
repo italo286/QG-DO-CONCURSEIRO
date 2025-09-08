@@ -72,7 +72,7 @@ interface StudentViewRouterProps {
     onSelectTargetCargo: (courseId: string, cargoName: string) => void;
     onNoteSave: (contentId: string, content: string) => void;
     onToggleSplitView: () => void;
-    onSetIsSidebarCollapsed: (collapsed: boolean) => void;
+    onSetIsSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
     onOpenChatModal: () => void;
     setView: (view: ViewType) => void;
     setActiveChallenge: (challenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[] } | null) => void;
