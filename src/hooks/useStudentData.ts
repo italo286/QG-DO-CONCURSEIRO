@@ -116,7 +116,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 let questionsForChallenge: Question[] = [];
 
                 // FIX: Corrected type to allow for context properties (subjectId, topicId) on questions.
-                let availableQuestions: typeof allQuestionsWithContext = [];
+                let availableQuestions: (Question & { subjectId: string; topicId: string; })[] = [];
                 const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
                 
                 if (mode === 'standard') {
@@ -136,19 +136,23 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 
                 const attemptedIds = new Set<string>();
                 const correctIds = new Set<string>();
-                Object.values(studentProgress.progressByTopic).forEach(subject => {
-                    Object.values(subject).forEach(topic => {
-                        (topic.lastAttempt || []).forEach(attempt => {
-                            attemptedIds.add(attempt.questionId);
-                            if (attempt.isCorrect) correctIds.add(attempt.questionId);
-                        });
-                    });
-                });
-                (studentProgress.reviewSessions || []).forEach(session => {
-                    (session.attempts || []).forEach(attempt => {
+                
+                // From Topic Quizzes, Manual Reviews, and previous Daily Challenges
+                const allSources = [
+                    ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt)),
+                    ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || []),
+                    ...(studentProgress.reviewChallenge?.sessionAttempts || []),
+                    ...(studentProgress.glossaryChallenge?.sessionAttempts || []),
+                    ...(studentProgress.portugueseChallenge?.sessionAttempts || [])
+                ];
+
+                allSources.forEach(attempt => {
+                    if (attempt) {
                         attemptedIds.add(attempt.questionId);
-                        if (attempt.isCorrect) correctIds.add(attempt.questionId);
-                    });
+                        if (attempt.isCorrect) {
+                            correctIds.add(attempt.questionId);
+                        }
+                    }
                 });
                 
                 const incorrectIds = new Set<string>();
