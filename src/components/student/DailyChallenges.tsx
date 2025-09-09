@@ -65,6 +65,7 @@ const ChallengeCard: React.FC<{
     const isCompleted = challenge?.isCompleted;
     const attemptsMade = challenge?.attemptsMade || 0;
     const preferredTimeStr = studentProgress.dailyChallengeTime || '06:00';
+    const totalQuestions = challenge?.items?.length || 0;
     
     let maxAttempts: number | 'unlimited' = 1;
     switch (challengeType) {
@@ -81,8 +82,15 @@ const ChallengeCard: React.FC<{
 
     const hasUsedAttempts = maxAttempts !== 'unlimited' && attemptsMade >= maxAttempts;
     
-    const isPartiallyDone = answeredCount > 0 && !isCompleted;
-    const buttonText = isPartiallyDone ? 'Continuar Desafio' : 'Iniciar Desafio!';
+    const hasCompletedFullAttempt = totalQuestions > 0 && answeredCount >= totalQuestions;
+    const isPartiallyDone = answeredCount > 0 && !isCompleted && !hasCompletedFullAttempt;
+
+    let buttonText = 'Iniciar Desafio!';
+    if (isPartiallyDone) {
+        buttonText = 'Continuar Desafio';
+    } else if (hasCompletedFullAttempt && !isCompleted && !hasUsedAttempts) {
+        buttonText = 'Tentar Novamente';
+    }
 
     return (
         <Card className={`p-6 flex flex-col justify-between ${gradient}`}>

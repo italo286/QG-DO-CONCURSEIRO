@@ -29,7 +29,7 @@ interface TopicViewProps {
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onToggleSplitView: () => void;
-    onSetIsSidebarCollapsed: React.Dispatch<React.SetStateAction<boolean>>;
+    onSetIsSidebarCollapsed: (collapsed: boolean) => void;
     onOpenChatModal: () => void;
     onAddBonusXp: (amount: number, message: string) => void;
     onReportQuestion: (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => void;
