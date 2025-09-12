@@ -354,14 +354,20 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             challenge.sessionAttempts = finalAttempts;
             challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
             const score = finalAttempts.length > 0 ? finalAttempts.filter(a => a.isCorrect).length / finalAttempts.length : 0;
+            const isFullAttempt = finalAttempts.length === challenge.items.length;
 
-            if (score >= 0.6) { // 60% to pass
+            // Force completion after a full attempt, regardless of score or settings.
+            if (isFullAttempt) {
                 challenge.isCompleted = true;
-                const xpAmount = XP_CONFIG.DAILY_CHALLENGE_COMPLETE;
-                newProgress.xp = (newProgress.xp || 0) + xpAmount;
-                setXpToasts(prev => [...prev, { id: Date.now(), amount: xpAmount, message: 'Desafio Diário Concluído!' }]);
-                setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
+                // Only award XP if they passed the full attempt.
+                if (score >= 0.6) {
+                    const xpAmount = XP_CONFIG.DAILY_CHALLENGE_COMPLETE;
+                    newProgress.xp = (newProgress.xp || 0) + xpAmount;
+                    setXpToasts(prev => [...prev, { id: Date.now(), amount: xpAmount, message: 'Desafio Diário Concluído!' }]);
+                    setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
+                }
             }
+            
             setDailyChallengeResults({ questions: challenge.items, sessionAttempts: finalAttempts });
             changeView('daily_challenge_results');
         }

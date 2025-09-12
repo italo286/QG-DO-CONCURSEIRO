@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course, Question } from '../types';
-import { getBrasiliaDate, getLocalDateISOString } from '../utils';
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 import * as GeminiService from '../services/geminiService';
 
 // Helper to shuffle array elements for randomizing question options
@@ -115,23 +115,24 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 const questionCount = studentProgress.advancedReviewQuestionCount || 5;
                 let questionsForChallenge: Question[] = [];
 
-                // FIX: Corrected type to allow for context properties (subjectId, topicId) on questions.
                 let availableQuestions: (Question & { subjectId: string; topicId: string; })[] = [];
                 const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
                 
                 if (mode === 'standard') {
                     availableQuestions = allQuestionsWithContext;
-                } else {
+                } else { // Advanced mode
                     const subjectIds = new Set(studentProgress.advancedReviewSubjectIds || []);
                     const topicIds = new Set(studentProgress.advancedReviewTopicIds || []);
+                    
                     if (subjectIds.size > 0) {
-                        availableQuestions = allQuestionsWithContext.filter(q => subjectIds.has(q.subjectId));
+                        const filteredBySubject = allQuestionsWithContext.filter(q => subjectIds.has(q.subjectId));
                         if (topicIds.size > 0) {
-                            availableQuestions = availableQuestions.filter(q => topicIds.has(q.topicId));
+                            availableQuestions = filteredBySubject.filter(q => topicIds.has(q.topicId));
+                        } else {
+                            availableQuestions = filteredBySubject;
                         }
-                    } else {
-                        availableQuestions = allQuestionsWithContext;
-                    }
+                    } 
+                    // If no subjects are selected in advanced mode, availableQuestions remains empty, which is correct.
                 }
                 
                 const attemptedIds = new Set<string>();
