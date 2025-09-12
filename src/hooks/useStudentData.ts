@@ -68,11 +68,11 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
     const allQuestionsWithContext = useMemo(() => allSubjects.flatMap(subject =>
         subject.topics.flatMap(topic =>
             [
-                ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
-                ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
+                ...topic.questions.map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: topic.id, topicName: topic.name })),
+                ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: topic.id, topicName: topic.name })),
                 ...topic.subtopics.flatMap(st => [
-                    ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
-                    ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
+                    ...st.questions.map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: st.id, topicName: `${topic.name} / ${st.name}` })),
+                    ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: st.id, topicName: `${topic.name} / ${st.name}` })),
                 ])
             ]
         )

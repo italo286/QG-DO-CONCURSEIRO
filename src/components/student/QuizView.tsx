@@ -455,6 +455,12 @@ export const QuizView: React.FC<{
                 
                 {imageUrl && <img src={imageUrl} alt="Imagem da questão" className="max-h-60 w-auto rounded-lg mx-auto mb-4"/>}
                 
+                {isDailyChallenge && dailyChallengeType === 'review' && questionToDisplay.subjectName && questionToDisplay.topicName && (
+                    <div className="mb-2 text-xs text-gray-400 font-semibold uppercase tracking-wider">
+                        {questionToDisplay.subjectName} &gt; {questionToDisplay.topicName}
+                    </div>
+                )}
+
                 {dailyChallengeType !== 'portuguese' && (
                     <div className="prose prose-invert max-w-none mb-4" dangerouslySetInnerHTML={{ __html: markdownToHtml(statement) }}></div>
                 )}

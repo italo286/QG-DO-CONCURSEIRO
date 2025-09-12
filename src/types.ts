@@ -22,6 +22,8 @@ export interface Question {
       reason: string;
       studentId: string;
   };
+  subjectName?: string;
+  topicName?: string;
 }
 
 export interface PdfFile {
