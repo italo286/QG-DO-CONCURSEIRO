@@ -83,13 +83,12 @@ const ChallengeCard: React.FC<{
     const hasUsedAttempts = maxAttempts !== 'unlimited' && attemptsMade >= maxAttempts;
     
     const hasCompletedFullAttempt = totalQuestions > 0 && answeredCount >= totalQuestions;
-    const isPartiallyDone = answeredCount > 0 && !isCompleted && !hasCompletedFullAttempt;
+    const isEffectivelyCompleted = isCompleted || hasCompletedFullAttempt;
+    const isPartiallyDone = answeredCount > 0 && !isEffectivelyCompleted;
 
     let buttonText = 'Iniciar Desafio!';
     if (isPartiallyDone) {
         buttonText = 'Continuar Desafio';
-    } else if (hasCompletedFullAttempt && !isCompleted && !hasUsedAttempts) {
-        buttonText = 'Tentar Novamente';
     }
 
     return (
@@ -103,7 +102,7 @@ const ChallengeCard: React.FC<{
             </div>
             <div className="mt-4 text-center">
                 {challenge ? (
-                    (isCompleted || hasUsedAttempts) ? (
+                    (isEffectivelyCompleted || hasUsedAttempts) ? (
                         <Countdown targetTime={preferredTimeStr} />
                     ) : (
                         <Button onClick={onStart} className="bg-white/20 hover:bg-white/30 w-full">
