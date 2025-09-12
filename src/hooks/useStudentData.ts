@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course, Question } from '../types';
-import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
+import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 import * as GeminiService from '../services/geminiService';
 
 // Helper to shuffle array elements for randomizing question options
