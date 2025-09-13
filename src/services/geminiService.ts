@@ -382,7 +382,7 @@ export const generateQuestionsFromPdf = async (
         }
     }));
 
-    const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
     
     return generatedQuestions.map((q: any) => {
         const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -434,7 +434,7 @@ export const generateQuestionsFromText = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
         
          return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -508,7 +508,7 @@ export const generateCustomQuizQuestions = async (params: {
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
 
         return generatedQuestions.slice(0, questionCount).map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -566,7 +566,7 @@ export const extractQuestionsFromTecPdf = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
@@ -614,7 +614,7 @@ export const extractQuestionsFromTecText = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
@@ -696,7 +696,7 @@ export const generateSmartReview = async (
             }
         }));
         
-        const reviewQuestions = parseJsonResponse<Question[]>(response.text || '', 'array');
+        const reviewQuestions = parseJsonResponse<Question[]>(response.text.trim() || '', 'array');
         return reviewQuestions;
 
     } catch (error) {
@@ -723,7 +723,7 @@ export const generateTopicsFromText = async (
             }
         }));
 
-        const generatedTopics = parseJsonResponse<any[]>(response.text || '', 'array');
+        const generatedTopics = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
 
         // Validate and structure the response
         return generatedTopics.map((t: any) => ({
@@ -766,7 +766,7 @@ export const generateFlashcardsFromPdf = async (
         }
     }));
 
-    const generatedFlashcards = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedFlashcards = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
     
     return generatedFlashcards.map((f: any) => ({
         front: f.front,
@@ -808,7 +808,7 @@ export const analyzeStudentDifficulties = async (
             contents: prompt,
         }));
 
-        return response.text || "Não foi possível gerar a análise no momento.";
+        return response.text.trim() || "Não foi possível gerar a análise no momento.";
 
     } catch (error) {
         console.error("Erro ao analisar dificuldades com a IA:", error);
@@ -823,7 +823,7 @@ export const getAiExplanationForText = async (text: string): Promise<string> => 
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
-    return response.text || "Não foi possível gerar a explicação.";
+    return response.text.trim() || "Não foi possível gerar a explicação.";
 };
 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
@@ -833,7 +833,7 @@ export const getAiSummaryForText = async (text: string): Promise<string> => {
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
-    return response.text || "Não foi possível gerar o resumo.";
+    return response.text.trim() || "Não foi possível gerar o resumo.";
 };
 
 export const getAiQuestionForText = async (text: string): Promise<Omit<Question, 'id'>> => {
@@ -855,7 +855,7 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
         }
     }));
 
-    const generatedQuestion = parseJsonResponse<any>(response.text || '', 'object');
+    const generatedQuestion = parseJsonResponse<any>(response.text.trim() || '', 'object');
     const cleanedOptions = (generatedQuestion.options || []).map(stripOptionPrefix);
     const cleanedCorrectAnswer = stripOptionPrefix(generatedQuestion.correctAnswer || '');
 
@@ -900,7 +900,7 @@ export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions:
         }
     }));
 
-    const generatedFlashcards = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedFlashcards = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
     return generatedFlashcards.map((f: any) => ({ front: f.front, back: f.back }));
 };
 
@@ -911,7 +911,7 @@ export const generateQuizFeedback = async (questions: Question[], attempts: Ques
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
-    return response.text || "Não foi possível gerar o feedback.";
+    return response.text.trim() || "Não foi possível gerar o feedback.";
 };
 
 export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInfo> => {
@@ -928,7 +928,7 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
     }
   }));
 
-  return parseJsonResponse<EditalInfo>(response.text || '', 'object');
+  return parseJsonResponse<EditalInfo>(response.text.trim() || '', 'object');
 };
 
 export const analyzeEditalFromUrl = async (_url: string): Promise<EditalInfo> => {
@@ -947,7 +947,7 @@ export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuesti
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
-    return response.text || "Não foi possível gerar o resumo no momento.";
+    return response.text.trim() || "Não foi possível gerar o resumo no momento.";
 };
 
 export const generateJustificationsForQuestion = async (
@@ -985,7 +985,7 @@ export const generateJustificationsForQuestion = async (
         }
     }));
 
-    return parseJsonResponse<{ [optionText: string]: string }>(response.text || '', 'object');
+    return parseJsonResponse<{ [optionText: string]: string }>(response.text.trim() || '', 'object');
 };
 
 export const generateGameFromPdf = async (
@@ -1039,7 +1039,7 @@ export const generateGameFromPdf = async (
             }
         }));
     
-        const gameData = parseJsonResponse<any>(response.text || '', 'object');
+        const gameData = parseJsonResponse<any>(response.text.trim() || '', 'object');
         return gameData;
     } catch (error) {
         console.error(`Error generating ${gameType} game with AI:`, error);
@@ -1093,7 +1093,7 @@ export const generateGameFromText = async (
             }
         }));
     
-        const gameData = parseJsonResponse<any>(response.text || '', 'object');
+        const gameData = parseJsonResponse<any>(response.text.trim() || '', 'object');
         return gameData;
     } catch (error) {
         console.error(`Error generating ${gameType} game from text with AI:`, error);
@@ -1115,7 +1115,7 @@ export const generateAllGamesFromText = async (text: string): Promise<Omit<MiniG
             }
         }));
 
-        const result = parseJsonResponse<any>(response.text || '', 'object');
+        const result = parseJsonResponse<any>(response.text.trim() || '', 'object');
         const games: Omit<MiniGame, 'id'>[] = [];
 
         Object.keys(result).forEach((gameType) => {
@@ -1203,7 +1203,7 @@ export const generateAdaptiveStudyPlan = async (
         }
     }));
 
-    return parseJsonResponse<StudyPlan['plan']>(response.text || '', 'object');
+    return parseJsonResponse<StudyPlan['plan']>(response.text.trim() || '', 'object');
 };
 
 
@@ -1221,7 +1221,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
         }
     }));
     
-    return parseJsonResponse<GlossaryTerm[]>(response.text || '', 'array');
+    return parseJsonResponse<GlossaryTerm[]>(response.text.trim() || '', 'array');
 };
 
 export const generatePortugueseChallenge = async (
@@ -1263,7 +1263,7 @@ export const generatePortugueseChallenge = async (
         }
     }));
 
-    const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() || '', 'array');
 
     return generatedQuestions.map((q: any) => {
         const cleanedOptionJustifications: { [key: string]: string } = {};
@@ -1314,7 +1314,7 @@ export const analyzeTopicFrequencies = async (
         }
     }));
     
-    const results = parseJsonResponse<{ id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma' }[]>(response.text || '', 'array');
+    const results = parseJsonResponse<{ id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma' }[]>(response.text.trim() || '', 'array');
     
     const frequencyMap: { [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' } = {};
     results.forEach(item => {
