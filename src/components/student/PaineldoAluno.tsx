@@ -38,7 +38,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const [history, setHistory] = useState<ViewType[]>(['dashboard']);
     const {
         isLoading, allSubjects, allStudents, allStudentProgress, enrolledCourses, studentProgress, setStudentProgress,
-        studyPlan, messages, teacherProfiles, allQuestionsWithContext
+        studyPlan, messages, teacherProfiles
     } = useStudentData(user, isPreview);
 
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);

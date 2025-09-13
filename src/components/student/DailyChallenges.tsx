@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StudentProgress, DailyChallenge, Question } from '../../types';
-import { Card, Button, Spinner } from '../ui';
+import { Card, Button } from '../ui';
 import { TagIcon, TranslateIcon, RefreshIcon, FireIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 

@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course } from '../types';
 
@@ -50,29 +50,6 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
 
     }, [user.id, isPreview, isLoading]);
     
-    // Memoize complex data calculations
-    const allQuestionsWithContext = useMemo(() => allSubjects.flatMap(subject =>
-        subject.topics.flatMap(topic =>
-            [
-                ...topic.questions.map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: topic.id, topicName: topic.name })),
-                ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: topic.id, topicName: topic.name })),
-                ...topic.subtopics.flatMap(st => [
-                    ...st.questions.map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: st.id, topicName: `${topic.name} / ${st.name}` })),
-                    ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, subjectName: subject.name, topicId: st.id, topicName: `${topic.name} / ${st.name}` })),
-                ])
-            ]
-        )
-    ), [allSubjects]);
-    
-    const allGlossaryTermsWithContext = useMemo(() => allSubjects.flatMap(subject =>
-        subject.topics.flatMap(topic => [
-            ...(topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id })),
-            ...topic.subtopics.flatMap(subtopic =>
-                (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
-            )
-        ])
-    ), [allSubjects]);
-
     return {
         isLoading,
         allSubjects,
@@ -84,7 +61,5 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         studyPlan,
         messages,
         teacherProfiles,
-        allQuestionsWithContext,
-        allGlossaryTermsWithContext,
     };
 };
