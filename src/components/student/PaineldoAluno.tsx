@@ -1,9 +1,9 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner, Toast } from '../ui';
+import { Spinner } from '../ui';
 import { StudentHeader } from './StudentHeader';
 import { StudentViewRouter } from './StudentViewRouter';
 import { EditProfileModal } from './EditProfileModal';
@@ -11,7 +11,6 @@ import { StudentGamePlayerModal } from './StudentGamePlayerModal';
 import { LevelUpModal } from './LevelUpModal';
 import { BadgeAwardModal } from './BadgeAwardModal';
 import { XpToastDisplay } from './XpToastDisplay';
-import { MessageThreadModal } from '../MessageThreadModal';
 import { NewMessageModal } from './NewMessageModal';
 import { TopicChat } from './TopicChat';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
@@ -35,7 +34,7 @@ interface PaineldoAlunoProps {
     onToggleStudentView?: () => void;
 }
 
-export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview, onToggleStudentView }) => {
+export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -107,7 +106,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     }, [handleBack]);
 
 
-    const handleUpdateStudentProgress = useCallback(async (newProgress: StudentProgress, fromState: StudentProgress | null) => {
+    const handleUpdateStudentProgress = useCallback(async (newProgress: StudentProgress, fromState?: StudentProgress | null) => {
         if (isPreview) return;
         setStudentProgress(newProgress);
         await FirebaseService.saveStudentProgress(newProgress);
@@ -232,8 +231,8 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             newProgress.dailyChallengeStreak = streak;
 
             // Check for streak bonus XP
-            if (Gamification.XP_CONFIG.STREAK_BONUS[streak.current]) {
-                const bonusXp = Gamification.XP_CONFIG.STREAK_BONUS[streak.current];
+            if (Gamification.XP_CONFIG.STREAK_BONUS[streak.current as keyof typeof Gamification.XP_CONFIG.STREAK_BONUS]) {
+                const bonusXp = Gamification.XP_CONFIG.STREAK_BONUS[streak.current as keyof typeof Gamification.XP_CONFIG.STREAK_BONUS];
                 addXp(bonusXp, `Ofensiva de ${streak.current} dias! 🔥`);
             }
         }
@@ -385,7 +384,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                         const newProgress = { ...studentProgress, customGames: studentProgress.customGames.filter(g => g.id !== gameId) };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    onOpenCustomGameModal={(game) => { /* Logic to open custom game modal */ }}
+                    onOpenCustomGameModal={() => { /* Logic to open custom game modal */ }}
                     onSelectTargetCargo={(courseId, cargoName) => {
                         const newProgress = { ...studentProgress, targetCargoByCourse: { ...(studentProgress.targetCargoByCourse || {}), [courseId]: cargoName } };
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -399,7 +398,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={(challengeType, attempt) => {
+                    onSaveDailyChallengeAttempt={(_, attempt) => {
                         setActiveChallenge(prev => {
                             if(!prev) return null;
                             const updatedChallenge = {...prev};

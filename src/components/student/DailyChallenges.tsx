@@ -1,8 +1,8 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button } from '../ui';
-import { CheckBadgeIcon, ClipboardListIcon, TranslateIcon, FireIcon } from '../Icons';
-import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
+import { ClipboardListIcon, TranslateIcon, FireIcon } from '../Icons';
+import { getBrasiliaDate } from '../../utils';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
