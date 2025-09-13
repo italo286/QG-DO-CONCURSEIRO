@@ -9,5 +9,10 @@ export default defineConfig({
     // Vite does not polyfill process.env. We need to explicitly define it.
     // We will use import.meta.env for our own env variables.
     'process.env': {}
-  }
+  },
+  build: {
+    rollupOptions: {
+      external: ['firebase-admin', '@netlify/functions'],
+    },
+  },
 })
