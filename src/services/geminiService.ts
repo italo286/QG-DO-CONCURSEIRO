@@ -98,6 +98,10 @@ const questionSchema = {
             },
             required: ["option", "justification"]
           }
+        },
+        errorCategory: {
+            type: Type.STRING,
+            description: "A categoria do erro gramatical (ex: 'Crase', 'Concordância Verbal'). Apenas para questões de português. Para outros tipos, pode ser omitido."
         }
       },
       required: ["statement", "options", "correctAnswer", "justification"],
@@ -1220,17 +1224,26 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     return parseJsonResponse<GlossaryTerm[]>(response.text || '', 'array');
 };
 
-export const generatePortugueseChallenge = async (questionCount: number): Promise<Omit<Question, 'id'>[]> => {
+export const generatePortugueseChallenge = async (
+    questionCount: number,
+    errorStats?: StudentProgress['portugueseErrorStats']
+): Promise<Omit<Question, 'id'>[]> => {
+    
+    const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
+
     const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
     1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-    2. A frase deve ser dividida em 5 partes (alternativas).
-    3. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-    4. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-    5. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
+    2. ${errorFocusPrompt}
+    3. A frase deve ser dividida em 5 partes (alternativas).
+    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
     
     Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
     Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
     Resposta Correta: "que aguardavam"
+    errorCategory: "Concordância Verbal"
     Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
     OptionJustifications: [
         { "option": "A multidão,", "justification": "Este trecho não contém erros." },
@@ -1268,6 +1281,7 @@ export const generatePortugueseChallenge = async (questionCount: number): Promis
             correctAnswer: q.correctAnswer,
             justification: q.justification,
             optionJustifications: cleanedOptionJustifications,
+            errorCategory: q.errorCategory,
         };
     });
 };

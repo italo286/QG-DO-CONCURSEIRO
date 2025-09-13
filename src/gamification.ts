@@ -20,11 +20,13 @@ export const XP_CONFIG = {
     REVIEW_SESSION_COMPLETE: 75,
     MINI_GAME_COMPLETE: 25,
     DAILY_CHALLENGE_COMPLETE: 50,
+    CATCH_UP_CHALLENGE_COMPLETE: 25, // Reduced XP for catch-up
     GAME_ERROR_PENALTY: 5,
-    COMBO_BONUS: {
-        3: 10, // 3 in a row
-        5: 25, // 5 in a row
-        7: 50  // 7 in a row
+    STREAK_BONUS: {
+        3: 50,
+        7: 100,
+        15: 250,
+        30: 500
     }
 };
 
@@ -88,6 +90,10 @@ export const ALL_BADGES: {
         }
         return consecutiveDays >= 7;
     }},
+    'streak-3-day-challenge': { name: 'Ritmo Certo', description: 'Completou os desafios diários por 3 dias seguidos!', icon: FireIcon, condition: (p) => (p.dailyChallengeStreak?.current || 0) >= 3 },
+    'streak-7-day-challenge': { name: 'Força do Hábito', description: 'Completou os desafios diários por 7 dias seguidos!', icon: FireIcon, condition: (p) => (p.dailyChallengeStreak?.current || 0) >= 7 },
+    'streak-15-day-challenge': { name: 'Implacável', description: 'Completou os desafios diários por 15 dias seguidos!', icon: FireIcon, condition: (p) => (p.dailyChallengeStreak?.current || 0) >= 15 },
+    'streak-30-day-challenge': { name: 'Lenda Diária', description: 'Completou os desafios diários por 30 dias seguidos!', icon: FireIcon, condition: (p) => (p.dailyChallengeStreak?.current || 0) >= 30 },
     'subject-completer': { name: 'Finalizador', description: 'Concluiu todos os tópicos de uma disciplina.', icon: CheckCircleIcon, condition: (p, subjects) => {
         for (const subject of subjects) {
             const allTopicsAndSubtopics = subject.topics.flatMap(t => [t, ...t.subtopics]);

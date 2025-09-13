@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { StudentProgress, DailyChallenge } from '../../types';
+import { StudentProgress, DailyChallenge, Question } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { TagIcon, TranslateIcon, RefreshIcon } from '../Icons';
-import { getBrasiliaDate } from '../../utils';
+import { TagIcon, TranslateIcon, RefreshIcon, FireIcon } from '../Icons';
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
     const [timeLeft, setTimeLeft] = useState('');
@@ -26,7 +26,7 @@ const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
                 const s = Math.floor((difference / 1000) % 60);
                 setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
             } else {
-                setTimeLeft('00:00:00');
+                setTimeLeft('Carregando...');
             }
         };
 
@@ -48,52 +48,22 @@ const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
 interface DailyChallengesProps {
     studentProgress: StudentProgress;
     onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
-    onGenerateDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
-    isGeneratingDailyChallenge: 'review' | 'glossary' | 'portuguese' | null;
 }
 
 const ChallengeCard: React.FC<{
     title: string;
     description: string;
     Icon: React.FC<{className?: string}>;
-    challenge: DailyChallenge<any> | undefined | null;
+    challenge: DailyChallenge<Question> | undefined | null;
     onStart: () => void;
-    onGenerate: () => void;
-    isGenerating: boolean;
     gradient: string;
     studentProgress: StudentProgress;
-    challengeType: 'review' | 'glossary' | 'portuguese';
-}> = ({ title, description, Icon, challenge, onStart, onGenerate, isGenerating, gradient, studentProgress, challengeType }) => {
-    const uncompletedCount = challenge?.uncompletedCount || 0;
-    const answeredCount = challenge?.sessionAttempts?.length || 0;
+}> = ({ title, description, Icon, challenge, onStart, gradient, studentProgress }) => {
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+    const isTodayChallenge = challenge?.date === todayISO || challenge?.generatedForDate === todayISO;
     const isCompleted = challenge?.isCompleted;
-    const attemptsMade = challenge?.attemptsMade || 0;
+    const isPartiallyDone = (challenge?.sessionAttempts?.length || 0) > 0 && !isCompleted;
     const preferredTimeStr = studentProgress.dailyChallengeTime || '06:00';
-    const totalQuestions = challenge?.items?.length || 0;
-    
-    let maxAttempts: number | 'unlimited' = 1;
-    switch (challengeType) {
-        case 'review':
-            maxAttempts = studentProgress.dailyReviewMode === 'standard' ? 1 : (studentProgress.advancedReviewMaxAttempts ?? 1);
-            break;
-        case 'glossary':
-            maxAttempts = studentProgress.glossaryChallengeMode === 'standard' ? 1 : (studentProgress.glossaryChallengeMaxAttempts ?? 1);
-            break;
-        case 'portuguese':
-            maxAttempts = studentProgress.portugueseChallengeMaxAttempts ?? 1;
-            break;
-    }
-
-    const hasUsedAttempts = maxAttempts !== 'unlimited' && attemptsMade >= maxAttempts;
-    
-    const hasCompletedFullAttempt = totalQuestions > 0 && answeredCount >= totalQuestions;
-    const isEffectivelyCompleted = isCompleted || hasCompletedFullAttempt;
-    const isPartiallyDone = answeredCount > 0 && !isEffectivelyCompleted;
-
-    let buttonText = 'Iniciar Desafio!';
-    if (isPartiallyDone) {
-        buttonText = 'Continuar Desafio';
-    }
 
     return (
         <Card className={`p-6 flex flex-col justify-between ${gradient}`}>
@@ -102,22 +72,14 @@ const ChallengeCard: React.FC<{
                     <Icon className="h-6 w-6 mr-3" /> {title}
                 </h3>
                 <p className="text-gray-200 mt-2 text-sm">{description}</p>
-                {uncompletedCount > 0 && <p className="text-yellow-300 text-xs mt-1">{uncompletedCount} desafio(s) anterior(es) não concluído(s).</p>}
             </div>
             <div className="mt-4 text-center">
-                {!challenge && (
-                    <Button onClick={onGenerate} disabled={isGenerating} className="bg-white/20 hover:bg-white/30 w-full">
-                        {isGenerating ? <Spinner /> : 'Gerar Desafio'}
-                    </Button>
-                )}
-                {challenge && (
-                    (isEffectivelyCompleted || hasUsedAttempts) ? (
-                        <Countdown targetTime={preferredTimeStr} />
-                    ) : (
-                        <Button onClick={onStart} className="bg-white/20 hover:bg-white/30 w-full">
-                           {buttonText}
-                        </Button>
-                    )
+                {isTodayChallenge && !isCompleted ? (
+                     <Button onClick={onStart} className="bg-white/20 hover:bg-white/30 w-full">
+                        {isPartiallyDone ? 'Continuar Desafio' : 'Iniciar Desafio!'}
+                     </Button>
+                ) : (
+                    <Countdown targetTime={preferredTimeStr} />
                 )}
             </div>
         </Card>
@@ -125,11 +87,21 @@ const ChallengeCard: React.FC<{
 };
 
 
-export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge, onGenerateDailyChallenge, isGeneratingDailyChallenge }) => {
-    
+export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge }) => {
+    const streak = studentProgress.dailyChallengeStreak?.current || 0;
+
     return (
         <div>
-            <h2 className="text-2xl font-bold mb-4">Desafios Diários</h2>
+            <div className="flex justify-between items-center mb-4">
+                <h2 className="text-2xl font-bold">Desafios Diários</h2>
+                {streak > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-300 font-semibold animate-pulse-orange">
+                        <FireIcon className="h-5 w-5" />
+                        <span>{streak} dia{streak > 1 ? 's' : ''} de ofensiva!</span>
+                    </div>
+                )}
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <ChallengeCard
                     title="Desafio da Revisão"
@@ -137,11 +109,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={RefreshIcon}
                     challenge={studentProgress.reviewChallenge}
                     onStart={() => onStartDailyChallenge('review')}
-                    onGenerate={() => onGenerateDailyChallenge('review')}
-                    isGenerating={isGeneratingDailyChallenge === 'review'}
                     gradient="bg-gradient-to-br from-cyan-900 to-blue-900"
                     studentProgress={studentProgress}
-                    challengeType="review"
                 />
                 <ChallengeCard
                     title="Desafio do Glossário"
@@ -149,11 +118,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={TagIcon}
                     challenge={studentProgress.glossaryChallenge}
                     onStart={() => onStartDailyChallenge('glossary')}
-                    onGenerate={() => onGenerateDailyChallenge('glossary')}
-                    isGenerating={isGeneratingDailyChallenge === 'glossary'}
                     gradient="bg-gradient-to-br from-emerald-900 to-teal-900"
                     studentProgress={studentProgress}
-                    challengeType="glossary"
                 />
                  <ChallengeCard
                     title="Desafio de Português"
@@ -161,11 +127,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={TranslateIcon}
                     challenge={studentProgress.portugueseChallenge}
                     onStart={() => onStartDailyChallenge('portuguese')}
-                    onGenerate={() => onGenerateDailyChallenge('portuguese')}
-                    isGenerating={isGeneratingDailyChallenge === 'portuguese'}
                     gradient="bg-gradient-to-br from-rose-900 to-pink-900"
                     studentProgress={studentProgress}
-                    challengeType="portuguese"
                 />
             </div>
         </div>

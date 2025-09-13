@@ -24,6 +24,7 @@ export interface Question {
   };
   subjectName?: string;
   topicName?: string;
+  errorCategory?: string; // For adaptive Portuguese challenges
 }
 
 export interface PdfFile {
@@ -174,6 +175,7 @@ export interface ReviewSession {
 
 export interface DailyChallenge<T> {
     date: string; // ISO Date 'YYYY-MM-DD'
+    generatedForDate?: string; // ISO Date 'YYYY-MM-DD', used for catch-up challenges
     generatedAtTime?: string; // e.g., "08:00", the time setting when it was generated
     items: T[];
     isCompleted: boolean;
@@ -246,6 +248,7 @@ export interface StudentProgress {
   portugueseChallengeQuestionCount?: number;
   portugueseChallengeTimerDuration?: number | 'unlimited';
   portugueseChallengeMaxAttempts?: number | 'unlimited';
+  portugueseErrorStats?: { [category: string]: { correct: number; incorrect: number; } };
 
   // Daily Challenge Data
   reviewChallenge?: DailyChallenge<Question>;
@@ -253,6 +256,11 @@ export interface StudentProgress {
   portugueseChallenge?: DailyChallenge<Question>;
   gamesCompletedCount?: number;
   dailyChallengeTime?: string; // e.g., "08:00"
+  dailyChallengeStreak?: {
+      current: number;
+      longest: number;
+      lastCompletedDate: string; // ISO Date 'YYYY-MM-DD'
+  };
 }
 
 
