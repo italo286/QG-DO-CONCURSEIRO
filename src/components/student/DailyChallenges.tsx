@@ -1,7 +1,7 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button } from '../ui';
-import { ClipboardListIcon, TranslateIcon, FireIcon } from '../Icons';
+import { TranslateIcon, FireIcon, CycleIcon, TagIcon } from '../Icons';
 import { getBrasiliaDate } from '../../utils';
 
 interface DailyChallengesProps {
@@ -14,7 +14,7 @@ const ChallengeCard: React.FC<{
     icon: React.FC<{className?: string}>;
     challenge: DailyChallenge<any> | undefined;
     onStart: () => void;
-    type: string;
+    type: 'review' | 'glossary' | 'portuguese';
     studentProgress: StudentProgress | null;
 }> = ({ title, icon: Icon, challenge, onStart, type, studentProgress }) => {
     
@@ -29,7 +29,6 @@ const ChallengeCard: React.FC<{
     const hasStarted = challenge && (challenge.sessionAttempts?.length || 0) > 0;
     const itemsCount = challenge?.items?.length || 0;
     
-    // Countdown logic
     const getNextChallengeTime = () => {
         const challengeTime = studentProgress?.dailyChallengeTime || '06:00';
         const [hours, minutes] = challengeTime.split(':').map(Number);
@@ -71,11 +70,30 @@ const ChallengeCard: React.FC<{
         );
     };
 
+    let cardClasses = 'bg-gradient-to-br border transition-all duration-300 ';
+    let iconColor = 'text-cyan-300';
+    
+    if (isEffectivelyCompleted) {
+        cardClasses += 'bg-green-900/30 border-green-800/50';
+        iconColor = 'text-green-400';
+    } else {
+        switch(type) {
+            case 'review':
+                cardClasses += 'from-rose-900 to-red-900 border-rose-700/50 hover:border-rose-400';
+                break;
+            case 'glossary':
+                cardClasses += 'from-indigo-900 to-blue-900 border-indigo-700/50 hover:border-indigo-400';
+                break;
+            case 'portuguese':
+                cardClasses += 'from-teal-900 to-green-900 border-teal-700/50 hover:border-teal-400';
+                break;
+        }
+    }
 
     return (
-        <div className={`p-4 rounded-lg flex flex-col justify-between text-center transition-all ${isEffectivelyCompleted ? 'bg-green-900/30' : 'bg-gray-700/50'}`}>
+        <div className={`p-4 rounded-lg flex flex-col justify-between text-center ${cardClasses}`}>
             <div>
-                <Icon className={`h-10 w-10 mx-auto mb-2 ${isEffectivelyCompleted ? 'text-green-400' : 'text-cyan-400'}`} />
+                <Icon className={`h-10 w-10 mx-auto mb-2 ${iconColor}`} />
                 <h4 className="font-bold text-white">{title}</h4>
                 <p className="text-xs text-gray-400 mt-1">{itemsCount} {type === 'portuguese' ? 'frases' : (type === 'glossary' ? 'termos' : 'questões')}</p>
             </div>
@@ -83,7 +101,11 @@ const ChallengeCard: React.FC<{
             {isEffectivelyCompleted ? (
                 <Countdown />
             ) : (
-                <Button onClick={onStart} disabled={itemsCount === 0} className="mt-3 text-sm py-2 px-3 w-full">
+                <Button 
+                    onClick={onStart} 
+                    disabled={itemsCount === 0} 
+                    className="mt-3 text-sm py-2 px-3 w-full bg-black/20 hover:bg-black/40 border border-white/20"
+                >
                     {itemsCount > 0 ? (hasStarted ? 'Continuar Desafio' : 'Começar') : 'N/A para hoje'}
                 </Button>
             )}
@@ -112,7 +134,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <ChallengeCard 
                     title="Desafio da Revisão"
-                    icon={ClipboardListIcon}
+                    icon={CycleIcon}
                     challenge={reviewChallenge}
                     onStart={() => onStartDailyChallenge('review')}
                     type="review"
@@ -120,7 +142,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                 />
                 <ChallengeCard 
                     title="Desafio do Glossário"
-                    icon={TranslateIcon}
+                    icon={TagIcon}
                     challenge={glossaryChallenge}
                     onStart={() => onStartDailyChallenge('glossary')}
                     type="glossary"
