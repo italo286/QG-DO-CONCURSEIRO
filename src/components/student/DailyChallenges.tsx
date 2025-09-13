@@ -1,8 +1,8 @@
-
 import React from 'react';
-import { StudentProgress } from '../../types';
+import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button } from '../ui';
 import { CheckBadgeIcon, ClipboardListIcon, TranslateIcon, FireIcon } from '../Icons';
+import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
@@ -12,28 +12,79 @@ interface DailyChallengesProps {
 const ChallengeCard: React.FC<{
     title: string;
     icon: React.FC<{className?: string}>;
-    challenge: StudentProgress['reviewChallenge']; // Using one type, structure is the same
+    challenge: DailyChallenge<any> | undefined;
     onStart: () => void;
     type: string;
-}> = ({ title, icon: Icon, challenge, onStart, type }) => {
-    const isCompleted = challenge?.isCompleted || false;
+    studentProgress: StudentProgress | null;
+}> = ({ title, icon: Icon, challenge, onStart, type, studentProgress }) => {
+    
+    const maxAttemptsKey = `${type}ChallengeMaxAttempts` as keyof StudentProgress;
+    const maxAttempts = studentProgress?.[maxAttemptsKey] as number | 'unlimited' | undefined ?? 1;
+
+    const isEffectivelyCompleted = challenge?.isCompleted || (
+        challenge && maxAttempts !== 'unlimited' &&
+        (challenge.attemptsMade || 0) >= maxAttempts
+    );
+
+    const hasStarted = challenge && (challenge.sessionAttempts?.length || 0) > 0;
     const itemsCount = challenge?.items?.length || 0;
     
-    return (
-        <div className={`p-4 rounded-lg flex flex-col justify-between text-center transition-all ${isCompleted ? 'bg-green-900/30' : 'bg-gray-700/50'}`}>
-            <div>
-                <Icon className={`h-10 w-10 mx-auto mb-2 ${isCompleted ? 'text-green-400' : 'text-cyan-400'}`} />
-                <h4 className="font-bold text-white">{title}</h4>
-                <p className="text-xs text-gray-400 mt-1">{itemsCount} {type}</p>
+    // Countdown logic
+    const getNextChallengeTime = () => {
+        const challengeTime = studentProgress?.dailyChallengeTime || '06:00';
+        const [hours, minutes] = challengeTime.split(':').map(Number);
+        const now = getBrasiliaDate();
+        
+        let nextDate = getBrasiliaDate();
+        nextDate.setUTCHours(hours, minutes, 0, 0);
+
+        if (now > nextDate) {
+            nextDate.setUTCDate(nextDate.getUTCDate() + 1);
+        }
+        
+        return nextDate;
+    };
+    
+    const Countdown: React.FC = () => {
+        const [timeLeft, setTimeLeft] = React.useState('');
+
+        React.useEffect(() => {
+            const timer = setInterval(() => {
+                const difference = +getNextChallengeTime() - +getBrasiliaDate();
+                if (difference > 0) {
+                    const hours = Math.floor((difference / (1000 * 60 * 60)) % 24);
+                    const minutes = Math.floor((difference / 1000 / 60) % 60);
+                    const seconds = Math.floor((difference / 1000) % 60);
+                    setTimeLeft(`${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`);
+                } else {
+                    setTimeLeft('00:00:00');
+                }
+            }, 1000);
+            return () => clearInterval(timer);
+        }, []);
+
+        return (
+            <div className="mt-3 text-center">
+                <p className="text-sm text-gray-400">Próximo desafio em:</p>
+                <p className="font-mono font-bold text-lg text-cyan-400">{timeLeft}</p>
             </div>
-            {isCompleted ? (
-                <div className="mt-3 flex items-center justify-center text-green-400">
-                    <CheckBadgeIcon className="h-5 w-5 mr-2" />
-                    <span className="text-sm font-semibold">Concluído!</span>
-                </div>
+        );
+    };
+
+
+    return (
+        <div className={`p-4 rounded-lg flex flex-col justify-between text-center transition-all ${isEffectivelyCompleted ? 'bg-green-900/30' : 'bg-gray-700/50'}`}>
+            <div>
+                <Icon className={`h-10 w-10 mx-auto mb-2 ${isEffectivelyCompleted ? 'text-green-400' : 'text-cyan-400'}`} />
+                <h4 className="font-bold text-white">{title}</h4>
+                <p className="text-xs text-gray-400 mt-1">{itemsCount} {type === 'portuguese' ? 'frases' : (type === 'glossary' ? 'termos' : 'questões')}</p>
+            </div>
+            
+            {isEffectivelyCompleted ? (
+                <Countdown />
             ) : (
                 <Button onClick={onStart} disabled={itemsCount === 0} className="mt-3 text-sm py-2 px-3 w-full">
-                    {itemsCount > 0 ? 'Começar' : 'N/A'}
+                    {itemsCount > 0 ? (hasStarted ? 'Continuar Desafio' : 'Começar') : 'N/A para hoje'}
                 </Button>
             )}
         </div>
@@ -64,21 +115,24 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     icon={ClipboardListIcon}
                     challenge={reviewChallenge}
                     onStart={() => onStartDailyChallenge('review')}
-                    type="questões"
+                    type="review"
+                    studentProgress={studentProgress}
                 />
                 <ChallengeCard 
                     title="Desafio do Glossário"
                     icon={TranslateIcon}
                     challenge={glossaryChallenge}
                     onStart={() => onStartDailyChallenge('glossary')}
-                    type="termos"
+                    type="glossary"
+                    studentProgress={studentProgress}
                 />
                  <ChallengeCard 
                     title="Desafio de Português"
-                    icon={TranslateIcon} // Reusing icon for consistency
+                    icon={TranslateIcon}
                     challenge={portugueseChallenge}
                     onStart={() => onStartDailyChallenge('portuguese')}
-                    type="frases"
+                    type="portuguese"
+                    studentProgress={studentProgress}
                 />
             </div>
         </Card>

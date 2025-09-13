@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -16,7 +15,9 @@ import { MessageThreadModal } from '../MessageThreadModal';
 import { NewMessageModal } from './NewMessageModal';
 import { TopicChat } from './TopicChat';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
-import { getLocalDateISOString } from '../../utils';
+import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
+// FIX: Imported GeminiService to resolve reference errors.
+import * as GeminiService from '../../services/geminiService';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
@@ -71,7 +72,6 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         messages,
         teacherProfiles
     } = useStudentData(user, isPreview);
-    const prevXpRef = useRef(studentProgress?.xp || 0);
 
     const handleBack = useCallback(() => {
         if (view === 'topic') {
@@ -135,6 +135,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
 
     useEffect(() => {
         if (!studentProgress) return;
+// FIX: Corrected function call to Gamification.checkAndAwardBadges.
         const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
         if (awarded.length > 0) {
             setAwardedBadges(prev => [...prev, ...awarded]);
@@ -194,6 +195,55 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setView('review_quiz');
     };
 
+    const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[]) => {
+        if (!activeChallenge || !studentProgress) return;
+
+        const newProgress = { ...studentProgress };
+        const challengeType = activeChallenge.type;
+        const challengeKey = `${challengeType}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+
+        const challenge = newProgress[challengeKey];
+        if (!challenge) return;
+
+        challenge.isCompleted = true;
+        challenge.sessionAttempts = finalAttempts;
+        challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
+
+        const correctCount = finalAttempts.filter(a => a.isCorrect).length;
+        const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
+        
+        if (score >= 0.6) { // 60% to pass
+            addXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
+            
+            // Streak Logic
+            const yesterday = getBrasiliaDate();
+            yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+            const yesterdayISO = getLocalDateISOString(yesterday);
+            const todayISO = getLocalDateISOString(getBrasiliaDate());
+
+            const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
+            if (streak.lastCompletedDate === yesterdayISO) {
+                streak.current += 1;
+            } else if (streak.lastCompletedDate !== todayISO) {
+                streak.current = 1; // Start a new streak
+            }
+            streak.lastCompletedDate = todayISO;
+            streak.longest = Math.max(streak.current, streak.longest);
+            newProgress.dailyChallengeStreak = streak;
+
+            // Check for streak bonus XP
+            if (Gamification.XP_CONFIG.STREAK_BONUS[streak.current]) {
+                const bonusXp = Gamification.XP_CONFIG.STREAK_BONUS[streak.current];
+                addXp(bonusXp, `Ofensiva de ${streak.current} dias! 🔥`);
+            }
+        }
+        
+        setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
+        handleUpdateStudentProgress(newProgress, studentProgress);
+        setView('daily_challenge_results');
+        setActiveChallenge(null);
+    };
+
     if (isLoading) {
         return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     }
@@ -246,7 +296,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onStartDailyChallenge={async (type) => {
                         const challenge = studentProgress[type === 'review' ? 'reviewChallenge' : type === 'glossary' ? 'glossaryChallenge' : 'portugueseChallenge'];
                         if(challenge && challenge.items.length > 0) {
-                            setActiveChallenge({ type, questions: challenge.items, sessionAttempts: [] });
+                            setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [] });
                             setQuizInstanceKey(Date.now());
                             setView('daily_challenge_quiz');
                         }
@@ -268,7 +318,8 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onGenerateSmartReview={async () => {
                         setIsGeneratingReview(true);
                         try {
-                            const questions = await FirebaseService.generateSmartReview(studentProgress, allSubjects);
+// FIX: Corrected function call to use GeminiService instead of Gamification.
+                            const questions = await GeminiService.generateSmartReview(studentProgress, allSubjects);
                             if (questions.length > 0) {
                                 const smartSession: ReviewSession = { id: `rev-ai-${Date.now()}`, name: "Revisão Inteligente da IA", type: 'ai', createdAt: Date.now(), questions, isCompleted: false };
                                 onStartReview(smartSession);
@@ -290,11 +341,13 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                         }
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
-                        const flashcards = await FirebaseService.generateFlashcardsFromIncorrectAnswers(questions);
+// FIX: Corrected function call to use GeminiService for AI-based generation.
+                        const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
                         const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {
+// FIX: Corrected function call to Gamification.updateSrsFlashcard.
                         const newProgress = Gamification.updateSrsFlashcard(studentProgress, flashcardId, performance);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
@@ -316,22 +369,18 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                         }
                     }}
                     handleTopicQuizComplete={(subjectId, topicId, attempts) => {
+// FIX: Corrected function call to Gamification.processQuizCompletion.
                         const newProgress = Gamification.processQuizCompletion(studentProgress, subjectId, topicId, attempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     handleReviewQuizComplete={(reviewId, attempts) => {
+// FIX: Corrected function call to Gamification.processReviewCompletion.
                         const newProgress = Gamification.processReviewCompletion(studentProgress, reviewId, attempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    handleDailyChallengeComplete={(finalAttempts) => {
-                        const newProgress = Gamification.processDailyChallengeCompletion(studentProgress, activeChallenge!.type, finalAttempts, addXp);
-                        setDailyChallengeResults({ questions: activeChallenge!.questions, sessionAttempts: finalAttempts });
-                        handleUpdateStudentProgress(newProgress, studentProgress);
-                        setView('daily_challenge_results');
-                        setActiveChallenge(null);
-                    }}
+                    handleDailyChallengeComplete={handleDailyChallengeComplete}
                     onAddBonusXp={addXp}
-                    onPlayGame={(game, topicId) => setPlayingGame({ game, topicId })}
+                    onPlayGame={(game, topicId) => { setPlayingGame({ game, topicId }); setIsGamePlayerOpen(true); }}
                     onDeleteCustomGame={(gameId) => {
                         const newProgress = { ...studentProgress, customGames: studentProgress.customGames.filter(g => g.id !== gameId) };
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -351,9 +400,18 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={(challengeType, attempt) => {
-                        setActiveChallenge(prev => prev ? ({ ...prev, sessionAttempts: [...prev.sessionAttempts, attempt] }) : null);
+                        setActiveChallenge(prev => {
+                            if(!prev) return null;
+                            const updatedChallenge = {...prev};
+                            if (!updatedChallenge.sessionAttempts) {
+                                updatedChallenge.sessionAttempts = [];
+                            }
+                            updatedChallenge.sessionAttempts.push(attempt);
+                            return updatedChallenge;
+                        });
                     }}
                     handleGameComplete={(gameId) => {
+// FIX: Corrected function call to Gamification.processGameCompletion.
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
@@ -390,6 +448,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                         });
                     }}
                     handleCustomQuizComplete={(finalAttempts) => {
+// FIX: Corrected function call to Gamification.processCustomQuizCompletion.
                         const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                         setView('custom_quiz_list');
@@ -406,6 +465,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                 onClose={() => setIsGamePlayerOpen(false)} 
                 game={playingGame?.game || null}
                 onGameComplete={(gameId) => {
+// FIX: Corrected function call to Gamification.processGameCompletion.
                     const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                     handleUpdateStudentProgress(newProgress, studentProgress);
                 }}

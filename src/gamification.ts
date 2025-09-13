@@ -1,5 +1,6 @@
 import React from "react";
-import { StudentProgress, Subject } from "./types";
+// FIX: Added imports for types used in the new gamification logic functions.
+import { StudentProgress, Subject, QuestionAttempt, Badge } from "./types";
 import { getBrasiliaDate, getLocalDateISOString } from './utils';
 import { 
     StarIcon,
@@ -147,4 +148,206 @@ export const ALL_BADGES: {
         }
         return false;
     }}
+};
+
+// FIX: Added missing gamification logic functions.
+export const checkAndAwardBadges = (
+    progress: StudentProgress,
+    subjects: Subject[],
+    allProgress?: { [studentId: string]: StudentProgress }
+): (Badge & {id: string})[] => {
+    const newlyAwarded: (Badge & {id: string})[] = [];
+    for (const badgeId in ALL_BADGES) {
+        if (!progress.earnedBadgeIds.includes(badgeId)) {
+            const badgeInfo = ALL_BADGES[badgeId];
+            const result = badgeInfo.condition(progress, subjects, allProgress);
+            if (result) {
+                if (typeof result === 'object') {
+                    newlyAwarded.push({ id: badgeId, ...badgeInfo, ...result });
+                } else {
+                    newlyAwarded.push({ id: badgeId, ...badgeInfo });
+                }
+            }
+        }
+    }
+    return newlyAwarded;
+};
+
+export const updateSrsFlashcard = (
+    progress: StudentProgress,
+    flashcardId: string,
+    performance: 'good' | 'bad'
+): StudentProgress => {
+    const newProgress = { ...progress };
+    if (!newProgress.srsFlashcardData) {
+        newProgress.srsFlashcardData = {};
+    }
+
+    let currentStage = newProgress.srsFlashcardData[flashcardId]?.stage || 0;
+
+    if (performance === 'good') {
+        currentStage = Math.min(currentStage + 1, SRS_INTERVALS.length - 1);
+    } else { // 'bad'
+        currentStage = Math.max(0, currentStage - 1);
+    }
+
+    const nextReviewInterval = SRS_INTERVALS[currentStage];
+    const nextReviewDate = getBrasiliaDate();
+    nextReviewDate.setUTCDate(nextReviewDate.getUTCDate() + nextReviewInterval);
+    
+    newProgress.srsFlashcardData[flashcardId] = {
+        stage: currentStage,
+        nextReviewDate: getLocalDateISOString(nextReviewDate),
+    };
+
+    return newProgress;
+};
+
+export const processQuizCompletion = (
+    progress: StudentProgress,
+    subjectId: string,
+    topicId: string,
+    attempts: QuestionAttempt[],
+    addXp: (amount: number) => void
+): StudentProgress => {
+    if (attempts.length === 0) return progress;
+
+    const correctCount = attempts.filter(a => a.isCorrect).length;
+    const score = correctCount / attempts.length;
+    
+    addXp(correctCount * XP_CONFIG.CORRECT_ANSWER);
+
+    const newProgress = { ...progress };
+    if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
+    const oldScore = newProgress.progressByTopic[subjectId][topicId]?.score || 0;
+
+    newProgress.progressByTopic[subjectId][topicId] = {
+        completed: true,
+        score,
+        lastAttempt: attempts
+    };
+
+    if (score > oldScore) {
+        addXp(XP_CONFIG.TOPIC_COMPLETE);
+    }
+
+    const newBadges = [];
+    if (score >= 0.7) newBadges.push('bronze');
+    if (score >= 0.9) newBadges.push('silver');
+    if (score === 1) newBadges.push('gold');
+    
+    if (newBadges.length > 0) {
+        if (!newProgress.earnedTopicBadgeIds) newProgress.earnedTopicBadgeIds = {};
+        const existingBadges = newProgress.earnedTopicBadgeIds[topicId] || [];
+        newProgress.earnedTopicBadgeIds[topicId] = [...new Set([...existingBadges, ...newBadges])];
+    }
+    
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+    if (!newProgress.dailyActivity[todayISO]) {
+        newProgress.dailyActivity[todayISO] = { questionsAnswered: 0 };
+    }
+    newProgress.dailyActivity[todayISO].questionsAnswered += attempts.length;
+
+    return newProgress;
+};
+
+export const processReviewCompletion = (
+    progress: StudentProgress,
+    reviewId: string,
+    attempts: QuestionAttempt[],
+    addXp: (amount: number) => void
+): StudentProgress => {
+    const newProgress = { ...progress };
+    const reviewIndex = newProgress.reviewSessions.findIndex(r => r.id === reviewId);
+    if (reviewIndex === -1) return newProgress;
+
+    const review = newProgress.reviewSessions[reviewIndex];
+    review.isCompleted = true;
+    review.attempts = attempts;
+    
+    addXp(XP_CONFIG.REVIEW_SESSION_COMPLETE);
+
+    if (review.type === 'srs') {
+        if (!newProgress.srsData) newProgress.srsData = {};
+        attempts.forEach(attempt => {
+            const currentStage = newProgress.srsData[attempt.questionId]?.stage || 0;
+            let nextStage: number;
+
+            if (attempt.isCorrect) {
+                nextStage = Math.min(currentStage + 1, SRS_INTERVALS.length - 1);
+                addXp(XP_CONFIG.CORRECT_REVIEW_ANSWER);
+            } else {
+                nextStage = Math.max(0, Math.floor(currentStage / 2));
+            }
+            
+            const nextReviewInterval = SRS_INTERVALS[nextStage];
+            const nextReviewDate = getBrasiliaDate();
+            nextReviewDate.setUTCDate(nextReviewDate.getUTCDate() + nextReviewInterval);
+            
+            newProgress.srsData[attempt.questionId] = {
+                stage: nextStage,
+                nextReviewDate: getLocalDateISOString(nextReviewDate),
+            };
+        });
+    } else {
+        const correctCount = attempts.filter(a => a.isCorrect).length;
+        addXp(correctCount * XP_CONFIG.CORRECT_REVIEW_ANSWER);
+    }
+
+    return newProgress;
+};
+
+export const processGameCompletion = (
+    progress: StudentProgress,
+    topicId: string,
+    gameId: string,
+    addXp: (amount: number) => void
+): StudentProgress => {
+    const newProgress = { ...progress };
+    addXp(XP_CONFIG.MINI_GAME_COMPLETE);
+
+    if (topicId !== 'custom') {
+        if (!newProgress.earnedGameBadgeIds) newProgress.earnedGameBadgeIds = {};
+        if (!newProgress.earnedGameBadgeIds[topicId]) newProgress.earnedGameBadgeIds[topicId] = [];
+        
+        const existingBadges = newProgress.earnedGameBadgeIds[topicId];
+        if (!existingBadges.includes(gameId)) {
+            newProgress.earnedGameBadgeIds[topicId] = [...existingBadges, gameId];
+        }
+    }
+
+    newProgress.gamesCompletedCount = (newProgress.gamesCompletedCount || 0) + 1;
+    
+    return newProgress;
+};
+
+export const processCustomQuizCompletion = (
+    progress: StudentProgress,
+    quizId: string,
+    attempts: QuestionAttempt[],
+    addXp: (amount: number) => void
+): StudentProgress => {
+    const newProgress = { ...progress };
+    if (!newProgress.customQuizzes) {
+        newProgress.customQuizzes = [];
+    }
+    const quizIndex = newProgress.customQuizzes.findIndex(q => q.id === quizId);
+    if (quizIndex === -1) return newProgress;
+    
+    const correctCount = attempts.filter(a => a.isCorrect).length;
+    addXp(correctCount * XP_CONFIG.CORRECT_ANSWER);
+
+    newProgress.customQuizzes[quizIndex] = {
+        ...newProgress.customQuizzes[quizIndex],
+        isCompleted: true,
+        attempts: attempts
+    };
+    
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+    if (!newProgress.dailyActivity[todayISO]) {
+        newProgress.dailyActivity[todayISO] = { questionsAnswered: 0 };
+    }
+    newProgress.dailyActivity[todayISO].questionsAnswered += attempts.length;
+
+    return newProgress;
 };
