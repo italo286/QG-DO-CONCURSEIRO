@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User } from '../../../types';
+import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge } from '../../../types';
 import { Card, Button } from '../../ui';
 import { BellIcon, BookOpenIcon } from '../../Icons';
 import { StudentFocusPanel } from '../StudentFocusPanel';
@@ -17,7 +17,7 @@ interface DashboardHomeProps {
     teacherProfiles: User[];
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
-    onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;

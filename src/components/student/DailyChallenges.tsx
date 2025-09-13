@@ -1,12 +1,12 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button } from '../ui';
-import { TranslateIcon, FireIcon, CycleIcon, TagIcon } from '../Icons';
-import { getBrasiliaDate } from '../../utils';
+import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon } from '../Icons';
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
-    onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
 }
 
 const ChallengeCard: React.FC<{
@@ -120,6 +120,21 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
     const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak } = studentProgress;
     const streak = dailyChallengeStreak?.current || 0;
 
+    const yesterday = getBrasiliaDate();
+    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    const yesterdayISO = getLocalDateISOString(yesterday);
+
+    const missedChallenges = (['review', 'glossary', 'portuguese'] as const)
+        .map(type => {
+            const challengeKey = `${type}Challenge` as const;
+            const challenge = studentProgress[challengeKey];
+            if (challenge && challenge.generatedForDate === yesterdayISO && !challenge.isCompleted) {
+                return { type, challenge };
+            }
+            return null;
+        })
+        .filter((c): c is { type: 'review' | 'glossary' | 'portuguese', challenge: DailyChallenge<any> } => c !== null);
+
     return (
         <Card className="p-6">
             <div className="flex justify-between items-center mb-4">
@@ -131,12 +146,26 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     </div>
                 )}
             </div>
+            {missedChallenges.length > 0 && (
+                <div className="mb-4 p-4 rounded-lg bg-yellow-500/20 border border-yellow-500/30 text-center animate-pulse-orange">
+                    <h4 className="font-bold text-yellow-300">Não perca sua ofensiva! 🔥</h4>
+                    <p className="text-sm text-yellow-200/80 my-2">Você tem desafios de ontem pendentes. Complete-os para manter sua sequência.</p>
+                    <div className="flex justify-center gap-2 mt-3">
+                    {missedChallenges.map(({ type, challenge }) => (
+                        <Button key={type} onClick={() => onStartDailyChallenge(challenge, type, true)} className="text-sm py-2 px-3 bg-yellow-600 hover:bg-yellow-500">
+                            <SparklesIcon className="h-4 w-4 mr-2"/>
+                            Recuperar Desafio de {type === 'review' ? 'Revisão' : type === 'glossary' ? 'Glossário' : 'Português'}
+                        </Button>
+                    ))}
+                    </div>
+                </div>
+            )}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <ChallengeCard 
                     title="Desafio da Revisão"
                     icon={CycleIcon}
                     challenge={reviewChallenge}
-                    onStart={() => onStartDailyChallenge('review')}
+                    onStart={() => onStartDailyChallenge(reviewChallenge!, 'review')}
                     type="review"
                     studentProgress={studentProgress}
                 />
@@ -144,7 +173,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     title="Desafio do Glossário"
                     icon={TagIcon}
                     challenge={glossaryChallenge}
-                    onStart={() => onStartDailyChallenge('glossary')}
+                    onStart={() => onStartDailyChallenge(glossaryChallenge!, 'glossary')}
                     type="glossary"
                     studentProgress={studentProgress}
                 />
@@ -152,7 +181,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     title="Desafio de Português"
                     icon={TranslateIcon}
                     challenge={portugueseChallenge}
-                    onStart={() => onStartDailyChallenge('portuguese')}
+                    onStart={() => onStartDailyChallenge(portugueseChallenge!, 'portuguese')}
                     type="portuguese"
                     studentProgress={studentProgress}
                 />

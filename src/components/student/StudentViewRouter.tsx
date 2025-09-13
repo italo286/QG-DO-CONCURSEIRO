@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz
+    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz, DailyChallenge
 } from '../../types';
 import { getLocalDateISOString } from '../../utils';
 
@@ -36,7 +36,7 @@ interface StudentViewRouterProps {
     selectedTopic: Topic | null;
     selectedSubtopic: SubTopic | null;
     selectedReview: ReviewSession | null;
-    activeChallenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[] } | null;
+    activeChallenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null;
     dailyChallengeResults: { questions: Question[], sessionAttempts: QuestionAttempt[] } | null;
     isGeneratingReview: boolean;
     isSplitView: boolean;
@@ -49,7 +49,7 @@ interface StudentViewRouterProps {
     onCourseSelect: (course: Course) => void;
     onSubjectSelect: (subject: Subject) => void;
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
-    onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
@@ -64,7 +64,7 @@ interface StudentViewRouterProps {
     saveReviewProgress: (reviewId: string, attempt: QuestionAttempt) => void;
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
     handleReviewQuizComplete: (reviewId: string, attempts: QuestionAttempt[]) => void;
-    handleDailyChallengeComplete: (finalAttempts: QuestionAttempt[]) => void;
+    handleDailyChallengeComplete: (finalAttempts: QuestionAttempt[], isCatchUp?: boolean) => void;
     onAddBonusXp: (amount: number, message: string) => void;
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onDeleteCustomGame: (gameId: string) => void;
@@ -75,7 +75,7 @@ interface StudentViewRouterProps {
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
     onOpenChatModal: () => void;
     setView: (view: ViewType) => void;
-    setActiveChallenge: (challenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[] } | null) => void;
+    setActiveChallenge: (challenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null) => void;
     onSaveDailyChallengeAttempt: (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => void;
     handleGameComplete: (gameId: string) => void;
     handleGameError: () => void;
@@ -181,7 +181,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 questions={props.activeChallenge.questions}
                 initialAttempts={props.activeChallenge.sessionAttempts}
                 onSaveAttempt={(attempt) => props.onSaveDailyChallengeAttempt(props.activeChallenge!.type, attempt)}
-                onComplete={props.handleDailyChallengeComplete}
+                onComplete={(attempts) => props.handleDailyChallengeComplete(attempts, props.activeChallenge?.isCatchUp)}
                 onBack={() => { props.setView('dashboard'); props.setActiveChallenge(null); }}
                 quizTitle={`Desafio Diário: ${props.activeChallenge.type === 'review' ? 'Revisão' : props.activeChallenge.type === 'glossary' ? 'Glossário' : 'Português'}`}
                 subjectName="Desafio Diário"

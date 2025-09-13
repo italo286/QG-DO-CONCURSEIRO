@@ -1,11 +1,10 @@
 import { Handler } from '@netlify/functions';
 import * as admin from 'firebase-admin';
-import { User, StudentProgress, Question, Subject, GlossaryTerm, DailyChallenge } from '../../src/types';
+import { User, StudentProgress, Question, Subject, GlossaryTerm } from '../../src/types';
 import * as GeminiService from '../../src/services/geminiService';
 import { getBrasiliaDate, getLocalDateISOString } from '../../src/utils';
 
 // --- INICIALIZAÇÃO DO FIREBASE ADMIN ---
-// Isso garante que o app do Firebase seja inicializado apenas uma vez.
 try {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT_KEY || '{}');
   if (!admin.apps.length) {
@@ -19,7 +18,6 @@ try {
 
 const db = admin.firestore();
 
-// Helper para embaralhar arrays
 const shuffle = <T,>(array: T[]): T[] => {
     if (!array || array.length === 0) return [];
     const newArray = [...array];
@@ -43,6 +41,20 @@ export const handler: Handler = async () => {
     const studentsSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
     const subjectsSnapshot = await db.collection('subjects').get();
     const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as Subject);
+    
+    // Create a flat map of all questions for easy lookup
+    const allQuestionsMap = new Map<string, Question>();
+    allSubjects.forEach(s => {
+        (s.topics || []).forEach(t => {
+            (t.questions || []).forEach(q => allQuestionsMap.set(q.id, q));
+            (t.tecQuestions || []).forEach(q => allQuestionsMap.set(q.id, q));
+            (t.subtopics || []).forEach(st => {
+                (st.questions || []).forEach(q => allQuestionsMap.set(q.id, q));
+                (st.tecQuestions || []).forEach(q => allQuestionsMap.set(q.id, q));
+            });
+        });
+    });
+
 
     if (studentsSnapshot.empty) {
       return { statusCode: 200, body: 'Nenhum aluno encontrado.' };
@@ -64,61 +76,111 @@ export const handler: Handler = async () => {
 
       // --- 1. Lógica de Streak ---
       const streak = progressData.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
-      if (streak.lastCompletedDate && streak.lastCompletedDate !== yesterdayISO) {
+      if (streak.lastCompletedDate && streak.lastCompletedDate !== yesterdayISO && streak.lastCompletedDate !== todayISO) {
           streak.current = 0; // Quebrou a sequência
       }
       progressData.dailyChallengeStreak = streak;
 
-
       // --- 2. Lógica de Geração de Desafios ---
 
-      // a) Desafio de Revisão
+      // a) Desafio de Revisão (Ponderado)
       if (!progressData.reviewChallenge || progressData.reviewChallenge.generatedForDate !== todayISO) {
-          // FIX: Added explicit typing to `allQuestions` and included `tecQuestions` to prevent type errors and ensure all questions are considered.
-          const allQuestions: Question[] = allSubjects.flatMap(s =>
-            (s.topics || []).flatMap(t => [
-              ...(t.questions || []),
-              ...(t.tecQuestions || []),
-              ...(t.subtopics || []).flatMap(st => [
-                ...(st.questions || []),
-                ...(st.tecQuestions || []),
-              ]),
-            ]),
-          );
-          const incorrectIds = new Set<string>();
+          const questionCount = progressData.advancedReviewQuestionCount || 5;
+          let reviewQuestions: Question[] = [];
+
+          // Priority 1: SRS Questions due today
+          const srsDueIds = Object.entries(progressData.srsData || {})
+              .filter(([, data]) => data.nextReviewDate <= todayISO)
+              .map(([id]) => id);
+          const srsQuestions = srsDueIds.map(id => allQuestionsMap.get(id)).filter((q): q is Question => !!q);
+          
+          // Priority 2: Frequently incorrect questions
+          const errorCounts = new Map<string, number>();
           Object.values(progressData.progressByTopic).forEach(subject => {
-            Object.values(subject).forEach(topic => {
-              topic.lastAttempt.forEach(attempt => {
-                if (!attempt.isCorrect) incorrectIds.add(attempt.questionId);
+              Object.values(subject).forEach(topic => {
+                  (topic.lastAttempt || []).forEach(attempt => {
+                      if (!attempt.isCorrect) {
+                          errorCounts.set(attempt.questionId, (errorCounts.get(attempt.questionId) || 0) + 1);
+                      }
+                  });
               });
-            });
           });
-          const questions = shuffle(allQuestions.filter(q => incorrectIds.has(q.id))).slice(0, 5);
-          progressData.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0 };
+          
+          const frequentlyIncorrectQuestions = Array.from(errorCounts.entries())
+              .sort((a, b) => b[1] - a[1]) // Sort by count desc
+              .map(([id]) => allQuestionsMap.get(id))
+              .filter((q): q is Question => !!q);
+          
+          // Combine and deduplicate
+          const candidatePool = [...srsQuestions, ...frequentlyIncorrectQuestions];
+          const uniqueCandidates = Array.from(new Map(candidatePool.map(q => [q.id, q])).values());
+          
+          reviewQuestions = uniqueCandidates.slice(0, questionCount);
+
+          // Smart Plan B: If pool is still not full, find low-scoring topics
+          if (reviewQuestions.length < questionCount) {
+              const lowScoringTopics: { topicId: string, score: number }[] = [];
+              Object.values(progressData.progressByTopic).forEach(subject => {
+                  Object.entries(subject).forEach(([topicId, topicData]) => {
+                      if (topicData.score < 0.7) { // 70% threshold
+                          lowScoringTopics.push({ topicId, score: topicData.score });
+                      }
+                  });
+              });
+              
+              const sortedLowScoring = lowScoringTopics.sort((a, b) => a.score - b.score);
+              const existingQuestionIds = new Set(reviewQuestions.map(q => q.id));
+              
+              for (const { topicId } of sortedLowScoring) {
+                  if (reviewQuestions.length >= questionCount) break;
+
+                  const questionsFromTopic = shuffle([...allQuestionsMap.values()].filter(q => 
+                      (q.topicName?.includes(topicId) || q.id.startsWith(topicId)) && !existingQuestionIds.has(q.id)
+                  ));
+
+                  const needed = questionCount - reviewQuestions.length;
+                  reviewQuestions.push(...questionsFromTopic.slice(0, needed));
+              }
+          }
+          
+          progressData.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: reviewQuestions, isCompleted: reviewQuestions.length === 0, attemptsMade: 0 };
       }
 
-      // b) Desafio de Glossário
+      // b) Desafio de Glossário (Contextual)
       if (!progressData.glossaryChallenge || progressData.glossaryChallenge.generatedForDate !== todayISO) {
-        // FIX: Added explicit typing to `allGlossaryTerms` to resolve downstream type errors on properties like 'term' and 'definition'.
-        const allGlossaryTerms: GlossaryTerm[] = allSubjects.flatMap(s =>
-            (s.topics || []).flatMap(t => [
-                ...(t.glossary || []),
-                ...(t.subtopics || []).flatMap(st => st.glossary || []),
-            ]),
-        );
-        const uniqueTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
-        let questions: Question[] = [];
-        if (uniqueTerms.length >= 5) {
-            const selectedTerms = shuffle(uniqueTerms).slice(0, 5);
-            questions = selectedTerms.map((term, i) => ({
-                id: `gloss-chal-${todayISO}-${i}`,
-                statement: `Qual termo corresponde à definição: "${term.definition}"?`,
-                options: shuffle([term.term, ...shuffle(uniqueTerms.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.term)]),
-                correctAnswer: term.term,
-                justification: `O termo correto é **${term.term}**.`,
-            }));
-        }
-        progressData.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0 };
+          const studiedTopicIds = new Set(Object.values(progressData.progressByTopic).flatMap(s => Object.keys(s)));
+          
+          let contextualTerms: GlossaryTerm[] = [];
+          allSubjects.forEach(s => {
+              s.topics.forEach(t => {
+                  if (studiedTopicIds.has(t.id)) contextualTerms.push(...(t.glossary || []));
+                  t.subtopics.forEach(st => {
+                      if (studiedTopicIds.has(st.id)) contextualTerms.push(...(st.glossary || []));
+                  });
+              });
+          });
+          
+          let sourcePool = Array.from(new Map(contextualTerms.map(item => [item.term, item])).values());
+          
+          // Fallback if not enough contextual terms
+          if (sourcePool.length < 5) {
+            const allGlossaryTerms = allSubjects.flatMap(s => (s.topics || []).flatMap(t => [...(t.glossary || []), ...(t.subtopics || []).flatMap(st => st.glossary || [])]));
+            sourcePool = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
+          }
+
+          let questions: Question[] = [];
+          if (sourcePool.length >= 5) {
+              const questionCount = progressData.glossaryChallengeQuestionCount || 5;
+              const selectedTerms = shuffle(sourcePool).slice(0, questionCount);
+              questions = selectedTerms.map((term, i) => ({
+                  id: `gloss-chal-${todayISO}-${i}`,
+                  statement: `Qual termo corresponde à definição: "${term.definition}"?`,
+                  options: shuffle([term.term, ...shuffle(sourcePool.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.term)]),
+                  correctAnswer: term.term,
+                  justification: `O termo correto é **${term.term}**.`,
+              }));
+          }
+          progressData.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0 };
       }
 
       // c) Desafio de Português
