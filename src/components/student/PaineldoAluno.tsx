@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
     User, Subject, Topic, SubTopic, Course, ReviewSession, Question, QuestionAttempt,
-    MiniGame, CustomQuiz, TeacherMessage, StudentProgress
+    MiniGame, CustomQuiz, TeacherMessage, StudentProgress, DailyChallenge
 } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as GeminiService from '../../services/geminiService';
@@ -33,12 +33,23 @@ interface PaineldoAlunoProps {
     onToggleStudentView?: () => void;
 }
 
+// Helper to shuffle array elements for randomizing question options
+const shuffle = <T,>(array: T[]): T[] => {
+    if (!array) return [];
+    const newArray = [...array];
+    for (let i = newArray.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
+    }
+    return newArray;
+};
+
 export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview = false, onToggleStudentView, }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [history, setHistory] = useState<ViewType[]>(['dashboard']);
     const {
         isLoading, allSubjects, allStudents, allStudentProgress, enrolledCourses, studentProgress, setStudentProgress,
-        studyPlan, messages, teacherProfiles,
+        studyPlan, messages, teacherProfiles, allQuestionsWithContext, allGlossaryTermsWithContext
     } = useStudentData(user, isPreview);
 
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -70,6 +81,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const [isGeneratingReview, setIsGeneratingReview] = useState(false);
     const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
+    const [isGeneratingChallenge, setIsGeneratingChallenge] = useState<'review' | 'glossary' | 'portuguese' | null>(null);
 
     // FIX: Moved useMemo to the top of the component with other hooks to prevent conditional rendering errors.
     const quizInfoForDeleteModal = useMemo(() => {
@@ -409,6 +421,100 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         handleUpdateStudentProgress(newProgress);
     };
 
+    const handleGenerateChallenge = async (type: 'review' | 'glossary' | 'portuguese') => {
+        if (!studentProgress) return;
+        setIsGeneratingChallenge(type);
+
+        try {
+            const todayISO = getLocalDateISOString(getBrasiliaDate());
+            const newProgress = JSON.parse(JSON.stringify(studentProgress));
+            let newChallenge: DailyChallenge<Question>;
+
+            switch (type) {
+                case 'review': {
+                    const currentChallenge = studentProgress.reviewChallenge;
+                    const mode = studentProgress.dailyReviewMode || 'standard';
+                    const questionCount = studentProgress.advancedReviewQuestionCount || 5;
+                    const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
+                    
+                    let pool = allQuestionsWithContext;
+                    if (mode === 'advanced') {
+                        const subjectIds = new Set(studentProgress.advancedReviewSubjectIds || []);
+                        const topicIds = new Set(studentProgress.advancedReviewTopicIds || []);
+                        if (subjectIds.size > 0) {
+                            pool = pool.filter(q => subjectIds.has(q.subjectId));
+                            if (topicIds.size > 0) {
+                                pool = pool.filter(q => topicIds.has(q.topicId));
+                            }
+                        }
+                    }
+
+                    const attemptedIds = new Set<string>(), correctIds = new Set<string>();
+                    Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt)).forEach(a => { if(a) { attemptedIds.add(a.questionId); if(a.isCorrect) correctIds.add(a.questionId); } });
+                    const incorrectIds = new Set([...attemptedIds].filter(id => !correctIds.has(id)));
+
+                    let finalPool: Question[] = [];
+                    if (questionType === 'incorrect') finalPool = pool.filter(q => incorrectIds.has(q.id));
+                    else if (questionType === 'correct') finalPool = pool.filter(q => correctIds.has(q.id));
+                    else if (questionType === 'unanswered') finalPool = pool.filter(q => !attemptedIds.has(q.id));
+                    else finalPool = pool;
+
+                    const questions = shuffle(finalPool).slice(0, questionCount);
+                    newChallenge = { date: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0, sessionAttempts: [], uncompletedCount: (currentChallenge && !currentChallenge.isCompleted) ? (currentChallenge.uncompletedCount || 0) + 1 : 0 };
+                    newProgress.reviewChallenge = newChallenge;
+                    break;
+                }
+                case 'glossary': {
+                     const currentChallenge = studentProgress.glossaryChallenge;
+                    const mode = studentProgress.glossaryChallengeMode || 'standard';
+                    const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
+                    let pool = allGlossaryTermsWithContext;
+
+                    if (mode === 'advanced') {
+                        const subjectIds = new Set(studentProgress.advancedGlossarySubjectIds || []);
+                        const topicIds = new Set(studentProgress.advancedGlossaryTopicIds || []);
+                        if(subjectIds.size > 0) {
+                            pool = pool.filter(t => subjectIds.has(t.subjectId));
+                            if(topicIds.size > 0) pool = pool.filter(t => topicIds.has(t.topicId));
+                        }
+                    }
+
+                    const uniqueTerms = Array.from(new Map(pool.map(item => [item.term, item])).values());
+                    let questions: Question[] = [];
+                    if (uniqueTerms.length >= 4) {
+                        const selectedTerms = shuffle(uniqueTerms).slice(0, questionCount);
+                        questions = selectedTerms.map((term, i) => ({
+                            id: `gloss-chal-${todayISO}-${i}`,
+                            statement: `Qual termo corresponde à definição: "${term.definition}"?`,
+                            options: shuffle([term.term, ...shuffle(uniqueTerms.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.term)]),
+                            correctAnswer: term.term,
+                            justification: `O termo correto é **${term.term}**.`,
+                        }));
+                    }
+                    newChallenge = { date: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0, sessionAttempts: [], uncompletedCount: (currentChallenge && !currentChallenge.isCompleted) ? (currentChallenge.uncompletedCount || 0) + 1 : 0 };
+                    newProgress.glossaryChallenge = newChallenge;
+                    break;
+                }
+                case 'portuguese': {
+                    const currentChallenge = studentProgress.portugueseChallenge;
+                    const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
+                    const generated = await GeminiService.generatePortugueseChallenge(questionCount);
+                    const questions = generated.map((q, i) => ({ ...q, id: `port-chal-${todayISO}-${i}`}));
+                    newChallenge = { date: todayISO, items: questions, isCompleted: questions.length === 0, attemptsMade: 0, sessionAttempts: [], uncompletedCount: (currentChallenge && !currentChallenge.isCompleted) ? (currentChallenge.uncompletedCount || 0) + 1 : 0 };
+                    newProgress.portugueseChallenge = newChallenge;
+                    break;
+                }
+            }
+            
+            await handleUpdateStudentProgress(newProgress, studentProgress);
+
+        } catch (error) {
+            console.error(`Error generating ${type} challenge:`, error);
+        } finally {
+            setIsGeneratingChallenge(null);
+        }
+    };
+
 
     const handleStartDailyChallenge = (type: 'review' | 'glossary' | 'portuguese') => {
         if(!studentProgress) return;
@@ -618,6 +724,8 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onSubjectSelect={(subject) => { setSelectedSubject(subject); changeView('subject'); }}
                     onTopicSelect={(topic, parent) => handleTopicSelect(topic, parent)}
                     onStartDailyChallenge={handleStartDailyChallenge}
+                    onGenerateDailyChallenge={handleGenerateChallenge}
+                    isGeneratingDailyChallenge={isGeneratingChallenge}
                     onNavigateToTopic={onNavigateToTopic}
                     onToggleTopicCompletion={handleToggleTopicCompletion}
                     onOpenNewMessageModal={() => setIsNewMessageModalOpen(true)}

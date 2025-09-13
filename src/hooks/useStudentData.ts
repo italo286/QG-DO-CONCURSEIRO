@@ -1,20 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import * as FirebaseService from '../services/firebaseService';
-import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course, Question } from '../types';
-import { getBrasiliaDate, getLocalDateISOString } from '../utils';
-import * as GeminiService from '../services/geminiService';
-
-// Helper to shuffle array elements for randomizing question options
-const shuffle = <T,>(array: T[]): T[] => {
-    if (!array) return [];
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-};
-
+import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course } from '../types';
 
 export const useStudentData = (user: User, isPreview?: boolean) => {
     const [allSubjects, setAllSubjects] = useState<Subject[]>([]);
@@ -87,173 +73,6 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         ])
     ), [allSubjects]);
 
-
-    // Daily Challenge Generation Logic
-    useEffect(() => {
-        const checkAndGenerateChallenges = async () => {
-            if (isPreview || !studentProgress || allSubjects.length === 0 || enrolledCourses.length === 0) return;
-
-            const now = getBrasiliaDate();
-            const todayISO = getLocalDateISOString(now);
-
-            const preferredTimeStr = studentProgress.dailyChallengeTime || '06:00';
-            const [hours, minutes] = preferredTimeStr.split(':').map(Number);
-            const generationTime = getBrasiliaDate();
-            generationTime.setUTCHours(hours, minutes, 0, 0);
-
-            if (now.getTime() < generationTime.getTime()) {
-                return; // Not time yet to generate today's challenges
-            }
-
-            let needsUpdate = false;
-            const newProgress = JSON.parse(JSON.stringify(studentProgress));
-
-            // --- Review Challenge ---
-            const currentReviewChallenge = studentProgress.reviewChallenge;
-            if (!currentReviewChallenge || currentReviewChallenge.date !== todayISO) {
-                needsUpdate = true;
-                const mode = studentProgress.dailyReviewMode || 'standard';
-                const questionCount = studentProgress.advancedReviewQuestionCount || 5;
-
-                let availableQuestions: (Question & { subjectId: string; topicId: string; })[] = [];
-                const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
-                
-                if (mode === 'standard') {
-                    availableQuestions = allQuestionsWithContext;
-                } else { // Advanced mode
-                    const subjectIds = new Set(studentProgress.advancedReviewSubjectIds || []);
-                    const topicIds = new Set(studentProgress.advancedReviewTopicIds || []);
-                    
-                    if (subjectIds.size > 0) {
-                        const filteredBySubject = allQuestionsWithContext.filter(q => subjectIds.has(q.subjectId));
-                        if (topicIds.size > 0) {
-                            availableQuestions = filteredBySubject.filter(q => topicIds.has(q.topicId));
-                        } else {
-                            availableQuestions = filteredBySubject;
-                        }
-                    } 
-                }
-                
-                const attemptedIds = new Set<string>();
-                const correctIds = new Set<string>();
-                
-                const allSources = [
-                    ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt)),
-                    ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || []),
-                    ...(studentProgress.reviewChallenge?.sessionAttempts || []),
-                    ...(studentProgress.glossaryChallenge?.sessionAttempts || []),
-                    ...(studentProgress.portugueseChallenge?.sessionAttempts || [])
-                ];
-
-                allSources.forEach(attempt => {
-                    if (attempt) {
-                        attemptedIds.add(attempt.questionId);
-                        if (attempt.isCorrect) {
-                            correctIds.add(attempt.questionId);
-                        }
-                    }
-                });
-                
-                const incorrectIds = new Set<string>();
-                attemptedIds.forEach(id => { if (!correctIds.has(id)) incorrectIds.add(id); });
-
-                let finalSelectionPool: Question[] = [];
-                if (questionType === 'unanswered') {
-                    finalSelectionPool = availableQuestions.filter(q => !attemptedIds.has(q.id));
-                } else if (questionType === 'incorrect') {
-                    finalSelectionPool = availableQuestions.filter(q => incorrectIds.has(q.id));
-                } else if (questionType === 'correct') {
-                    finalSelectionPool = availableQuestions.filter(q => correctIds.has(q.id));
-                } else { // mixed
-                    finalSelectionPool = availableQuestions;
-                }
-                
-                const questionsForChallenge = shuffle(finalSelectionPool).slice(0, questionCount);
-
-                newProgress.reviewChallenge = {
-                    date: todayISO,
-                    items: questionsForChallenge,
-                    isCompleted: questionsForChallenge.length === 0,
-                    attemptsMade: 0,
-                    sessionAttempts: [],
-                    uncompletedCount: (currentReviewChallenge && !currentReviewChallenge.isCompleted) ? (currentReviewChallenge.uncompletedCount || 0) + 1 : 0
-                };
-            }
-            
-            // --- Glossary Challenge ---
-            const currentGlossaryChallenge = studentProgress.glossaryChallenge;
-            if (!currentGlossaryChallenge || currentGlossaryChallenge.date !== todayISO) {
-                needsUpdate = true;
-                const mode = studentProgress.glossaryChallengeMode || 'standard';
-                const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
-                let availableTerms = allGlossaryTermsWithContext;
-
-                if (mode === 'advanced') {
-                    const subjectIds = new Set(studentProgress.advancedGlossarySubjectIds || []);
-                    const topicIds = new Set(studentProgress.advancedGlossaryTopicIds || []);
-                    if (subjectIds.size > 0) {
-                        availableTerms = availableTerms.filter(term => subjectIds.has(term.subjectId));
-                        if (topicIds.size > 0) {
-                            availableTerms = availableTerms.filter(term => topicIds.has(term.topicId));
-                        }
-                    }
-                }
-
-                const uniqueTerms = Array.from(new Map(availableTerms.map(item => [item.term, item])).values());
-                let glossaryQuestions: Question[] = [];
-                if (uniqueTerms.length >= 4) {
-                    const selectedTerms = shuffle(uniqueTerms).slice(0, questionCount);
-                    glossaryQuestions = selectedTerms.map((correctTerm, index) => {
-                        const distractors = shuffle(uniqueTerms.filter(t => t.term !== correctTerm.term)).slice(0, 4).map(t => t.term);
-                        const options = shuffle([correctTerm.term, ...distractors]);
-                        return { id: `gloss-challenge-${todayISO}-${index}`, statement: `Qual termo corresponde à definição: "${correctTerm.definition}"?`, options, correctAnswer: correctTerm.term, justification: `O termo correto é **${correctTerm.term}**.` };
-                    });
-                }
-                
-                newProgress.glossaryChallenge = {
-                    date: todayISO,
-                    items: glossaryQuestions,
-                    isCompleted: glossaryQuestions.length === 0,
-                    attemptsMade: 0,
-                    sessionAttempts: [],
-                    uncompletedCount: (currentGlossaryChallenge && !currentGlossaryChallenge.isCompleted) ? (currentGlossaryChallenge.uncompletedCount || 0) + 1 : 0
-                };
-            }
-
-            // --- Portuguese Challenge ---
-            const currentPortugueseChallenge = studentProgress.portugueseChallenge;
-            if (!currentPortugueseChallenge || currentPortugueseChallenge.date !== todayISO) {
-                needsUpdate = true;
-                let questions: Question[] = [];
-                try {
-                    const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
-                    const generatedQuestions = await GeminiService.generatePortugueseChallenge(questionCount);
-                    if (generatedQuestions.length > 0) {
-                        questions = generatedQuestions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` }));
-                    }
-                } catch (error) {
-                    console.error("Failed to generate Portuguese challenge:", error);
-                }
-
-                newProgress.portugueseChallenge = {
-                    date: todayISO,
-                    items: questions,
-                    isCompleted: questions.length === 0,
-                    attemptsMade: 0,
-                    sessionAttempts: [],
-                    uncompletedCount: (currentPortugueseChallenge && !currentPortugueseChallenge.isCompleted) ? (currentPortugueseChallenge.uncompletedCount || 0) + 1 : 0
-                };
-            }
-
-            if (needsUpdate) {
-                await FirebaseService.saveStudentProgress(newProgress);
-            }
-        };
-
-        checkAndGenerateChallenges();
-    }, [studentProgress, isPreview, allSubjects, enrolledCourses, allQuestionsWithContext, allGlossaryTermsWithContext]);
-
-
     return {
         isLoading,
         allSubjects,
@@ -265,5 +84,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         studyPlan,
         messages,
         teacherProfiles,
+        allQuestionsWithContext,
+        allGlossaryTermsWithContext,
     };
 };

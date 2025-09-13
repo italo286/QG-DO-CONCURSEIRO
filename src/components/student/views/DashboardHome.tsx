@@ -18,6 +18,8 @@ interface DashboardHomeProps {
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
     onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    onGenerateDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    isGeneratingDailyChallenge: 'review' | 'glossary' | 'portuguese' | null;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
@@ -34,6 +36,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     onAcknowledgeMessage,
     onCourseSelect,
     onStartDailyChallenge,
+    onGenerateDailyChallenge,
+    isGeneratingDailyChallenge,
     onNavigateToTopic,
     onToggleTopicCompletion,
     onOpenNewMessageModal,
@@ -79,6 +83,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <DailyChallenges 
                     studentProgress={studentProgress}
                     onStartDailyChallenge={onStartDailyChallenge}
+                    onGenerateDailyChallenge={onGenerateDailyChallenge}
+                    isGeneratingDailyChallenge={isGeneratingDailyChallenge}
                 />
 
                 <StudentFocusPanel enrolledCourses={enrolledCourses} studentProgress={studentProgress} />

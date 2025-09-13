@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
-import { Card, Button } from '../ui';
+import { Card, Button, Spinner } from '../ui';
 import { TagIcon, TranslateIcon, RefreshIcon } from '../Icons';
 import { getBrasiliaDate } from '../../utils';
 
@@ -48,6 +48,8 @@ const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
 interface DailyChallengesProps {
     studentProgress: StudentProgress;
     onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    onGenerateDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
+    isGeneratingDailyChallenge: 'review' | 'glossary' | 'portuguese' | null;
 }
 
 const ChallengeCard: React.FC<{
@@ -56,10 +58,12 @@ const ChallengeCard: React.FC<{
     Icon: React.FC<{className?: string}>;
     challenge: DailyChallenge<any> | undefined | null;
     onStart: () => void;
+    onGenerate: () => void;
+    isGenerating: boolean;
     gradient: string;
     studentProgress: StudentProgress;
     challengeType: 'review' | 'glossary' | 'portuguese';
-}> = ({ title, description, Icon, challenge, onStart, gradient, studentProgress, challengeType }) => {
+}> = ({ title, description, Icon, challenge, onStart, onGenerate, isGenerating, gradient, studentProgress, challengeType }) => {
     const uncompletedCount = challenge?.uncompletedCount || 0;
     const answeredCount = challenge?.sessionAttempts?.length || 0;
     const isCompleted = challenge?.isCompleted;
@@ -101,7 +105,12 @@ const ChallengeCard: React.FC<{
                 {uncompletedCount > 0 && <p className="text-yellow-300 text-xs mt-1">{uncompletedCount} desafio(s) anterior(es) não concluído(s).</p>}
             </div>
             <div className="mt-4 text-center">
-                {challenge ? (
+                {!challenge && (
+                    <Button onClick={onGenerate} disabled={isGenerating} className="bg-white/20 hover:bg-white/30 w-full">
+                        {isGenerating ? <Spinner /> : 'Gerar Desafio'}
+                    </Button>
+                )}
+                {challenge && (
                     (isEffectivelyCompleted || hasUsedAttempts) ? (
                         <Countdown targetTime={preferredTimeStr} />
                     ) : (
@@ -109,8 +118,6 @@ const ChallengeCard: React.FC<{
                            {buttonText}
                         </Button>
                     )
-                ) : (
-                    <p className="text-sm font-semibold text-gray-400">Indisponível</p>
                 )}
             </div>
         </Card>
@@ -118,7 +125,7 @@ const ChallengeCard: React.FC<{
 };
 
 
-export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge }) => {
+export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge, onGenerateDailyChallenge, isGeneratingDailyChallenge }) => {
     
     return (
         <div>
@@ -130,6 +137,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={RefreshIcon}
                     challenge={studentProgress.reviewChallenge}
                     onStart={() => onStartDailyChallenge('review')}
+                    onGenerate={() => onGenerateDailyChallenge('review')}
+                    isGenerating={isGeneratingDailyChallenge === 'review'}
                     gradient="bg-gradient-to-br from-cyan-900 to-blue-900"
                     studentProgress={studentProgress}
                     challengeType="review"
@@ -140,6 +149,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={TagIcon}
                     challenge={studentProgress.glossaryChallenge}
                     onStart={() => onStartDailyChallenge('glossary')}
+                    onGenerate={() => onGenerateDailyChallenge('glossary')}
+                    isGenerating={isGeneratingDailyChallenge === 'glossary'}
                     gradient="bg-gradient-to-br from-emerald-900 to-teal-900"
                     studentProgress={studentProgress}
                     challengeType="glossary"
@@ -150,6 +161,8 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     Icon={TranslateIcon}
                     challenge={studentProgress.portugueseChallenge}
                     onStart={() => onStartDailyChallenge('portuguese')}
+                    onGenerate={() => onGenerateDailyChallenge('portuguese')}
+                    isGenerating={isGeneratingDailyChallenge === 'portuguese'}
                     gradient="bg-gradient-to-br from-rose-900 to-pink-900"
                     studentProgress={studentProgress}
                     challengeType="portuguese"
