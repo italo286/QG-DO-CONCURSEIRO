@@ -111,9 +111,9 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
             // --- Review Challenge ---
             const currentReviewChallenge = studentProgress.reviewChallenge;
             if (!currentReviewChallenge || currentReviewChallenge.date !== todayISO) {
+                needsUpdate = true;
                 const mode = studentProgress.dailyReviewMode || 'standard';
                 const questionCount = studentProgress.advancedReviewQuestionCount || 5;
-                let questionsForChallenge: Question[] = [];
 
                 let availableQuestions: (Question & { subjectId: string; topicId: string; })[] = [];
                 const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
@@ -132,13 +132,11 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                             availableQuestions = filteredBySubject;
                         }
                     } 
-                    // If no subjects are selected in advanced mode, availableQuestions remains empty, which is correct.
                 }
                 
                 const attemptedIds = new Set<string>();
                 const correctIds = new Set<string>();
                 
-                // From Topic Quizzes, Manual Reviews, and previous Daily Challenges
                 const allSources = [
                     ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt)),
                     ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || []),
@@ -170,17 +168,22 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                     finalSelectionPool = availableQuestions;
                 }
                 
-                questionsForChallenge = shuffle(finalSelectionPool).slice(0, questionCount);
+                const questionsForChallenge = shuffle(finalSelectionPool).slice(0, questionCount);
 
-                if (questionsForChallenge.length > 0) {
-                    newProgress.reviewChallenge = { date: todayISO, items: questionsForChallenge, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentReviewChallenge && !currentReviewChallenge.isCompleted) ? (currentReviewChallenge.uncompletedCount || 0) + 1 : 0 };
-                    needsUpdate = true;
-                }
+                newProgress.reviewChallenge = {
+                    date: todayISO,
+                    items: questionsForChallenge,
+                    isCompleted: questionsForChallenge.length === 0,
+                    attemptsMade: 0,
+                    sessionAttempts: [],
+                    uncompletedCount: (currentReviewChallenge && !currentReviewChallenge.isCompleted) ? (currentReviewChallenge.uncompletedCount || 0) + 1 : 0
+                };
             }
             
             // --- Glossary Challenge ---
             const currentGlossaryChallenge = studentProgress.glossaryChallenge;
             if (!currentGlossaryChallenge || currentGlossaryChallenge.date !== todayISO) {
+                needsUpdate = true;
                 const mode = studentProgress.glossaryChallengeMode || 'standard';
                 const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
                 let availableTerms = allGlossaryTermsWithContext;
@@ -197,34 +200,49 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 }
 
                 const uniqueTerms = Array.from(new Map(availableTerms.map(item => [item.term, item])).values());
+                let glossaryQuestions: Question[] = [];
                 if (uniqueTerms.length >= 4) {
                     const selectedTerms = shuffle(uniqueTerms).slice(0, questionCount);
-                    const glossaryQuestions: Question[] = selectedTerms.map((correctTerm, index) => {
+                    glossaryQuestions = selectedTerms.map((correctTerm, index) => {
                         const distractors = shuffle(uniqueTerms.filter(t => t.term !== correctTerm.term)).slice(0, 4).map(t => t.term);
                         const options = shuffle([correctTerm.term, ...distractors]);
                         return { id: `gloss-challenge-${todayISO}-${index}`, statement: `Qual termo corresponde à definição: "${correctTerm.definition}"?`, options, correctAnswer: correctTerm.term, justification: `O termo correto é **${correctTerm.term}**.` };
                     });
-
-                    if (glossaryQuestions.length > 0) {
-                        newProgress.glossaryChallenge = { date: todayISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0, uncompletedCount: (currentGlossaryChallenge && !currentGlossaryChallenge.isCompleted) ? (currentGlossaryChallenge.uncompletedCount || 0) + 1 : 0 };
-                        needsUpdate = true;
-                    }
                 }
+                
+                newProgress.glossaryChallenge = {
+                    date: todayISO,
+                    items: glossaryQuestions,
+                    isCompleted: glossaryQuestions.length === 0,
+                    attemptsMade: 0,
+                    sessionAttempts: [],
+                    uncompletedCount: (currentGlossaryChallenge && !currentGlossaryChallenge.isCompleted) ? (currentGlossaryChallenge.uncompletedCount || 0) + 1 : 0
+                };
             }
 
             // --- Portuguese Challenge ---
             const currentPortugueseChallenge = studentProgress.portugueseChallenge;
             if (!currentPortugueseChallenge || currentPortugueseChallenge.date !== todayISO) {
+                needsUpdate = true;
+                let questions: Question[] = [];
                 try {
                     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
-                    const questions = await GeminiService.generatePortugueseChallenge(questionCount);
-                    if (questions.length > 0) {
-                        newProgress.portugueseChallenge = { date: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0, uncompletedCount: (currentPortugueseChallenge && !currentPortugueseChallenge.isCompleted) ? (currentPortugueseChallenge.uncompletedCount || 0) + 1 : 0 };
-                        needsUpdate = true;
+                    const generatedQuestions = await GeminiService.generatePortugueseChallenge(questionCount);
+                    if (generatedQuestions.length > 0) {
+                        questions = generatedQuestions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` }));
                     }
                 } catch (error) {
                     console.error("Failed to generate Portuguese challenge:", error);
                 }
+
+                newProgress.portugueseChallenge = {
+                    date: todayISO,
+                    items: questions,
+                    isCompleted: questions.length === 0,
+                    attemptsMade: 0,
+                    sessionAttempts: [],
+                    uncompletedCount: (currentPortugueseChallenge && !currentPortugueseChallenge.isCompleted) ? (currentPortugueseChallenge.uncompletedCount || 0) + 1 : 0
+                };
             }
 
             if (needsUpdate) {
