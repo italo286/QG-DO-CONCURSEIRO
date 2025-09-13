@@ -131,7 +131,7 @@ const generatePortugueseChallenge = async (questionCount: number, errorStats?: S
         }
     }));
     
-    const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
 
     return generatedQuestions.map((q: any) => {
         const cleanedOptionJustifications: { [key: string]: string } = {};
@@ -175,7 +175,7 @@ const generateGlossaryChallenge = async (terms: GlossaryTerm[], questionCount: n
         }
     }));
 
-    const generatedQuestions = parseJsonResponse<any[]>(response.text || '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
     return generatedQuestions.map(q => ({
         statement: q.statement,
         options: q.options,
@@ -245,7 +245,8 @@ export const handler: Handler = async () => {
                     if (glossaryQuestions.length > 0) {
                          updatedProgress.glossaryChallenge = {
                             date: todayISO,
-                            items: glossaryQuestions,
+                            // FIX: Added a map function to add a unique ID to each generated question, satisfying the Question[] type.
+                            items: glossaryQuestions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })),
                             isCompleted: false,
                             attemptsMade: 0
                         };
