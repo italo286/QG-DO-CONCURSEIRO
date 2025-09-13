@@ -1,136 +1,86 @@
-import React, { useState, useEffect } from 'react';
-import { StudentProgress, DailyChallenge, Question } from '../../types';
+
+import React from 'react';
+import { StudentProgress } from '../../types';
 import { Card, Button } from '../ui';
-import { TagIcon, TranslateIcon, RefreshIcon, FireIcon } from '../Icons';
-import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
-
-const Countdown: React.FC<{ targetTime: string }> = ({ targetTime }) => {
-    const [timeLeft, setTimeLeft] = useState('');
-
-    useEffect(() => {
-        const calculateAndSetTime = () => {
-            const now = getBrasiliaDate();
-            
-            const [hours, minutes] = targetTime.split(':').map(Number);
-            let targetDate = getBrasiliaDate();
-            targetDate.setUTCHours(hours, minutes, 0, 0);
-            
-            if (now.getTime() > targetDate.getTime()) {
-                targetDate.setUTCDate(targetDate.getUTCDate() + 1);
-            }
-
-            const difference = targetDate.getTime() - now.getTime();
-            if (difference > 0) {
-                const h = Math.floor((difference / (1000 * 60 * 60)));
-                const m = Math.floor((difference / 1000 / 60) % 60);
-                const s = Math.floor((difference / 1000) % 60);
-                setTimeLeft(`${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}`);
-            } else {
-                setTimeLeft('Carregando...');
-            }
-        };
-
-        calculateAndSetTime();
-        const timer = setInterval(calculateAndSetTime, 1000);
-
-        return () => clearInterval(timer);
-    }, [targetTime]);
-
-    return (
-        <div className="text-center">
-            <p className="text-sm text-gray-400">Próximo desafio em:</p>
-            <p className="text-2xl font-mono font-bold text-cyan-400">{timeLeft}</p>
-        </div>
-    );
-};
-
+import { CheckBadgeIcon, ClipboardListIcon, TranslateIcon, FireIcon } from '../Icons';
 
 interface DailyChallengesProps {
-    studentProgress: StudentProgress;
+    studentProgress: StudentProgress | null;
     onStartDailyChallenge: (challengeType: 'review' | 'glossary' | 'portuguese') => void;
 }
 
 const ChallengeCard: React.FC<{
     title: string;
-    description: string;
-    Icon: React.FC<{className?: string}>;
-    challenge: DailyChallenge<Question> | undefined | null;
+    icon: React.FC<{className?: string}>;
+    challenge: StudentProgress['reviewChallenge']; // Using one type, structure is the same
     onStart: () => void;
-    gradient: string;
-    studentProgress: StudentProgress;
-}> = ({ title, description, Icon, challenge, onStart, gradient, studentProgress }) => {
-    const todayISO = getLocalDateISOString(getBrasiliaDate());
-    const isTodayChallenge = challenge?.date === todayISO || challenge?.generatedForDate === todayISO;
-    const isCompleted = challenge?.isCompleted;
-    const isPartiallyDone = (challenge?.sessionAttempts?.length || 0) > 0 && !isCompleted;
-    const preferredTimeStr = studentProgress.dailyChallengeTime || '06:00';
-
+    type: string;
+}> = ({ title, icon: Icon, challenge, onStart, type }) => {
+    const isCompleted = challenge?.isCompleted || false;
+    const itemsCount = challenge?.items?.length || 0;
+    
     return (
-        <Card className={`p-6 flex flex-col justify-between ${gradient}`}>
+        <div className={`p-4 rounded-lg flex flex-col justify-between text-center transition-all ${isCompleted ? 'bg-green-900/30' : 'bg-gray-700/50'}`}>
             <div>
-                <h3 className="text-xl font-bold text-white flex items-center">
-                    <Icon className="h-6 w-6 mr-3" /> {title}
-                </h3>
-                <p className="text-gray-200 mt-2 text-sm">{description}</p>
+                <Icon className={`h-10 w-10 mx-auto mb-2 ${isCompleted ? 'text-green-400' : 'text-cyan-400'}`} />
+                <h4 className="font-bold text-white">{title}</h4>
+                <p className="text-xs text-gray-400 mt-1">{itemsCount} {type}</p>
             </div>
-            <div className="mt-4 text-center">
-                {isTodayChallenge && !isCompleted ? (
-                     <Button onClick={onStart} className="bg-white/20 hover:bg-white/30 w-full">
-                        {isPartiallyDone ? 'Continuar Desafio' : 'Iniciar Desafio!'}
-                     </Button>
-                ) : (
-                    <Countdown targetTime={preferredTimeStr} />
-                )}
-            </div>
-        </Card>
+            {isCompleted ? (
+                <div className="mt-3 flex items-center justify-center text-green-400">
+                    <CheckBadgeIcon className="h-5 w-5 mr-2" />
+                    <span className="text-sm font-semibold">Concluído!</span>
+                </div>
+            ) : (
+                <Button onClick={onStart} disabled={itemsCount === 0} className="mt-3 text-sm py-2 px-3 w-full">
+                    {itemsCount > 0 ? 'Começar' : 'N/A'}
+                </Button>
+            )}
+        </div>
     );
 };
 
 
 export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge }) => {
-    const streak = studentProgress.dailyChallengeStreak?.current || 0;
+    if (!studentProgress) return null;
+
+    const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak } = studentProgress;
+    const streak = dailyChallengeStreak?.current || 0;
 
     return (
-        <div>
+        <Card className="p-6">
             <div className="flex justify-between items-center mb-4">
-                <h2 className="text-2xl font-bold">Desafios Diários</h2>
+                <h3 className="text-xl font-bold text-white">Desafios Diários</h3>
                 {streak > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-300 font-semibold animate-pulse-orange">
+                    <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-300">
                         <FireIcon className="h-5 w-5" />
-                        <span>{streak} dia{streak > 1 ? 's' : ''} de ofensiva!</span>
+                        <span className="font-bold text-sm">{streak} dia(s) de ofensiva</span>
                     </div>
                 )}
             </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <ChallengeCard
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <ChallengeCard 
                     title="Desafio da Revisão"
-                    description="Acerte questões que você errou anteriormente."
-                    Icon={RefreshIcon}
-                    challenge={studentProgress.reviewChallenge}
+                    icon={ClipboardListIcon}
+                    challenge={reviewChallenge}
                     onStart={() => onStartDailyChallenge('review')}
-                    gradient="bg-gradient-to-br from-cyan-900 to-blue-900"
-                    studentProgress={studentProgress}
+                    type="questões"
                 />
-                <ChallengeCard
+                <ChallengeCard 
                     title="Desafio do Glossário"
-                    description="Teste seu conhecimento dos termos técnicos."
-                    Icon={TagIcon}
-                    challenge={studentProgress.glossaryChallenge}
+                    icon={TranslateIcon}
+                    challenge={glossaryChallenge}
                     onStart={() => onStartDailyChallenge('glossary')}
-                    gradient="bg-gradient-to-br from-emerald-900 to-teal-900"
-                    studentProgress={studentProgress}
+                    type="termos"
                 />
-                 <ChallengeCard
+                 <ChallengeCard 
                     title="Desafio de Português"
-                    description="Encontre o erro gramatical na frase."
-                    Icon={TranslateIcon}
-                    challenge={studentProgress.portugueseChallenge}
+                    icon={TranslateIcon} // Reusing icon for consistency
+                    challenge={portugueseChallenge}
                     onStart={() => onStartDailyChallenge('portuguese')}
-                    gradient="bg-gradient-to-br from-rose-900 to-pink-900"
-                    studentProgress={studentProgress}
+                    type="frases"
                 />
             </div>
-        </div>
+        </Card>
     );
 };

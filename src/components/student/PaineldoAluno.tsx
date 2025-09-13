@@ -1,29 +1,30 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
-import {
-    User, Subject, Topic, SubTopic, Course, ReviewSession, Question, QuestionAttempt,
-    MiniGame, CustomQuiz, TeacherMessage, StudentProgress, DailyChallenge
-} from '../../types';
+
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
-import * as GeminiService from '../../services/geminiService';
+import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner, Modal, Button } from '../ui';
+import { Spinner, Toast } from '../ui';
 import { StudentHeader } from './StudentHeader';
 import { StudentViewRouter } from './StudentViewRouter';
 import { EditProfileModal } from './EditProfileModal';
+import { StudentGamePlayerModal } from './StudentGamePlayerModal';
 import { LevelUpModal } from './LevelUpModal';
 import { BadgeAwardModal } from './BadgeAwardModal';
 import { XpToastDisplay } from './XpToastDisplay';
-import { StudentGamePlayerModal } from './StudentGamePlayerModal';
-// FIX: Corrected import to a valid component module.
 import { MessageThreadModal } from '../MessageThreadModal';
 import { NewMessageModal } from './NewMessageModal';
-import { AiAssistant } from './AiAssistant';
+import { TopicChat } from './TopicChat';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
-import { calculateLevel, getLevelTitle, XP_CONFIG, ALL_BADGES, SRS_INTERVALS } from '../../gamification';
-import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
-import { ArrowRightIcon } from '../Icons';
+import { getLocalDateISOString } from '../../utils';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
+
+type XpToast = {
+    id: number;
+    amount: number;
+    message?: string;
+};
 
 interface PaineldoAlunoProps {
     user: User;
@@ -33,677 +34,410 @@ interface PaineldoAlunoProps {
     onToggleStudentView?: () => void;
 }
 
-export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview = false, onToggleStudentView, }) => {
+export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview, onToggleStudentView }) => {
     const [view, setView] = useState<ViewType>('dashboard');
-    const [history, setHistory] = useState<ViewType[]>(['dashboard']);
-    const {
-        isLoading, allSubjects, allStudents, allStudentProgress, enrolledCourses, studentProgress, setStudentProgress,
-        studyPlan, messages, teacherProfiles
-    } = useStudentData(user, isPreview);
-
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
     const [selectedSubtopic, setSelectedSubtopic] = useState<SubTopic | null>(null);
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
-    
+    const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
-    const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-    const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
-    const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
-    const [quizToDeleteId, setQuizToDeleteId] = useState<string | null>(null);
-    const [gameToDeleteId, setGameToDeleteId] = useState<string | null>(null);
-    
-    const [levelUpInfo, setLevelUpInfo] = useState<{ level: number; title: string } | null>(null);
+    const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
+    const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
+    const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
+    const [newLevelInfo, setNewLevelInfo] = useState({ level: 0, title: '' });
     const [awardedBadges, setAwardedBadges] = useState<any[]>([]);
-    const [xpToasts, setXpToasts] = useState<{ id: number; amount: number; message?: string }[]>([]);
-    
-    const [playingGame, setPlayingGame] = useState<{ game: MiniGame; topicId: string } | null>(null);
-    const [activeThread, setActiveThread] = useState<TeacherMessage | null>(null);
-    
+    const [xpToasts, setXpToasts] = useState<XpToast[]>([]);
+    const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
+    const [isChatModalOpen, setIsChatModalOpen] = useState(false);
+    const [isGeneratingReview, setIsGeneratingReview] = useState(false);
     const [isSplitView, setIsSplitView] = useState(false);
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    
+    const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
-    
-    const [isGeneratingReview, setIsGeneratingReview] = useState(false);
-    const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
-    const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
-    
-    const quizInfoForDeleteModal = useMemo(() => {
-        if (!quizToDeleteId || !studentProgress?.customQuizzes) return null;
-        return studentProgress.customQuizzes.find(q => q.id === quizToDeleteId);
-    }, [quizToDeleteId, studentProgress]);
+    const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
 
-    const gameInfoForDeleteModal = useMemo(() => {
-        if (!gameToDeleteId || !studentProgress?.customGames) return null;
-        return studentProgress.customGames.find(g => g.id === gameToDeleteId);
-    }, [gameToDeleteId, studentProgress]);
+    const {
+        isLoading,
+        allSubjects,
+        allStudents,
+        allStudentProgress,
+        enrolledCourses,
+        studentProgress,
+        setStudentProgress,
+        studyPlan,
+        messages,
+        teacherProfiles
+    } = useStudentData(user, isPreview);
+    const prevXpRef = useRef(studentProgress?.xp || 0);
 
-    useEffect(() => { if (!isSplitView) { setIsSidebarCollapsed(false); } }, [isSplitView]);
-    
-    const changeView = (newView: ViewType) => {
-        setView(newView);
-        if (newView !== 'topic') setIsSplitView(false);
-        setHistory(prev => [...prev, newView]);
-    };
-
-    const handleGoHome = () => {
-        setView('dashboard');
-        setHistory(['dashboard']);
-        setSelectedCourse(null);
-        setSelectedSubject(null);
-        setSelectedTopic(null);
-        setSelectedSubtopic(null);
-        setSelectedReview(null);
-        setActiveChallenge(null);
-        setDailyChallengeResults(null);
-        setActiveCustomQuiz(null);
-    };
-    
-    const handleBack = useCallback((): boolean => {
-        if (isSplitView) {
-            setIsSplitView(false);
-            return true;
+    const handleBack = useCallback(() => {
+        if (view === 'topic') {
+            setView('subject');
+            setSelectedTopic(null);
+            setSelectedSubtopic(null);
+        } else if (view === 'subject') {
+            setView('course');
+            setSelectedSubject(null);
+        } else if (view === 'course') {
+            setView('dashboard');
+            setSelectedCourse(null);
+        } else if (['schedule', 'performance', 'reviews', 'games', 'custom_quiz_list'].includes(view)) {
+            setView('dashboard');
+        } else if (view === 'review_quiz' || view === 'daily_challenge_quiz') {
+            setView(view === 'review_quiz' ? 'reviews' : 'dashboard');
+            setSelectedReview(null);
+            setActiveChallenge(null);
+        } else if (view === 'custom_quiz_player') {
+            setView('custom_quiz_list');
+            setActiveCustomQuiz(null);
         }
-
-        if (history.length > 1) {
-            const newHistory = [...history];
-            newHistory.pop();
-            const prevView = newHistory[newHistory.length - 1];
-            
-            if (prevView === 'dashboard') {
-                setSelectedCourse(null);
-                setSelectedSubject(null);
-                setSelectedTopic(null);
-                setSelectedSubtopic(null);
-            } else if (prevView === 'course') {
-                setSelectedSubject(null);
-                setSelectedTopic(null);
-                setSelectedSubtopic(null);
-            } else if (prevView === 'subject') {
-                setSelectedTopic(null);
-                setSelectedSubtopic(null);
-            }
-
-            setView(prevView);
-            setHistory(newHistory);
-            return true;
-        }
-
-        if (isPreview && onToggleStudentView) {
-            onToggleStudentView();
-            return true;
-        }
-
-        return false;
-    }, [history, isSplitView, isPreview, onToggleStudentView]);
-
+        return true;
+    }, [view]);
+    
     useEffect(() => {
         window.customGoBack = handleBack;
         return () => {
-            if (window.customGoBack === handleBack) {
+            if(window.customGoBack === handleBack) {
                 window.customGoBack = undefined;
             }
         };
     }, [handleBack]);
 
+
+    const handleUpdateStudentProgress = useCallback(async (newProgress: StudentProgress, fromState: StudentProgress | null) => {
+        if (isPreview) return;
+        setStudentProgress(newProgress);
+        await FirebaseService.saveStudentProgress(newProgress);
+
+        const oldLevel = fromState ? Gamification.calculateLevel(fromState.xp) : 0;
+        const newLevel = Gamification.calculateLevel(newProgress.xp);
+        if (newLevel > oldLevel) {
+            setNewLevelInfo({ level: newLevel, title: Gamification.getLevelTitle(newLevel) });
+            setIsLevelUpModalOpen(true);
+        }
+    }, [isPreview, setStudentProgress]);
+
+    const addXp = useCallback((amount: number, message?: string) => {
+        if (isPreview || amount === 0) return;
+        setXpToasts(prev => [...prev, { id: Date.now(), amount, message }]);
+        setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
+        
+        setStudentProgress(prev => {
+            if (!prev) return null;
+            const newProgress = { ...prev, xp: (prev.xp || 0) + amount };
+            handleUpdateStudentProgress(newProgress, prev);
+            return newProgress;
+        });
+    }, [isPreview, handleUpdateStudentProgress, setStudentProgress]);
+
+    useEffect(() => {
+        if (!studentProgress) return;
+        const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
+        if (awarded.length > 0) {
+            setAwardedBadges(prev => [...prev, ...awarded]);
+            const newProgress = {
+                ...studentProgress,
+                earnedBadgeIds: [...new Set([...studentProgress.earnedBadgeIds, ...awarded.map(b => b.id)])]
+            };
+            handleUpdateStudentProgress(newProgress, studentProgress);
+        }
+    }, [studentProgress, allSubjects, allStudentProgress, handleUpdateStudentProgress]);
     
-    const handleTopicSelect = (topic: Topic | SubTopic, parent?: Topic) => {
+    // Navigation handlers
+    const handleCourseSelect = (course: Course) => {
+        setSelectedCourse(course);
+        setView('course');
+    };
+    const handleSubjectSelect = (subject: Subject) => {
+        setSelectedSubject(subject);
+        setView('subject');
+    };
+    const handleTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
         if ('subtopics' in topic) { // It's a Topic
             setSelectedTopic(topic);
             setSelectedSubtopic(null);
         } else { // It's a SubTopic
-            setSelectedTopic(parent!);
+            setSelectedTopic(parentTopic!);
             setSelectedSubtopic(topic);
         }
-        changeView('topic');
+        setView('topic');
     };
-    
-    const onNavigateToTopic = (topicId: string) => {
-        for (const subject of allSubjects) {
-            const course = enrolledCourses.find(c => c.disciplines.some(d => d.subjectId === subject.id));
-            if (!course) continue;
 
+    const handleNavigateToTopic = (topicId: string) => {
+        for (const subject of allSubjects) {
             for (const topic of subject.topics) {
                 if (topic.id === topicId) {
-                    setSelectedCourse(course);
                     setSelectedSubject(subject);
-                    handleTopicSelect(topic);
+                    setSelectedTopic(topic);
+                    setSelectedSubtopic(null);
+                    setView('topic');
                     return;
                 }
                 const subtopic = topic.subtopics.find(st => st.id === topicId);
                 if (subtopic) {
-                    setSelectedCourse(course);
                     setSelectedSubject(subject);
-                    handleTopicSelect(subtopic, topic);
+                    setSelectedTopic(topic);
+                    setSelectedSubtopic(subtopic);
+                    setView('topic');
                     return;
                 }
             }
         }
     };
     
-    const handleUpdateStudentProgress = useCallback(async (newProgress: StudentProgress, fromState: StudentProgress | null = studentProgress) => {
-        if (isPreview) { setStudentProgress(newProgress); return; }
-        if (fromState) {
-            if (calculateLevel(newProgress.xp) > calculateLevel(fromState.xp)) {
-                setLevelUpInfo({ level: calculateLevel(newProgress.xp), title: getLevelTitle(calculateLevel(newProgress.xp)) });
-            }
-            
-            const newlyAwardedBadges = Object.keys(ALL_BADGES)
-                .filter(id => !(fromState.earnedBadgeIds || []).includes(id) && ALL_BADGES[id].condition(newProgress, allSubjects, allStudentProgress))
-                .map(id => ({ ...ALL_BADGES[id], id }));
-                
-            if (newlyAwardedBadges.length > 0) {
-                setAwardedBadges(prev => [...prev, ...newlyAwardedBadges]);
-                const newBadgeIds = newlyAwardedBadges.map(b => b.id);
-                newProgress.earnedBadgeIds = [...(newProgress.earnedBadgeIds || []), ...newBadgeIds];
-            }
-        }
-        setStudentProgress(newProgress);
-        await FirebaseService.saveStudentProgress(newProgress);
-    }, [isPreview, studentProgress, setStudentProgress, allSubjects, allStudentProgress]);
-
-    const addXp = useCallback((amount: number, message?: string) => {
-        if (isPreview) return;
-        setXpToasts(prev => [...prev, { id: Date.now(), amount, message }]);
-        setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
-        if (!studentProgress) return;
-        handleUpdateStudentProgress({ ...studentProgress, xp: studentProgress.xp + amount }, studentProgress);
-    }, [isPreview, studentProgress, handleUpdateStudentProgress]);
-    
-    const handleNoteSave = (contentId: string, content: string) => { if (studentProgress) handleUpdateStudentProgress({ ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } }); };
-    
-    const saveQuizProgress = (subjectId: string, topicId: string, attempt: QuestionAttempt) => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-
-        if (!newProgress.progressByTopic[subjectId]) {
-            newProgress.progressByTopic[subjectId] = {};
-        }
-        if (!newProgress.progressByTopic[subjectId][topicId]) {
-            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
-        }
-        const existingAttempts = newProgress.progressByTopic[subjectId][topicId].lastAttempt || [];
-        const attemptIndex = existingAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-        if (attemptIndex > -1) {
-            existingAttempts[attemptIndex] = attempt;
-        } else {
-            existingAttempts.push(attempt);
-        }
-        newProgress.progressByTopic[subjectId][topicId].lastAttempt = existingAttempts;
-
-        const today = getLocalDateISOString(getBrasiliaDate());
-        newProgress.dailyActivity[today] = newProgress.dailyActivity[today] || { questionsAnswered: 0 };
-        newProgress.dailyActivity[today].questionsAnswered++;
-        const srsData = newProgress.srsData[attempt.questionId] || { stage: 0 };
-        const newStage = attempt.isCorrect ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1);
-        const nextReview = getBrasiliaDate();
-        nextReview.setUTCDate(nextReview.getUTCDate() + SRS_INTERVALS[newStage]);
-        newProgress.srsData[attempt.questionId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) };
-        if(attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const handleTopicQuizComplete = (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => {
-        if (!studentProgress) return;
-        const score = attempts.length > 0 ? attempts.filter(a => a.isCorrect).length / attempts.length : 0;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        
-        if (!newProgress.progressByTopic[subjectId]) {
-            newProgress.progressByTopic[subjectId] = {};
-        }
-        if (!newProgress.progressByTopic[subjectId][topicId]) {
-            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
-        }
-        newProgress.progressByTopic[subjectId][topicId].score = score;
-        newProgress.progressByTopic[subjectId][topicId].lastAttempt = attempts;
-        
-        if (!newProgress.earnedTopicBadgeIds) {
-            newProgress.earnedTopicBadgeIds = {};
-        }
-        const earnedBadges = new Set(newProgress.earnedTopicBadgeIds[topicId] || []);
-        if (score === 1) {
-            earnedBadges.add('gold');
-            earnedBadges.add('silver');
-            earnedBadges.add('bronze');
-        } else if (score >= 0.9) {
-            earnedBadges.add('silver');
-            earnedBadges.add('bronze');
-        } else if (score >= 0.7) {
-            earnedBadges.add('bronze');
-        }
-        newProgress.earnedTopicBadgeIds[topicId] = Array.from(earnedBadges);
-        
-        if (score >= 0.7 && !newProgress.progressByTopic[subjectId][topicId].completed) {
-            newProgress.progressByTopic[subjectId][topicId].completed = true;
-            addXp(XP_CONFIG.TOPIC_COMPLETE, 'Tópico Concluído!');
-        }
-        handleUpdateStudentProgress(newProgress);
-    };
-    
-    const saveReviewProgress = (reviewId: string, attempt: QuestionAttempt) => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        const reviewIndex = newProgress.reviewSessions.findIndex((r: ReviewSession) => r.id === reviewId);
-        if (reviewIndex > -1) {
-            const review = newProgress.reviewSessions[reviewIndex];
-            if (!review.attempts) review.attempts = [];
-            const attemptIndex = review.attempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-            if(attemptIndex > -1) {
-                review.attempts[attemptIndex] = attempt;
-            } else {
-                review.attempts.push(attempt);
-            }
-        }
-        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_REVIEW_ANSWER);
-        handleUpdateStudentProgress(newProgress);
-    };
-    
-    const handleReviewQuizComplete = (reviewId: string, attempts: QuestionAttempt[]) => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        const reviewIndex = newProgress.reviewSessions.findIndex((r: ReviewSession) => r.id === reviewId);
-        if (reviewIndex > -1) {
-            newProgress.reviewSessions[reviewIndex].isCompleted = true;
-            newProgress.reviewSessions[reviewIndex].attempts = attempts;
-            addXp(XP_CONFIG.REVIEW_SESSION_COMPLETE, 'Revisão Concluída!');
-        }
-        handleUpdateStudentProgress(newProgress);
-    };
-    
-    const onSaveDailyChallengeAttempt = (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        
-        const challengeKey = `${challengeType}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
-        const challenge = newProgress[challengeKey];
-
-        if (challenge) {
-            if (!challenge.sessionAttempts) challenge.sessionAttempts = [];
-            
-            const attemptIndex = challenge.sessionAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-            if (attemptIndex > -1) {
-                challenge.sessionAttempts[attemptIndex] = attempt;
-            } else {
-                challenge.sessionAttempts.push(attempt);
-            }
-        }
-        
-        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[]) => {
-        if (!studentProgress || !activeChallenge) return;
-
-        const { type } = activeChallenge;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        const challengeKey = `${type}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
-        const challenge = newProgress[challengeKey];
-
-        if (challenge) {
-            challenge.sessionAttempts = finalAttempts;
-            challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
-            const score = finalAttempts.length > 0 ? finalAttempts.filter(a => a.isCorrect).length / finalAttempts.length : 0;
-            const isFullAttempt = finalAttempts.length === challenge.items.length;
-
-            if (isFullAttempt) {
-                challenge.isCompleted = true;
-                if (score >= 0.6) {
-                    const xpAmount = XP_CONFIG.DAILY_CHALLENGE_COMPLETE;
-                    newProgress.xp = (newProgress.xp || 0) + xpAmount;
-                    setXpToasts(prev => [...prev, { id: Date.now(), amount: xpAmount, message: 'Desafio Diário Concluído!' }]);
-                    setTimeout(() => setXpToasts(prev => prev.slice(1)), 3000);
-                }
-            }
-            
-            setDailyChallengeResults({ questions: challenge.items, sessionAttempts: finalAttempts });
-            changeView('daily_challenge_results');
-        }
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const saveCustomQuizAttempt = (attempt: QuestionAttempt) => {
-        if (!studentProgress || !activeCustomQuiz) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        
-        const quizIndex = (newProgress.customQuizzes || []).findIndex((q: CustomQuiz) => q.id === activeCustomQuiz.id);
-        if (quizIndex > -1) {
-            const quiz = newProgress.customQuizzes[quizIndex];
-            if (!quiz.attempts) quiz.attempts = [];
-            
-            const attemptIndex = quiz.attempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-            if (attemptIndex > -1) {
-                quiz.attempts[attemptIndex] = attempt;
-            } else {
-                quiz.attempts.push(attempt);
-            }
-        }
-        
-        if (attempt.isCorrect) addXp(XP_CONFIG.CORRECT_ANSWER);
-        handleUpdateStudentProgress(newProgress);
-    };
-    
-    const handleCustomQuizComplete = (finalAttempts: QuestionAttempt[]) => {
-        if (!studentProgress || !activeCustomQuiz) return;
-        
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        const quizIndex = (newProgress.customQuizzes || []).findIndex((q: CustomQuiz) => q.id === activeCustomQuiz.id);
-        
-        if (quizIndex > -1) {
-            newProgress.customQuizzes[quizIndex].isCompleted = true;
-            newProgress.customQuizzes[quizIndex].attempts = finalAttempts;
-        }
-        
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const handleStartDailyChallenge = (type: 'review' | 'glossary' | 'portuguese') => {
-        if(!studentProgress) return;
-        
-        const todayISO = getLocalDateISOString(getBrasiliaDate());
-        let challenge: DailyChallenge<Question> | undefined | null;
-
-        switch(type) {
-            case 'review': challenge = studentProgress.reviewChallenge; break;
-            case 'glossary': challenge = studentProgress.glossaryChallenge; break;
-            case 'portuguese': challenge = studentProgress.portugueseChallenge; break;
-        }
-
-        if(challenge && (challenge.date === todayISO || challenge.generatedForDate === todayISO) && !challenge.isCompleted) {
-            setActiveChallenge({type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || []});
-            setQuizInstanceKey(Date.now());
-            changeView('daily_challenge_quiz');
-        }
-    };
-    
-    const handleGameComplete = (gameId: string) => {
-        if (!studentProgress) return;
-        addXp(XP_CONFIG.MINI_GAME_COMPLETE, 'Jogo Concluído!');
-        const contentId = playingGame!.topicId;
-        const newProgress = { ...studentProgress };
-        newProgress.gamesCompletedCount = (newProgress.gamesCompletedCount || 0) + 1;
-        newProgress.earnedGameBadgeIds = newProgress.earnedGameBadgeIds || {};
-        newProgress.earnedGameBadgeIds[contentId] = [...new Set([...(newProgress.earnedGameBadgeIds[contentId] || []), gameId])];
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const handleGameError = () => { addXp(-XP_CONFIG.GAME_ERROR_PENALTY, 'Erro no jogo'); };
-
-    const onPlayGame = (game: MiniGame, topicId: string) => { setPlayingGame({ game, topicId }); };
-    
     const onStartReview = (session: ReviewSession) => {
         setSelectedReview(session);
-        changeView('review_quiz');
-    };
-
-    const onReportQuestion = async (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => {
-        const subject = allSubjects.find(s => s.id === subjectId);
-        if(!subject) return;
-        const topic = subject.topics.find(t => t.id === topicId) || subject.topics.flatMap(t => t.subtopics).find(st => st.id === topicId);
-        if(!topic) return;
-        const question = (isTec ? topic.tecQuestions : topic.questions)?.find(q => q.id === questionId);
-        if (!question) return;
-        const reportInfo = { reason, studentId: user.id };
-        await FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, reportInfo);
-        const teacher = teacherProfiles.find(t => t.id === subject.teacherId);
-        if (teacher) {
-            await FirebaseService.createReportNotification(teacher.id, user, subject.name, topic.name, question.statement, reason);
-        }
-    };
-
-    const onSelectTargetCargo = (courseId: string, cargoName: string) => {
-        if (!studentProgress) return;
-        const newTargets = {...studentProgress.targetCargoByCourse, [courseId]: cargoName};
-        const newProgress = {...studentProgress, targetCargoByCourse: newTargets};
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const onGenerateSmartReview = async () => {
-        if (!studentProgress) return;
-        setIsGeneratingReview(true);
-        try {
-            const questions = await GeminiService.generateSmartReview(studentProgress, allSubjects);
-            if (questions.length > 0) {
-                const newSession: ReviewSession = {
-                    id: `rev-ai-${Date.now()}`,
-                    name: "Revisão Inteligente da IA",
-                    type: 'ai',
-                    createdAt: Date.now(),
-                    questions: questions,
-                    isCompleted: false,
-                };
-                onStartReview(newSession);
-            } else {
-                alert("Não há dados de erros suficientes para gerar uma revisão inteligente.");
-            }
-        } catch (e) {
-            console.error(e);
-            alert("Erro ao gerar revisão inteligente.");
-        } finally {
-            setIsGeneratingReview(false);
-        }
-    };
-
-    const handleOpenCustomQuizCreator = useCallback(() => {
-        setIsCustomQuizCreatorOpen(true);
-    }, []);
-
-    const handleCloseCustomQuizCreator = useCallback(() => {
-        setIsCustomQuizCreatorOpen(false);
-    }, []);
-
-    const handleCustomQuizSave = useCallback((quiz: CustomQuiz) => {
-        if (!studentProgress) return;
-        const newQuizzes = [...(studentProgress.customQuizzes || []), quiz];
-        handleUpdateStudentProgress({ ...studentProgress, customQuizzes: newQuizzes });
-    }, [studentProgress, handleUpdateStudentProgress]);
-    
-    const handleDeleteCustomQuiz = useCallback((quizId: string) => {
-        setQuizToDeleteId(quizId);
-    }, []);
-
-    const confirmDeleteQuiz = useCallback(() => {
-        if (!studentProgress || !quizToDeleteId) return;
-        const updatedQuizzes = (studentProgress.customQuizzes || []).filter(q => q.id !== quizToDeleteId);
-        handleUpdateStudentProgress({ ...studentProgress, customQuizzes: updatedQuizzes });
-        setQuizToDeleteId(null);
-    }, [studentProgress, quizToDeleteId, handleUpdateStudentProgress]);
-    
-    const handleDeleteCustomGame = useCallback((gameId: string) => {
-        setGameToDeleteId(gameId);
-    }, []);
-
-    const confirmDeleteGame = useCallback(() => {
-        if (!studentProgress || !gameToDeleteId) return;
-        const updatedGames = (studentProgress.customGames || []).filter(g => g.id !== gameToDeleteId);
-        handleUpdateStudentProgress({ ...studentProgress, customGames: updatedGames });
-        setGameToDeleteId(null);
-    }, [studentProgress, gameToDeleteId, handleUpdateStudentProgress]);
-
-    const handleToggleTopicCompletion = useCallback((subjectId: string, topicId: string, isCompleted: boolean) => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        if (!newProgress.progressByTopic) newProgress.progressByTopic = {};
-        if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
-        if (!newProgress.progressByTopic[subjectId][topicId]) {
-            newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
-        }
-        newProgress.progressByTopic[subjectId][topicId].completed = isCompleted;
-        handleUpdateStudentProgress(newProgress);
-    }, [studentProgress, handleUpdateStudentProgress]);
-
-    const onGenerateSmartFlashcards = async (questions: Question[]) => {
-        if (!studentProgress) return;
-        const cards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-        const cardsWithIds = cards.map(c => ({...c, id: `fc-ai-${Date.now()}-${Math.random()}`}));
-        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...cardsWithIds] };
-        handleUpdateStudentProgress(newProgress);
-    };
-
-    const handleStartQuiz = useCallback((quiz: CustomQuiz) => {
-        if (!studentProgress) return;
-
-        let quizToStart = quiz;
-        
-        if (quiz.isCompleted) {
-            quizToStart = {
-                ...quiz,
-                isCompleted: false,
-                attempts: [],
-            };
-    
-            const updatedQuizzes = (studentProgress.customQuizzes || []).map(q =>
-                q.id === quiz.id ? quizToStart : q
-            );
-            const newProgress = { ...studentProgress, customQuizzes: updatedQuizzes };
-            
-            handleUpdateStudentProgress(newProgress);
-        }
-        
-        setActiveCustomQuiz(quizToStart);
         setQuizInstanceKey(Date.now());
-        changeView('custom_quiz_player');
-    }, [studentProgress, handleUpdateStudentProgress]);
-    
-    const onFlashcardReview = (flashcardId: string, performance: 'good' | 'bad') => {
-        if (!studentProgress) return;
-        const newProgress = JSON.parse(JSON.stringify(studentProgress));
-        
-        newProgress.srsFlashcardData = newProgress.srsFlashcardData || {};
-        
-        const srsData = newProgress.srsFlashcardData[flashcardId] || { stage: 0 };
-        const newStage = performance === 'good' ? Math.min(srsData.stage + 1, SRS_INTERVALS.length - 1) : Math.max(0, srsData.stage - 1);
-        const nextReview = getBrasiliaDate();
-        nextReview.setUTCDate(nextReview.getUTCDate() + SRS_INTERVALS[newStage]);
-        newProgress.srsFlashcardData[flashcardId] = { stage: newStage, nextReviewDate: getLocalDateISOString(nextReview) };
-        handleUpdateStudentProgress(newProgress);
+        setView('review_quiz');
     };
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
-    if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900">Erro ao carregar dados do aluno.</div>;
+    if (isLoading) {
+        return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
+    }
+    if (!studentProgress) {
+        return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
+    }
 
     return (
-        <div className="p-4 md:p-8 max-w-screen-2xl mx-auto">
-            <StudentHeader
-                user={user} studentProgress={studentProgress} view={view} onSetView={changeView}
+        <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-6 lg:p-8">
+            <StudentHeader 
+                user={user} 
+                studentProgress={studentProgress}
+                view={view}
                 selectedTopicName={selectedSubtopic?.name || selectedTopic?.name}
                 selectedCourseName={selectedCourse?.name}
-                onOpenProfile={() => setIsProfileModalOpen(true)} 
+                onSetView={setView}
+                onOpenProfile={() => setIsProfileModalOpen(true)}
                 onLogout={onLogout}
-                onGoHome={handleGoHome}
+                onGoHome={() => setView('dashboard')}
             />
             <main>
-                {view !== 'dashboard' && (
-                    <button
-                        onClick={handleBack}
-                        className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-lg shadow-sm text-white bg-cyan-700 hover:bg-cyan-800 focus:outline-none mb-6"
-                    >
-                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
-                    </button>
-                )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress}
-                    enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject}
-                    selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults}
-                    isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
-                    onAcknowledgeMessage={(id) => FirebaseService.acknowledgeMessage(id, user.id)}
-                    onCourseSelect={(course) => { setSelectedCourse(course); changeView('course'); }}
-                    onSubjectSelect={(subject) => { setSelectedSubject(subject); changeView('subject'); }}
-                    onTopicSelect={(topic, parent) => handleTopicSelect(topic, parent)}
-                    onStartDailyChallenge={handleStartDailyChallenge}
-                    // FIX: Removed non-existent props 'onGenerateDailyChallenge' and 'isGeneratingDailyChallenge' to fix type error.
-                    onNavigateToTopic={onNavigateToTopic}
-                    onToggleTopicCompletion={handleToggleTopicCompletion}
+                    view={view}
+                    isPreview={isPreview}
+                    currentUser={user}
+                    studentProgress={studentProgress}
+                    allSubjects={allSubjects}
+                    allStudents={allStudents}
+                    allStudentProgress={allStudentProgress}
+                    enrolledCourses={enrolledCourses}
+                    studyPlan={studyPlan}
+                    messages={messages}
+                    teacherProfiles={teacherProfiles}
+                    selectedCourse={selectedCourse}
+                    selectedSubject={selectedSubject}
+                    selectedTopic={selectedTopic}
+                    selectedSubtopic={selectedSubtopic}
+                    selectedReview={selectedReview}
+                    activeChallenge={activeChallenge}
+                    dailyChallengeResults={dailyChallengeResults}
+                    isGeneratingReview={isGeneratingReview}
+                    isSplitView={isSplitView}
+                    isSidebarCollapsed={isSidebarCollapsed}
+                    quizInstanceKey={quizInstanceKey}
+                    activeCustomQuiz={activeCustomQuiz}
+                    onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
+                    onCourseSelect={handleCourseSelect}
+                    onSubjectSelect={handleSubjectSelect}
+                    onTopicSelect={handleTopicSelect}
+                    onStartDailyChallenge={async (type) => {
+                        const challenge = studentProgress[type === 'review' ? 'reviewChallenge' : type === 'glossary' ? 'glossaryChallenge' : 'portugueseChallenge'];
+                        if(challenge && challenge.items.length > 0) {
+                            setActiveChallenge({ type, questions: challenge.items, sessionAttempts: [] });
+                            setQuizInstanceKey(Date.now());
+                            setView('daily_challenge_quiz');
+                        }
+                    }}
+                    onNavigateToTopic={handleNavigateToTopic}
+                    onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
+                        const newProgress = { ...studentProgress };
+                        if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
+                        if (!newProgress.progressByTopic[subjectId][topicId]) newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
+                        newProgress.progressByTopic[subjectId][topicId].completed = isCompleted;
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
                     onOpenNewMessageModal={() => setIsNewMessageModalOpen(true)}
-                    onSavePlan={async (plan) => { if(studentProgress) await FirebaseService.saveStudyPlanForStudent({studentId: user.id, plan}); }}
+                    onSavePlan={async (plan) => {
+                        const newStudyPlan = { studentId: user.id, plan };
+                        await FirebaseService.saveStudyPlanForStudent(newStudyPlan);
+                    }}
                     onStartReview={onStartReview}
-                    onGenerateSmartReview={onGenerateSmartReview}
-                    onGenerateSrsReview={(questions) => { if(questions.length > 0) setSelectedReview({id: `srs-${Date.now()}`, name: "Revisão Diária (SRS)", type: 'srs', createdAt: Date.now(), questions, isCompleted: false}); changeView('review_quiz'); }}
-                    onGenerateSmartFlashcards={onGenerateSmartFlashcards}
-                    onFlashcardReview={onFlashcardReview}
+                    onGenerateSmartReview={async () => {
+                        setIsGeneratingReview(true);
+                        try {
+                            const questions = await FirebaseService.generateSmartReview(studentProgress, allSubjects);
+                            if (questions.length > 0) {
+                                const smartSession: ReviewSession = { id: `rev-ai-${Date.now()}`, name: "Revisão Inteligente da IA", type: 'ai', createdAt: Date.now(), questions, isCompleted: false };
+                                onStartReview(smartSession);
+                            } else {
+                                alert("Não há dados suficientes para gerar uma revisão inteligente.");
+                            }
+                        } catch (e) {
+                            console.error(e);
+                        } finally {
+                            setIsGeneratingReview(false);
+                        }
+                    }}
+                    onGenerateSrsReview={(questions) => {
+                        if (questions.length > 0) {
+                            const srsSession: ReviewSession = { id: `rev-srs-${Date.now()}`, name: "Revisão Diária (SRS)", type: 'srs', createdAt: Date.now(), questions, isCompleted: false };
+                            onStartReview(srsSession);
+                        } else {
+                            alert("Nenhuma questão agendada para revisão hoje.");
+                        }
+                    }}
+                    onGenerateSmartFlashcards={async (questions) => {
+                        const flashcards = await FirebaseService.generateFlashcardsFromIncorrectAnswers(questions);
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    onFlashcardReview={(flashcardId, performance) => {
+                        const newProgress = Gamification.updateSrsFlashcard(studentProgress, flashcardId, performance);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
                     onUpdateStudentProgress={handleUpdateStudentProgress}
-                    saveQuizProgress={saveQuizProgress}
-                    saveReviewProgress={saveReviewProgress}
-                    handleTopicQuizComplete={handleTopicQuizComplete}
-                    handleReviewQuizComplete={handleReviewQuizComplete}
-                    handleDailyChallengeComplete={handleDailyChallengeComplete}
+                    saveQuizProgress={(subjectId, topicId, attempt) => {
+                         const newProgress = { ...studentProgress };
+                         if (!newProgress.progressByTopic[subjectId]) newProgress.progressByTopic[subjectId] = {};
+                         if (!newProgress.progressByTopic[subjectId][topicId]) newProgress.progressByTopic[subjectId][topicId] = { completed: false, score: 0, lastAttempt: [] };
+                         newProgress.progressByTopic[subjectId][topicId].lastAttempt.push(attempt);
+                         handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    saveReviewProgress={(reviewId, attempt) => {
+                        const newProgress = { ...studentProgress };
+                        const reviewIndex = newProgress.reviewSessions.findIndex(r => r.id === reviewId);
+                        if (reviewIndex > -1) {
+                            if (!newProgress.reviewSessions[reviewIndex].attempts) newProgress.reviewSessions[reviewIndex].attempts = [];
+                            newProgress.reviewSessions[reviewIndex].attempts!.push(attempt);
+                            handleUpdateStudentProgress(newProgress, studentProgress);
+                        }
+                    }}
+                    handleTopicQuizComplete={(subjectId, topicId, attempts) => {
+                        const newProgress = Gamification.processQuizCompletion(studentProgress, subjectId, topicId, attempts, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    handleReviewQuizComplete={(reviewId, attempts) => {
+                        const newProgress = Gamification.processReviewCompletion(studentProgress, reviewId, attempts, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    handleDailyChallengeComplete={(finalAttempts) => {
+                        const newProgress = Gamification.processDailyChallengeCompletion(studentProgress, activeChallenge!.type, finalAttempts, addXp);
+                        setDailyChallengeResults({ questions: activeChallenge!.questions, sessionAttempts: finalAttempts });
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                        setView('daily_challenge_results');
+                        setActiveChallenge(null);
+                    }}
                     onAddBonusXp={addXp}
-                    onPlayGame={onPlayGame}
-                    onDeleteCustomGame={handleDeleteCustomGame}
-                    onOpenCustomGameModal={() => {}}
-                    onSelectTargetCargo={onSelectTargetCargo}
-                    onNoteSave={handleNoteSave}
-                    onToggleSplitView={() => setIsSplitView(p => !p)}
+                    onPlayGame={(game, topicId) => setPlayingGame({ game, topicId })}
+                    onDeleteCustomGame={(gameId) => {
+                        const newProgress = { ...studentProgress, customGames: studentProgress.customGames.filter(g => g.id !== gameId) };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    onOpenCustomGameModal={(game) => { /* Logic to open custom game modal */ }}
+                    onSelectTargetCargo={(courseId, cargoName) => {
+                        const newProgress = { ...studentProgress, targetCargoByCourse: { ...(studentProgress.targetCargoByCourse || {}), [courseId]: cargoName } };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    onNoteSave={(contentId, content) => {
+                        const newProgress = { ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    onToggleSplitView={() => setIsSplitView(!isSplitView)}
                     onSetIsSidebarCollapsed={setIsSidebarCollapsed}
                     onOpenChatModal={() => setIsChatModalOpen(true)}
-                    setView={changeView}
+                    setView={setView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={onSaveDailyChallengeAttempt}
-                    handleGameComplete={handleGameComplete}
-                    handleGameError={handleGameError}
-                    onReportQuestion={onReportQuestion}
+                    onSaveDailyChallengeAttempt={(challengeType, attempt) => {
+                        setActiveChallenge(prev => prev ? ({ ...prev, sessionAttempts: [...prev.sessionAttempts, attempt] }) : null);
+                    }}
+                    handleGameComplete={(gameId) => {
+                        const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
+                    onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
+                        FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });
+                        FirebaseService.createReportNotification(
+                            allSubjects.find(s=>s.id === subjectId)!.teacherId,
+                            user,
+                            allSubjects.find(s => s.id === subjectId)!.name,
+                            selectedSubtopic?.name || selectedTopic!.name,
+                            (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A',
+                            reason
+                        );
+                    }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
-                    onOpenCreator={handleOpenCustomQuizCreator}
-                    onStartQuiz={handleStartQuiz}
-                    onDeleteQuiz={handleDeleteCustomQuiz}
-                    saveCustomQuizAttempt={saveCustomQuizAttempt}
-                    handleCustomQuizComplete={handleCustomQuizComplete}
+                    onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
+                    onStartQuiz={(quiz) => {
+                        setActiveCustomQuiz(quiz);
+                        setQuizInstanceKey(Date.now());
+                        setView('custom_quiz_player');
+                    }}
+                    onDeleteQuiz={(quizId) => {
+                         if (window.confirm("Tem certeza que deseja apagar este quiz?")) {
+                            const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
+                            handleUpdateStudentProgress(newProgress, studentProgress);
+                        }
+                    }}
+                    saveCustomQuizAttempt={(attempt) => {
+                        setActiveCustomQuiz(prev => {
+                            if (!prev) return null;
+                            const newAttempts = [...(prev.attempts || []), attempt];
+                            return { ...prev, attempts: newAttempts };
+                        });
+                    }}
+                    handleCustomQuizComplete={(finalAttempts) => {
+                        const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                        setView('custom_quiz_list');
+                        setActiveCustomQuiz(null);
+                    }}
                 />
             </main>
-            <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
-            {levelUpInfo && <LevelUpModal isOpen={!!levelUpInfo} onClose={() => setLevelUpInfo(null)} newLevel={levelUpInfo.level} levelTitle={levelUpInfo.title} />}
-            {awardedBadges.length > 0 && <BadgeAwardModal isOpen={true} onClose={() => setAwardedBadges(prev => prev.slice(1))} badges={awardedBadges} />}
+
+            {/* Modals */}
             <XpToastDisplay toasts={xpToasts} />
-            <StudentGamePlayerModal isOpen={!!playingGame} onClose={() => setPlayingGame(null)} game={playingGame?.game || null} onGameComplete={handleGameComplete} onGameError={handleGameError} />
-            {isChatModalOpen && selectedTopic && selectedSubject && <Modal isOpen={isChatModalOpen} onClose={() => setIsChatModalOpen(false)} title="Assistente IA" size="2xl"><div className="h-[70vh]"><AiAssistant subject={selectedSubject} topic={selectedSubtopic || selectedTopic} /></div></Modal>}
-            <NewMessageModal isOpen={isNewMessageModalOpen} onClose={() => setIsNewMessageModalOpen(false)} teachers={teacherProfiles} onSendMessage={async (teacherId, text) => { await FirebaseService.addMessage({ senderId: user.id, teacherId, studentId: user.id, message: text }); }}/>
-            {activeThread && <MessageThreadModal isOpen={!!activeThread} onClose={() => setActiveThread(null)} thread={activeThread} currentUser={user} participants={{...teacherProfiles.reduce((acc, t) => ({...acc, [t.id]: t}), {}), [user.id]: user}} onSendReply={FirebaseService.addReplyToMessage} onDelete={(id) => FirebaseService.deleteMessageForUser(id, user.id)} />}
-            <StudentCustomQuizCreatorModal
-                isOpen={isCustomQuizCreatorOpen}
-                onClose={handleCloseCustomQuizCreator}
-                onSave={handleCustomQuizSave}
+            <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
+            <StudentGamePlayerModal 
+                isOpen={isGamePlayerOpen} 
+                onClose={() => setIsGamePlayerOpen(false)} 
+                game={playingGame?.game || null}
+                onGameComplete={(gameId) => {
+                    const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
+                    handleUpdateStudentProgress(newProgress, studentProgress);
+                }}
+                onGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
             />
-            {quizInfoForDeleteModal && (
-                <Modal
-                    isOpen={!!quizToDeleteId}
-                    onClose={() => setQuizToDeleteId(null)}
-                    title="Confirmar Exclusão"
-                >
-                    <div className="space-y-4">
-                        <p>Tem certeza que deseja apagar o quiz "{quizInfoForDeleteModal.name}"? Esta ação não pode ser desfeita.</p>
-                        <div className="flex justify-end gap-4 pt-4">
-                            <Button onClick={() => setQuizToDeleteId(null)} className="bg-gray-600 hover:bg-gray-500">
-                                Cancelar
-                            </Button>
-                            <Button onClick={confirmDeleteQuiz} className="bg-red-600 hover:bg-red-700">
-                                Apagar
-                            </Button>
-                        </div>
+            <LevelUpModal isOpen={isLevelUpModalOpen} onClose={() => setIsLevelUpModalOpen(false)} newLevel={newLevelInfo.level} levelTitle={newLevelInfo.title} />
+            <BadgeAwardModal isOpen={awardedBadges.length > 0} onClose={() => setAwardedBadges(prev => prev.slice(1))} badges={awardedBadges} />
+             <NewMessageModal
+                isOpen={isNewMessageModalOpen}
+                onClose={() => setIsNewMessageModalOpen(false)}
+                teachers={teacherProfiles}
+                onSendMessage={async (teacherId, message) => {
+                    await FirebaseService.addMessage({ senderId: user.id, teacherId, studentId: user.id, message });
+                }}
+            />
+            {isChatModalOpen && selectedTopic && (
+                 <div className="fixed bottom-4 right-4 h-[60vh] w-[400px] z-50 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 flex flex-col">
+                    <div className="flex justify-between items-center p-2 border-b border-gray-700 bg-gray-900/50 rounded-t-lg">
+                        <h3 className="font-bold text-sm">Assistente IA</h3>
+                        <button onClick={() => setIsChatModalOpen(false)} className="text-gray-400 hover:text-white">&times;</button>
                     </div>
-                </Modal>
+                    <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
+                </div>
             )}
-            {gameInfoForDeleteModal && (
-                <Modal
-                    isOpen={!!gameToDeleteId}
-                    onClose={() => setGameToDeleteId(null)}
-                    title="Confirmar Exclusão"
-                >
-                    <div className="space-y-4">
-                        <p>Tem certeza que deseja apagar o jogo "{gameInfoForDeleteModal.name}"? Esta ação não pode ser desfeita.</p>
-                        <div className="flex justify-end gap-4 pt-4">
-                            <Button onClick={() => setGameToDeleteId(null)} className="bg-gray-600 hover:bg-gray-500">
-                                Cancelar
-                            </Button>
-                            <Button onClick={confirmDeleteGame} className="bg-red-600 hover:bg-red-700">
-                                Apagar
-                            </Button>
-                        </div>
-                    </div>
-                </Modal>
-            )}
+            <StudentCustomQuizCreatorModal 
+                isOpen={isCustomQuizCreatorOpen}
+                onClose={() => setIsCustomQuizCreatorOpen(false)}
+                onSave={(quiz) => {
+                    const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
+                    handleUpdateStudentProgress(newProgress, studentProgress);
+                }}
+            />
         </div>
     );
 };
