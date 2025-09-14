@@ -8,6 +8,8 @@ export interface User {
   name?: string;
   role: UserRole;
   avatarUrl?: string; // Changed from base64 to URL
+  // FIX: Added fcmToken to support push notifications.
+  fcmToken?: string;
 }
 
 export interface Question {

@@ -1,20 +1,19 @@
 import { Handler } from "@netlify/functions";
 import * as admin from "firebase-admin";
-// FIX: Use @google/genai per guidelines
 import { GoogleGenAI, Type, GenerateContentResponse } from "@google/genai";
-import { StudentProgress, Subject, Question, GlossaryTerm } from "../../src/types";
+import { StudentProgress, Subject, Question, GlossaryTerm, User } from "../../src/types";
 
 // Firebase Admin SDK initialization
-// Ensure you have set FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, and FIREBASE_CLIENT_EMAIL in your Netlify environment variables
 try {
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID!,
-                privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
-            }),
-        });
+    const serviceAccountKey = process.env.FIREBASE_SERVICE_ACCOUNT_KEY;
+    if (serviceAccountKey) {
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(JSON.parse(serviceAccountKey)),
+            });
+        }
+    } else {
+        console.error("FIREBASE_SERVICE_ACCOUNT_KEY is not set.");
     }
 } catch (error) {
     console.error("Firebase Admin initialization error", error);
@@ -23,8 +22,11 @@ try {
 const db = admin.firestore();
 
 // Gemini API initialization
-// FIX: Initialize Gemini API client as per guidelines, using API_KEY from environment variables.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const GEMINI_API_KEY = process.env.VITE_GEMINI_API_KEY;
+if (!GEMINI_API_KEY) {
+    console.error("VITE_GEMINI_API_KEY is not set.");
+}
+const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
 
 
 // --- UTILITY FUNCTIONS ---
@@ -108,20 +110,22 @@ const questionSchema = {
     },
 };
 
-// --- AI CHALLENGE GENERATION LOGIC (Adapted from geminiService) ---
+// --- AI CHALLENGE GENERATION LOGIC ---
 
 const generatePortugueseChallenge = async (questionCount: number, errorStats?: StudentProgress['portugueseErrorStats']): Promise<Omit<Question, 'id'>[]> => {
-    const errorFocusPrompt = errorStats ? `Based on the student's error stats, focus on the most common error types: ${JSON.stringify(errorStats)}.` : '';
-    const prompt = `Create ${questionCount} question(s) for a Portuguese grammar challenge in the following format:
-    1. The question is a single sentence containing a subtle grammatical error (e.g., agreement, punctuation).
+    const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
+    1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
     2. ${errorFocusPrompt}
-    3. The sentence must be split into exactly 5 parts (the options).
-    4. The 'correctAnswer' is the part containing the error.
-    5. For each question, include an 'errorCategory' (e.g., 'Crase', 'Concordância Verbal').
-    6. Provide a general 'justification' explaining the error.
-    7. Provide an 'optionJustifications' array explaining each option. For the correct option, explain the error. For incorrect options, the justification should be "Este trecho não contém erros.".
-    Return the question(s) as a JSON array, strictly following the schema.`;
-
+    3. A frase deve ser dividida em 5 partes (alternativas).
+    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
+    
+    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+    `;
+    
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -130,7 +134,7 @@ const generatePortugueseChallenge = async (questionCount: number, errorStats?: S
             responseSchema: questionSchema
         }
     }));
-    
+
     const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
 
     return generatedQuestions.map((q: any) => {
@@ -154,17 +158,17 @@ const generatePortugueseChallenge = async (questionCount: number, errorStats?: S
 const generateGlossaryChallenge = async (terms: GlossaryTerm[], questionCount: number): Promise<Omit<Question, 'id'>[]> => {
     if (terms.length < 4) return [];
 
-    const prompt = `From the following list of glossary terms, create ${questionCount} multiple-choice question(s).
-    For each question:
-    1. The 'statement' will be the DEFINITION of a term.
-    2. The 'options' will be an array of 5 TERMS, one of which is the correct one for the definition. The other 4 should be plausible distractors from the list.
-    3. The 'correctAnswer' is the correct TERM.
-    4. The 'justification' should simply be "This is the correct term for the provided definition."
-    5. The 'optionJustifications' array should be empty.
+    const prompt = `A partir da lista de termos de glossário a seguir, crie ${questionCount} questão(ões) de múltipla escolha.
+    Para cada questão:
+    1. O 'statement' será a DEFINIÇÃO de um termo.
+    2. As 'options' serão um array de 5 TERMOS, um dos quais é o correto para a definição. Os outros 4 devem ser distratores plausíveis da lista.
+    3. O 'correctAnswer' é o TERMO correto.
+    4. A 'justification' deve ser simplesmente "Este é o termo correto para a definição fornecida."
+    5. O array 'optionJustifications' deve estar vazio.
     
-    Glossary Terms: ${JSON.stringify(terms)}
+    Termos do Glossário: ${JSON.stringify(terms)}
 
-    Return the question(s) as a JSON array, strictly following the schema.`;
+    Retorne a(s) questão(ões) como um array JSON, seguindo estritamente o schema.`;
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
@@ -195,27 +199,60 @@ export const handler: Handler = async () => {
 
         console.log(`Running generateDailyChallenges at ${now.toISOString()} (Brasilia: ${todayISO} ${currentTime})`);
 
-        const [progressSnap, subjectsSnap] = await Promise.all([
+        const [progressSnap, subjectsSnap, usersSnap] = await Promise.all([
             db.collection('studentProgress').get(),
-            db.collection('subjects').get()
+            db.collection('subjects').get(),
+            db.collection('users').get()
         ]);
 
         const allProgress: StudentProgress[] = progressSnap.docs.map(doc => doc.data() as StudentProgress);
         const allSubjects: Subject[] = subjectsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+        const allUsers: User[] = usersSnap.docs.map(doc => ({ id: doc.id, ...doc.data() } as User));
 
         const writeBatch = db.batch();
+        
+        // --- Build a comprehensive map of all questions for efficient lookup ---
+        const allQuestionsMap = new Map<string, Question>();
+        allSubjects.forEach(subject => {
+            subject.topics.forEach(topic => {
+                const addQuestionsToMap = (qList: Question[] | undefined, isTec: boolean) => {
+                    (qList || []).forEach(q => {
+                        allQuestionsMap.set(q.id, {
+                            ...q,
+                            subjectName: subject.name,
+                            topicName: topic.name + (isTec ? ' (TEC)' : ''),
+                        });
+                    });
+                };
+                addQuestionsToMap(topic.questions, false);
+                addQuestionsToMap(topic.tecQuestions, true);
+                topic.subtopics.forEach(subtopic => {
+                    const addSubtopicQuestionsToMap = (qList: Question[] | undefined, isTec: boolean) => {
+                        (qList || []).forEach(q => {
+                            allQuestionsMap.set(q.id, {
+                                ...q,
+                                subjectName: subject.name,
+                                topicName: `${topic.name} / ${subtopic.name}` + (isTec ? ' (TEC)' : ''),
+                            });
+                        });
+                    };
+                    addSubtopicQuestionsToMap(subtopic.questions, false);
+                    addSubtopicQuestionsToMap(subtopic.tecQuestions, true);
+                });
+            });
+        });
 
         for (const progress of allProgress) {
             const challengeTime = progress.dailyChallengeTime || '06:00';
-            const hasGeneratedToday = progress.reviewChallenge?.date === todayISO || progress.glossaryChallenge?.date === todayISO || progress.portugueseChallenge?.date === todayISO;
+            const hasGeneratedToday = progress.reviewChallenge?.date === todayISO;
 
             if (currentTime >= challengeTime && !hasGeneratedToday) {
                 console.log(`Generating challenges for student ${progress.studentId}...`);
 
+                const updatedProgress: StudentProgress = JSON.parse(JSON.stringify(progress)); // Deep copy to avoid mutation issues
                 let needsUpdate = false;
-                const updatedProgress: StudentProgress = { ...progress };
 
-                // 1. Review Challenge
+                // --- 1. Review Challenge ---
                 const reviewQuestionCount = progress.advancedReviewQuestionCount ?? 5;
                 const incorrectQuestionIds = new Set<string>();
                 Object.values(progress.progressByTopic).forEach(subject => {
@@ -225,61 +262,81 @@ export const handler: Handler = async () => {
                         });
                     });
                 });
-                const allQuestions = allSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.subtopics.flatMap(st => st.questions))]));
-                const reviewQuestions = allQuestions.filter(q => incorrectQuestionIds.has(q.id)).slice(0, reviewQuestionCount);
-                if (reviewQuestions.length > 0) {
-                    updatedProgress.reviewChallenge = {
-                        date: todayISO,
-                        items: reviewQuestions,
-                        isCompleted: false,
-                        attemptsMade: 0
-                    };
-                    needsUpdate = true;
-                }
-
-                // 2. Glossary Challenge
+                const reviewQuestions = Array.from(incorrectQuestionIds)
+                                            .map(id => allQuestionsMap.get(id))
+                                            .filter((q): q is Question => q !== undefined)
+                                            .slice(0, reviewQuestionCount);
+                
+                updatedProgress.reviewChallenge = {
+                    date: todayISO,
+                    items: reviewQuestions,
+                    isCompleted: reviewQuestions.length === 0,
+                    attemptsMade: 0
+                };
+                needsUpdate = true;
+                
+                // --- 2. Glossary Challenge ---
                 const glossaryQuestionCount = progress.glossaryChallengeQuestionCount ?? 5;
                 const allGlossaryTerms = allSubjects.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...(t.subtopics.flatMap(st => st.glossary || []))]));
-                if (allGlossaryTerms.length >= 4) {
-                    const glossaryQuestions = await generateGlossaryChallenge(allGlossaryTerms, glossaryQuestionCount);
-                    if (glossaryQuestions.length > 0) {
-                         updatedProgress.glossaryChallenge = {
+                const uniqueGlossaryTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
+                
+                if (uniqueGlossaryTerms.length >= 4) {
+                    try {
+                        const glossaryQuestions = await generateGlossaryChallenge(uniqueGlossaryTerms, glossaryQuestionCount);
+                        updatedProgress.glossaryChallenge = {
                             date: todayISO,
-                            // FIX: Added a map function to add a unique ID to each generated question, satisfying the Question[] type.
                             items: glossaryQuestions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })),
-                            isCompleted: false,
+                            isCompleted: glossaryQuestions.length === 0,
                             attemptsMade: 0
                         };
-                        needsUpdate = true;
+                    } catch (e) {
+                         console.error(`Failed to generate glossary challenge for ${progress.studentId}`, e);
+                         updatedProgress.glossaryChallenge = { date: todayISO, items: [], isCompleted: true, attemptsMade: 0 };
                     }
+                } else {
+                    updatedProgress.glossaryChallenge = { date: todayISO, items: [], isCompleted: true, attemptsMade: 0 };
                 }
-
-                // 3. Portuguese Challenge
-                const portugueseQuestionCount = progress.portugueseChallengeQuestionCount ?? 1;
-                const portugueseQuestions = await generatePortugueseChallenge(portugueseQuestionCount, progress.portugueseErrorStats);
-                if(portugueseQuestions.length > 0) {
+                
+                // --- 3. Portuguese Challenge ---
+                 try {
+                    const portugueseQuestionCount = progress.portugueseChallengeQuestionCount ?? 1;
+                    const portugueseQuestions = await generatePortugueseChallenge(portugueseQuestionCount, progress.portugueseErrorStats);
                     updatedProgress.portugueseChallenge = {
                         date: todayISO,
                         items: portugueseQuestions.map((q, i) => ({...q, id: `port-challenge-${todayISO}-${i}`})),
-                        isCompleted: false,
+                        isCompleted: portugueseQuestions.length === 0,
                         attemptsMade: 0
                     };
-                    needsUpdate = true;
+                } catch (e) {
+                    console.error(`Failed to generate portuguese challenge for ${progress.studentId}`, e);
+                    updatedProgress.portugueseChallenge = { date: todayISO, items: [], isCompleted: true, attemptsMade: 0 };
                 }
-                
-                // Set catch-up challenge from yesterday if not completed
+
+                // --- 4. Streak Reset ---
                 const yesterday = getBrasiliaDate();
                 yesterday.setUTCDate(yesterday.getUTCDate() - 1);
                 const yesterdayISO = getLocalDateISOString(yesterday);
-
-                (['reviewChallenge', 'glossaryChallenge', 'portugueseChallenge'] as const).forEach(key => {
-                    const challenge = progress[key];
-                    if (challenge && challenge.date === yesterdayISO && !challenge.isCompleted) {
-                        updatedProgress[key] = { ...challenge, generatedForDate: yesterdayISO, date: todayISO };
-                        needsUpdate = true;
+                if (progress.dailyChallengeStreak && progress.dailyChallengeStreak.lastCompletedDate < yesterdayISO) {
+                    updatedProgress.dailyChallengeStreak = { ...progress.dailyChallengeStreak, current: 0 };
+                }
+                
+                // --- 5. Push Notification ---
+                const studentUser = allUsers.find(u => u.id === progress.studentId);
+                if (studentUser && studentUser.fcmToken) {
+                    const message = {
+                        notification: {
+                            title: 'Seus desafios diários estão prontos!',
+                            body: 'Clique para começar a praticar e manter sua sequência! 🔥',
+                        },
+                        token: studentUser.fcmToken,
+                    };
+                    try {
+                        await admin.messaging().send(message);
+                        console.log(`Notification sent to ${studentUser.name}`);
+                    } catch (error) {
+                        console.error(`Error sending notification to ${studentUser.name}:`, error);
                     }
-                });
-
+                }
 
                 if (needsUpdate) {
                     const progressRef = db.collection('studentProgress').doc(progress.studentId);
@@ -289,7 +346,7 @@ export const handler: Handler = async () => {
         }
         
         await writeBatch.commit();
-        console.log(`Batch commit successful.`);
+        console.log(`Batch commit successful. Updated challenges for students.`);
 
         return {
             statusCode: 200,
