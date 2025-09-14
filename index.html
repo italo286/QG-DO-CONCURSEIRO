@@ -140,6 +140,31 @@
         flex-shrink: 0;
       }
 
+      /* Floating Back Button */
+      .floating-back-button {
+        position: fixed;
+        bottom: 2rem;
+        left: 2rem;
+        z-index: 40; /* Lower than modal's z-index (50) */
+        background-color: rgba(30, 41, 59, 0.8); /* slate-800 with opacity */
+        -webkit-backdrop-filter: blur(4px);
+        backdrop-filter: blur(4px);
+        color: #67e8f9; /* cyan-300 */
+        border: 1px solid #0e7490; /* cyan-700 */
+        border-radius: 9999px; /* rounded-full */
+        padding: 0.75rem; /* p-3 */
+        box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.2), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .floating-back-button:hover {
+        transform: scale(1.1);
+        box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.2), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+        background-color: rgba(51, 65, 85, 0.9); /* slate-700 with opacity */
+      }
+
     </style>
   <script type="importmap">
 {

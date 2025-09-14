@@ -16,6 +16,7 @@ import { TopicChat } from './TopicChat';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
+import { ArrowRightIcon } from '../Icons';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
@@ -71,28 +72,39 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         teacherProfiles
     } = useStudentData(user, isPreview);
 
-    const handleBack = useCallback(() => {
+    const handleBack = useCallback((): boolean => {
         if (view === 'topic') {
             setView('subject');
             setSelectedTopic(null);
             setSelectedSubtopic(null);
-        } else if (view === 'subject') {
+            return true;
+        }
+        if (view === 'subject') {
             setView('course');
             setSelectedSubject(null);
-        } else if (view === 'course') {
+            return true;
+        }
+        if (view === 'course') {
             setView('dashboard');
             setSelectedCourse(null);
-        } else if (['schedule', 'performance', 'reviews', 'games', 'custom_quiz_list'].includes(view)) {
+            return true;
+        }
+        if (['schedule', 'performance', 'reviews', 'games', 'custom_quiz_list'].includes(view)) {
             setView('dashboard');
-        } else if (view === 'review_quiz' || view === 'daily_challenge_quiz') {
+            return true;
+        }
+        if (view === 'review_quiz' || view === 'daily_challenge_quiz') {
             setView(view === 'review_quiz' ? 'reviews' : 'dashboard');
             setSelectedReview(null);
             setActiveChallenge(null);
-        } else if (view === 'custom_quiz_player') {
+            return true;
+        }
+        if (view === 'custom_quiz_player') {
             setView('custom_quiz_list');
             setActiveCustomQuiz(null);
+            return true;
         }
-        return true;
+        return false;
     }, [view]);
     
     useEffect(() => {
@@ -355,6 +367,13 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     }}
                 />
             </main>
+
+            {view !== 'dashboard' && !isPreview && (
+                <button onClick={() => handleBack()} className="floating-back-button" title="Voltar">
+                    <ArrowRightIcon className="h-6 w-6 transform rotate-180" aria-hidden="true" />
+                    <span className="sr-only">Voltar</span>
+                </button>
+            )}
 
             <XpToastDisplay toasts={xpToasts} />
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />

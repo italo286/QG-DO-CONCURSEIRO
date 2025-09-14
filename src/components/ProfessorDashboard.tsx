@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import * as FirebaseService from '../services/firebaseService';
-import { User, Subject, Course } from '../types';
+import * as FirebaseService from '../../services/firebaseService';
+import { User, Subject, Course } from '../../types';
 import { Spinner, Button, Card, Modal, Toast } from './ui';
 import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon } from './Icons';
 
@@ -329,14 +329,15 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             </header>
             
             <main>
-                {view !== 'courses' && (
-                    <button onClick={handleBack} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
-                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
-                    </button>
-                )}
-
                 {renderContent()}
             </main>
+
+            {view !== 'courses' && (
+                <button onClick={handleBack} className="floating-back-button" title="Voltar">
+                    <ArrowRightIcon className="h-6 w-6 transform rotate-180" aria-hidden="true" />
+                    <span className="sr-only">Voltar</span>
+                </button>
+            )}
 
             <Modal isOpen={isNewCourseModalOpen} onClose={handleCloseNewCourseModal} title="Criar Novo Curso">
                 <form onSubmit={handleSaveNewCourse} className="space-y-4">
