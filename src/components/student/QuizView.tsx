@@ -15,6 +15,9 @@ const XP_CONFIG = {
     } as Record<number, number>
 };
 
+const CONTINUOUS_COMBO_XP = 25;
+const CONTINUOUS_COMBO_INTERVAL = 3;
+
 const HIGHLIGHT_COLORS = [
     'bg-blue-500/30 text-blue-200 border border-blue-400/50',
     'bg-green-500/30 text-green-200 border border-green-400/50',
@@ -34,6 +37,64 @@ const PORTUGUESE_HIGHLIGHT_COLORS = [
 const isInsideWebView = () => {
     return window.Android && typeof window.Android.downloadPdf === 'function';
 };
+
+const ComboProgressBar: React.FC<{ streak: number }> = ({ streak }) => {
+    if (streak <= 0) return null;
+
+    let goal: number;
+    let progress: number;
+    let previousMilestone: number;
+    let nextBonus: number | null = null;
+    let message: string;
+
+    if (streak < 3) {
+        goal = 3;
+        previousMilestone = 0;
+        nextBonus = XP_CONFIG.COMBO_BONUS[3];
+        progress = (streak / goal) * 100;
+        message = `Acerte mais ${goal - streak} para +${nextBonus} XP!`;
+    } else if (streak < 5) {
+        goal = 5;
+        previousMilestone = 3;
+        nextBonus = XP_CONFIG.COMBO_BONUS[5];
+        progress = ((streak - previousMilestone) / (goal - previousMilestone)) * 100;
+        message = `Acerte mais ${goal - streak} para +${nextBonus} XP!`;
+    } else if (streak < 7) {
+        goal = 7;
+        previousMilestone = 5;
+        nextBonus = XP_CONFIG.COMBO_BONUS[7];
+        progress = ((streak - previousMilestone) / (goal - previousMilestone)) * 100;
+        message = `Acerte mais ${goal - streak} para +${nextBonus} XP!`;
+    } else { // streak >= 7
+        const streakAfter7 = streak - 7;
+        const stepsAfter7 = Math.floor(streakAfter7 / CONTINUOUS_COMBO_INTERVAL);
+        goal = 7 + (stepsAfter7 + 1) * CONTINUOUS_COMBO_INTERVAL;
+        previousMilestone = 7 + stepsAfter7 * CONTINUOUS_COMBO_INTERVAL;
+        nextBonus = CONTINUOUS_COMBO_XP;
+
+        progress = ((streak - previousMilestone) / (goal - previousMilestone)) * 100;
+        const needed = goal - streak;
+        message = `Em chamas! Acerte mais ${needed} para +${nextBonus} XP Bônus!`;
+    }
+
+    return (
+        <div className="flex items-center gap-3 p-2 bg-gray-800/50 rounded-lg">
+            <FireIcon className="h-6 w-6 text-orange-400 animate-pulse" />
+            <div className="w-full bg-gray-700 rounded-full h-4 relative overflow-hidden">
+                <div 
+                    className="bg-gradient-to-r from-orange-400 to-red-500 h-4 rounded-full transition-all duration-300 flex items-center justify-end pr-2" 
+                    style={{ width: `${progress}%` }}
+                >
+                </div>
+                <span className="absolute inset-0 flex items-center justify-center text-xs font-bold text-white drop-shadow-md">
+                   {streak >= 7 ? `🔥 Combo x${streak}` : `${streak} / ${goal}`}
+                </span>
+            </div>
+            <span className="text-sm font-semibold text-orange-300 whitespace-nowrap">{message}</span>
+        </div>
+    );
+};
+
 
 export const QuizView: React.FC<{
     questions: Question[];
@@ -77,6 +138,10 @@ export const QuizView: React.FC<{
     const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
     const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
     const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
+    
+    // New state for motivational messages
+    const [motivationalMessage, setMotivationalMessage] = useState<string | null>(null);
+    const [thresholdsMet, setThresholdsMet] = useState<Set<number>>(new Set());
 
 
     const correctCount = useMemo(() => sessionAttempts.filter(a => a.isCorrect).length, [sessionAttempts]);
@@ -116,8 +181,19 @@ export const QuizView: React.FC<{
             setTimeLeft(durationInSeconds);
             setCurrentIndex(0);
             setReportedQuestions(new Set());
+            setThresholdsMet(new Set());
+            setMotivationalMessage(null);
         }
     }, [questions, initialAttempts, durationInSeconds]);
+    
+    useEffect(() => {
+        if (motivationalMessage) {
+            const timer = setTimeout(() => {
+                setMotivationalMessage(null);
+            }, 4000); // Message disappears after 4 seconds
+            return () => clearTimeout(timer);
+        }
+    }, [motivationalMessage]);
 
     useEffect(() => {
         if (durationInSeconds !== undefined && !showResults) {
@@ -155,12 +231,45 @@ export const QuizView: React.FC<{
         
         setSessionAttempts(prev => [...prev, newAttempt]);
         onSaveAttempt(newAttempt);
+        
+        setMotivationalMessage(null);
+        setTimeout(() => {
+            let message: string | null = null;
+    
+            if (isCorrect) {
+                message = 'Mandou bem! Resposta correta!';
+                
+                const newCorrectCount = correctCount + 1;
+                const newTotal = sessionAttempts.length + 1;
+                const newScore = newCorrectCount / newTotal;
+    
+                if (newScore >= 0.9 && !thresholdsMet.has(90)) {
+                    message = 'Uau! Desempenho excelente, acima de 90% de acertos!';
+                    setThresholdsMet(prev => new Set(prev).add(90));
+                } else if (newScore >= 0.7 && !thresholdsMet.has(70)) {
+                    message = 'Ótimo trabalho! Você já acertou mais de 70% das questões!';
+                    setThresholdsMet(prev => new Set(prev).add(70));
+                }
+    
+            } else { // Incorrect answer
+                message = 'Não desanime, o erro faz parte do aprendizado!';
+            }
+    
+            setMotivationalMessage(message);
+        }, 400);
 
         if (isCorrect) {
             const newStreak = comboStreak + 1;
             setComboStreak(newStreak);
-            if(XP_CONFIG.COMBO_BONUS[newStreak]) {
-                const bonusXp = XP_CONFIG.COMBO_BONUS[newStreak];
+
+            let bonusXp = 0;
+            if (XP_CONFIG.COMBO_BONUS[newStreak]) {
+                bonusXp = XP_CONFIG.COMBO_BONUS[newStreak];
+            } else if (newStreak > 7 && (newStreak - 7) % CONTINUOUS_COMBO_INTERVAL === 0) {
+                bonusXp = CONTINUOUS_COMBO_XP;
+            }
+
+            if (bonusXp > 0) {
                 onAddBonusXp(bonusXp, `Combo x${newStreak}! +${bonusXp} XP Bônus 🔥`);
                 setShowComboToast(true);
                 setTimeout(() => setShowComboToast(false), 2000);
@@ -173,6 +282,7 @@ export const QuizView: React.FC<{
     const handleNext = () => {
         setSelectedOption(null);
         setEliminatedOptions(new Set());
+        setMotivationalMessage(null);
         if (currentIndex < questions.length - 1) {
             setCurrentIndex(prev => prev + 1);
         } else {
@@ -183,6 +293,7 @@ export const QuizView: React.FC<{
     const handlePrevious = () => {
         setSelectedOption(null);
         setEliminatedOptions(new Set());
+        setMotivationalMessage(null);
         if (currentIndex > 0) {
             setCurrentIndex(prev => prev - 1);
         }
@@ -443,7 +554,7 @@ export const QuizView: React.FC<{
                     </div>
                 </div>
 
-                 <div className="mb-4 space-y-2">
+                <div className="mb-4 space-y-2">
                     <div className="w-full bg-gray-700 rounded-full h-2.5">
                         <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full" style={{ width: `${((currentIndex + 1) / (questions.length || 1)) * 100}%` }}></div>
                     </div>
@@ -452,6 +563,18 @@ export const QuizView: React.FC<{
                         <span>Erros: <span className="font-bold text-red-400">{incorrectCount}</span></span>
                     </div>
                 </div>
+                
+                {comboStreak > 0 && !isCurrentQuestionAnswered && (
+                    <div key={comboStreak} className="my-3 animate-fade-in">
+                        <ComboProgressBar streak={comboStreak} />
+                    </div>
+                )}
+                
+                {motivationalMessage && (
+                    <div key={motivationalMessage} className="text-center my-3 p-2 bg-gray-800/50 rounded-lg animate-fade-in">
+                        <p className="text-sm font-semibold text-cyan-300">{motivationalMessage}</p>
+                    </div>
+                )}
                 
                 {imageUrl && <img src={imageUrl} alt="Imagem da questão" className="max-h-60 w-auto rounded-lg mx-auto mb-4"/>}
                 

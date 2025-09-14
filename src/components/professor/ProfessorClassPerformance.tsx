@@ -35,8 +35,9 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
+        // FIX: Explicitly typed the 'p' and 'subj' parameters in the chained `flatMap` call to resolve a TypeScript type inference issue where they were being treated as 'unknown'. This ensures correct property access on `p.progressByTopic` and allows the chain to execute without type errors.
         const allAttempts = Object.values(allProgress)
-            .flatMap(p => Object.values(p.progressByTopic).flatMap(subj => Object.values(subj).flatMap((t: any) => t.lastAttempt)));
+            .flatMap((p: StudentProgress) => Object.values(p.progressByTopic).flatMap((subj: any) => Object.values(subj).flatMap((t: any) => t.lastAttempt)));
 
         try {
             const result = await GeminiService.analyzeStudentDifficulties(allQuestionsWithContext, allAttempts);
