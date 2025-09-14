@@ -1,20 +1,10 @@
 # netlify.toml
 
 # Esta seção informa à Netlify onde encontrar suas funções de backend.
-# O caminho deve corresponder à estrutura de pastas do seu projeto.
 [functions]
   directory = "netlify/functions/"
 
-# Esta é a configuração do agendamento (cron job) para a nossa função.
-[[functions.generateDailyChallenges]]
-  # O nome 'generateDailyChallenges' corresponde ao nome do arquivo
-  # da função (generateDailyChallenges.ts).
-
-  # A expressão cron "0 6 * * *" define quando a função será executada.
-  # - Minuto 0
-  # - Hora 6
-  # - Todo dia do mês
-  # - Todo mês
-  # - Todo dia da semana
-  # O fuso horário é UTC. 6h UTC corresponde a 3h da manhã no horário de Brasília (UTC-3).
+# CORREÇÃO: Usamos [functions.NOME_DA_FUNCAO] para definir um objeto de configuração para a função.
+[functions.generateDailyChallenges]
+  # A propriedade 'schedule' pertence a este objeto de configuração.
   schedule = "0 6 * * *"
