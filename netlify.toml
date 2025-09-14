@@ -7,4 +7,5 @@
 # CORREÇÃO: Usamos [functions.NOME_DA_FUNCAO] para definir um objeto de configuração para a função.
 [functions.generateDailyChallenges]
   # A propriedade 'schedule' pertence a este objeto de configuração.
-  schedule = "0 6 * * *"
+
+  schedule = "0 3 * * *"
