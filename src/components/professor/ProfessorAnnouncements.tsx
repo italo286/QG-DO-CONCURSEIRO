@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { User, TeacherMessage, MessageReply } from '../../types';

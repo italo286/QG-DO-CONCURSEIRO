@@ -77,33 +77,11 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
         }
     };
 
-    const handleBackToDashboard = useCallback(() => {
+    const handleBackToDashboard = () => {
         setSelectedCourse(null);
         setSelectedSubject(null);
         setView('courses');
-    }, []);
-
-    const handleBack = useCallback((): boolean => {
-        if (view !== 'courses') {
-            if (view.startsWith('edit_')) {
-                setView(view.endsWith('course') ? 'courses' : 'subjects');
-            } else {
-                handleBackToDashboard();
-            }
-            return true;
-        }
-        return false;
-    }, [view, handleBackToDashboard]);
-
-    useEffect(() => {
-        window.customGoBack = handleBack;
-        return () => {
-            if (window.customGoBack === handleBack) {
-                window.customGoBack = undefined;
-            }
-        };
-    }, [handleBack]);
-
+    };
 
     const handleSaveNewCourse = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -278,9 +256,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
             <header className="flex justify-between items-center mb-8">
                 <div className="flex items-center gap-4">
-                    <button onClick={handleBackToDashboard} aria-label="Voltar para o início">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
-                    </button>
+                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
                     <div>
                         <h1 className="text-3xl font-bold text-white">Painel do Professor</h1>
                         <p className="text-gray-400">Gerencie seus cursos, disciplinas e alunos.</p>
@@ -329,15 +305,14 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
             </header>
             
             <main>
+                {view !== 'courses' && view !== 'subjects' && (
+                    <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    </button>
+                )}
+
                 {renderContent()}
             </main>
-
-            {view !== 'courses' && (
-                <button onClick={handleBack} className="floating-back-button" title="Voltar">
-                    <ArrowRightIcon className="h-6 w-6 transform rotate-180" aria-hidden="true" />
-                    <span className="sr-only">Voltar</span>
-                </button>
-            )}
 
             <Modal isOpen={isNewCourseModalOpen} onClose={handleCloseNewCourseModal} title="Criar Novo Curso">
                 <form onSubmit={handleSaveNewCourse} className="space-y-4">
