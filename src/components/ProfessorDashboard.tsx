@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import * as FirebaseService from '../../services/firebaseService';
-import { User, Subject, Course } from '../../types';
+import * as FirebaseService from '../services/firebaseService';
+import { User, Subject, Course } from '../types';
 import { Spinner, Button, Card, Modal, Toast } from './ui';
 import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon } from './Icons';
 
