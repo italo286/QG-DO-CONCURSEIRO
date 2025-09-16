@@ -7,6 +7,7 @@ import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from
 if (admin.apps.length === 0) {
     admin.initializeApp({
         credential: admin.credential.cert({
+            // FIX: Corrected property name from 'project_id' to 'projectId'.
             projectId: process.env.FIREBASE_PROJECT_ID,
             privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
             clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
