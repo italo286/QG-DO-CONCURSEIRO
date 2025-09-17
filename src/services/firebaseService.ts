@@ -289,15 +289,44 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
     });
 };
 
-export const listenToAllStudentProgress = (callback: (progress: {[studentId: string]: StudentProgress}) => void): Unsubscribe => {
-    const progressRef = db.collection('studentProgress');
-    return progressRef.onSnapshot((querySnapshot) => {
-        const allProgress: {[studentId: string]: StudentProgress} = {};
-        querySnapshot.forEach(doc => {
-            allProgress[doc.id] = doc.data() as StudentProgress;
-        });
-        callback(allProgress);
+export const listenToStudentProgressForTeacher = (studentIds: string[], callback: (progress: {[studentId: string]: StudentProgress}) => void): Unsubscribe => {
+    if (studentIds.length === 0) {
+        callback({});
+        return () => {};
+    }
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < studentIds.length; i += 10) {
+        chunks.push(studentIds.slice(i, i + 10));
+    }
+
+    const progressByChunk: { [chunkIndex: number]: { [id: string]: StudentProgress } } = {};
+    const unsubs: Unsubscribe[] = [];
+
+    const processAndCallback = () => {
+        const mergedProgress = Object.values(progressByChunk).reduce((acc, chunk) => ({...acc, ...chunk}), {});
+        callback(mergedProgress);
+    };
+
+    chunks.forEach((chunk, chunkIndex) => {
+        if (chunk.length > 0) {
+            const progressRef = db.collection('studentProgress');
+            const q = progressRef.where(firebase.firestore.FieldPath.documentId(), 'in', chunk);
+            const unsub = q.onSnapshot((querySnapshot) => {
+                const chunkProgress: { [id: string]: StudentProgress } = {};
+                querySnapshot.docs.forEach(doc => {
+                    chunkProgress[doc.id] = doc.data() as StudentProgress;
+                });
+                progressByChunk[chunkIndex] = chunkProgress;
+                processAndCallback();
+            }, (error) => {
+                console.error("Error in listenToStudentProgressForTeacher snapshot:", error);
+            });
+            unsubs.push(unsub);
+        }
     });
+    
+    return () => unsubs.forEach(unsub => unsub());
 };
 
 
@@ -490,15 +519,44 @@ export const listenToStudyPlanForStudent = (studentId: string, callback: (plan: 
     });
 };
 
-export const listenToAllStudyPlans = (callback: (plans: {[studentId: string]: StudyPlan}) => void): Unsubscribe => {
-    const plansRef = db.collection('studyPlans');
-    return plansRef.onSnapshot((querySnapshot) => {
-        const allPlans: {[studentId: string]: StudyPlan} = {};
-        querySnapshot.forEach(doc => {
-            allPlans[doc.id] = doc.data() as StudyPlan;
-        });
-        callback(allPlans);
+export const listenToStudyPlansForTeacher = (studentIds: string[], callback: (plans: {[studentId: string]: StudyPlan}) => void): Unsubscribe => {
+    if (studentIds.length === 0) {
+        callback({});
+        return () => {};
+    }
+
+    const chunks: string[][] = [];
+    for (let i = 0; i < studentIds.length; i += 10) {
+        chunks.push(studentIds.slice(i, i + 10));
+    }
+
+    const plansByChunk: { [chunkIndex: number]: { [id: string]: StudyPlan } } = {};
+    const unsubs: Unsubscribe[] = [];
+    
+    const processAndCallback = () => {
+        const mergedPlans = Object.values(plansByChunk).reduce((acc, chunk) => ({...acc, ...chunk}), {});
+        callback(mergedPlans);
+    };
+
+    chunks.forEach((chunk, chunkIndex) => {
+        if (chunk.length > 0) {
+            const plansRef = db.collection('studyPlans');
+            const q = plansRef.where(firebase.firestore.FieldPath.documentId(), 'in', chunk);
+            const unsub = q.onSnapshot((querySnapshot) => {
+                const chunkPlans: { [id: string]: StudyPlan } = {};
+                querySnapshot.docs.forEach(doc => {
+                    chunkPlans[doc.id] = doc.data() as StudyPlan;
+                });
+                plansByChunk[chunkIndex] = chunkPlans;
+                processAndCallback();
+            }, (error) => {
+                 console.error("Error in listenToStudyPlansForTeacher snapshot:", error);
+            });
+            unsubs.push(unsub);
+        }
     });
+    
+    return () => unsubs.forEach(unsub => unsub());
 };
 
 // --- Review Sessions ---

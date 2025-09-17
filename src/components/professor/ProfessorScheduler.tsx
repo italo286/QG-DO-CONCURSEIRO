@@ -17,12 +17,13 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
 
     useEffect(() => {
         setIsLoading(true);
-        const unsubscribe = FirebaseService.listenToAllStudyPlans((plans) => {
+        const studentIds = students.map(s => s.id);
+        const unsubscribe = FirebaseService.listenToStudyPlansForTeacher(studentIds, (plans) => {
             setAllStudyPlans(plans);
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [students]);
     
     useEffect(() => {
         // Set initial selected subject

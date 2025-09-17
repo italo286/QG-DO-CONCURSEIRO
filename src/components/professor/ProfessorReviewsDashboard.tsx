@@ -19,12 +19,13 @@ export const ProfessorReviewsDashboard: React.FC<{
 
     useEffect(() => {
         setIsLoadingProgress(true);
-        const unsubscribe = FirebaseService.listenToAllStudentProgress((progressData) => {
+        const studentIds = students.map(s => s.id);
+        const unsubscribe = FirebaseService.listenToStudentProgressForTeacher(studentIds, (progressData) => {
             setAllProgress(progressData);
             setIsLoadingProgress(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [students]);
 
     const incorrectQuestionsByTopic = useMemo(() => {
         const questionErrorCount: { [id: string]: { count: number, studentIds: Set<string> } } = {};

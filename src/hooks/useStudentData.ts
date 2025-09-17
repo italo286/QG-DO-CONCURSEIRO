@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import * as FirebaseService from '../services/firebaseService';
+import * as FirebaseService from '../../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course } from '../types';
 
 export const useStudentData = (user: User, isPreview?: boolean) => {
@@ -20,23 +20,64 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         }
 
         const unsubs: (() => void)[] = [];
+        
+        // This variable will hold the unsubscribe function for the progress listener
+        let progressUnsub: (() => void) | null = null;
+        
+        // FIX: Replaced non-existent `listenToAllStudentProgress` with a mechanism that uses `listenToStudents`
+        // and the existing `listenToStudentProgressForTeacher` to correctly fetch progress data for all students.
+        // This also prevents a memory leak by cleaning up the previous progress listener when the student list changes.
+        const studentsUnsub = FirebaseService.listenToStudents((students) => {
+            setAllStudents(students.filter(s => s.role === 'aluno'));
+            const studentIds = students.map(s => s.id);
 
-        unsubs.push(FirebaseService.listenToEnrolledCourses(user.id, (courses) => {
+            // Clean up old progress listener before creating a new one
+            if (progressUnsub) {
+                progressUnsub();
+            }
+
+            if (studentIds.length > 0) {
+                progressUnsub = FirebaseService.listenToStudentProgressForTeacher(studentIds, setAllStudentProgress);
+            }
+        });
+        unsubs.push(studentsUnsub);
+        // Ensure progress listener is cleaned up on unmount
+        unsubs.push(() => {
+            if (progressUnsub) {
+                progressUnsub();
+            }
+        });
+
+
+        // These listeners depend on teacherIds from enrolled courses.
+        // We manage their lifecycle to prevent memory leaks if courses change.
+        let subjectUnsub: (() => void) | null = null;
+        let messagesUnsub: (() => void) | null = null;
+
+        const coursesUnsub = FirebaseService.listenToEnrolledCourses(user.id, (courses) => {
             setEnrolledCourses(courses);
             const teacherIds = [...new Set(courses.map(c => c.teacherId))];
 
+            // Unsubscribe from previous listeners before creating new ones
+            if (subjectUnsub) subjectUnsub();
+            if (messagesUnsub) messagesUnsub();
+
             if (teacherIds.length > 0) {
                 FirebaseService.getUserProfilesByIds(teacherIds).then(setTeacherProfiles);
-                FirebaseService.listenToStudents((all) => setAllStudents(all.filter(s => s.role === 'aluno')));
-                unsubs.push(FirebaseService.listenToAllStudentProgress(setAllStudentProgress));
-                unsubs.push(FirebaseService.listenToSubjects(teacherIds, setAllSubjects));
-                unsubs.push(FirebaseService.listenToMessagesForStudent(user.id, teacherIds, setMessages));
+                subjectUnsub = FirebaseService.listenToSubjects(teacherIds, setAllSubjects);
+                messagesUnsub = FirebaseService.listenToMessagesForStudent(user.id, teacherIds, setMessages);
             } else {
                 setAllSubjects([]);
                 setMessages([]);
                 setTeacherProfiles([]);
             }
-        }));
+        });
+        unsubs.push(coursesUnsub);
+        unsubs.push(() => {
+            if (subjectUnsub) subjectUnsub();
+            if (messagesUnsub) messagesUnsub();
+        });
+
 
         unsubs.push(FirebaseService.listenToStudentProgress(user.id, (progress) => {
             setStudentProgress(progress);

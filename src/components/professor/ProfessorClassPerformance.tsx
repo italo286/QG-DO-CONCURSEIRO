@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as FirebaseService from '../../services/firebaseService';
@@ -18,12 +19,13 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
 
     useEffect(() => {
         setIsLoading(true);
-        const unsubscribe = FirebaseService.listenToAllStudentProgress((progressData) => {
+        const studentIds = students.map(s => s.id);
+        const unsubscribe = FirebaseService.listenToStudentProgressForTeacher(studentIds, (progressData) => {
             setAllProgress(progressData);
             setIsLoading(false);
         });
         return () => unsubscribe();
-    }, []);
+    }, [students]);
 
     const handleAnalyze = async () => {
         setIsAnalysisLoading(true);
