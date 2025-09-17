@@ -21,17 +21,12 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
 
         const unsubs: (() => void)[] = [];
         
-        // This variable will hold the unsubscribe function for the progress listener
         let progressUnsub: (() => void) | null = null;
         
-        // FIX: Replaced non-existent `listenToAllStudentProgress` with a mechanism that uses `listenToStudents`
-        // and the existing `listenToStudentProgressForTeacher` to correctly fetch progress data for all students.
-        // This also prevents a memory leak by cleaning up the previous progress listener when the student list changes.
-        const studentsUnsub = FirebaseService.listenToStudents((students) => {
+        const studentsUnsub = FirebaseService.listenToStudents((students: User[]) => {
             setAllStudents(students.filter(s => s.role === 'aluno'));
             const studentIds = students.map(s => s.id);
 
-            // Clean up old progress listener before creating a new one
             if (progressUnsub) {
                 progressUnsub();
             }
@@ -41,24 +36,19 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
             }
         });
         unsubs.push(studentsUnsub);
-        // Ensure progress listener is cleaned up on unmount
         unsubs.push(() => {
             if (progressUnsub) {
                 progressUnsub();
             }
         });
 
-
-        // These listeners depend on teacherIds from enrolled courses.
-        // We manage their lifecycle to prevent memory leaks if courses change.
         let subjectUnsub: (() => void) | null = null;
         let messagesUnsub: (() => void) | null = null;
 
-        const coursesUnsub = FirebaseService.listenToEnrolledCourses(user.id, (courses) => {
+        const coursesUnsub = FirebaseService.listenToEnrolledCourses(user.id, (courses: Course[]) => {
             setEnrolledCourses(courses);
             const teacherIds = [...new Set(courses.map(c => c.teacherId))];
 
-            // Unsubscribe from previous listeners before creating new ones
             if (subjectUnsub) subjectUnsub();
             if (messagesUnsub) messagesUnsub();
 
@@ -79,15 +69,15 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         });
 
 
-        unsubs.push(FirebaseService.listenToStudentProgress(user.id, (progress) => {
+        unsubs.push(FirebaseService.listenToStudentProgress(user.id, (progress: StudentProgress | null) => {
             setStudentProgress(progress);
             if (isLoading) {
                 setIsLoading(false);
             }
         }));
-        unsubs.push(FirebaseService.listenToStudyPlanForStudent(user.id, (plan) => setStudyPlan(plan.plan)));
+        unsubs.push(FirebaseService.listenToStudyPlanForStudent(user.id, (plan: StudyPlan) => setStudyPlan(plan.plan)));
 
-        return () => unsubs.forEach(unsub => unsub());
+        return () => unsubs.forEach((unsub: () => void) => unsub());
 
     }, [user.id, isPreview, isLoading]);
     
