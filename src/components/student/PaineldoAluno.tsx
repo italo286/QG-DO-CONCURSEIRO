@@ -238,6 +238,11 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-6 lg:p-8">
             <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={setView} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
             <main>
+                {view !== 'dashboard' && !isPreview && (
+                    <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    </button>
+                )}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
@@ -367,13 +372,6 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     }}
                 />
             </main>
-
-            {view !== 'dashboard' && !isPreview && (
-                <button onClick={() => handleBack()} className="floating-back-button" title="Voltar">
-                    <ArrowRightIcon className="h-6 w-6 transform rotate-180" aria-hidden="true" />
-                    <span className="sr-only">Voltar</span>
-                </button>
-            )}
 
             <XpToastDisplay toasts={xpToasts} />
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
