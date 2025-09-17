@@ -35,8 +35,12 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
-        const allAttempts = Object.values(allProgress)
-            .flatMap(p => Object.values(p.progressByTopic).flatMap(subj => Object.values(subj).flatMap((t: any) => t.lastAttempt)));
+        // FIX: Replaced the chained `flatMap` for collecting all attempts with a more robust and type-safe version. This prevents runtime errors from malformed data and resolves the TypeScript error where the type of `p` was inferred as `unknown`.
+        const allAttempts: QuestionAttempt[] = Object.values(allProgress)
+            .filter((p): p is StudentProgress => p && !!p.progressByTopic)
+            .flatMap(p => Object.values(p.progressByTopic))
+            .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
+            .flatMap(topicProgress => topicProgress.lastAttempt ?? []);
 
         try {
             const result = await GeminiService.analyzeStudentDifficulties(allQuestionsWithContext, allAttempts);
