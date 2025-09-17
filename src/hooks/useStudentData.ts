@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import * as FirebaseService from '../../services/firebaseService';
+import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course } from '../types';
 
 export const useStudentData = (user: User, isPreview?: boolean) => {
