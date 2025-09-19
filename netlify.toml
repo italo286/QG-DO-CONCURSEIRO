@@ -1,6 +1,15 @@
-# Define que a função "generateDailyChallenges" será agendada.
+# Esta linha define que a função "generateDailyChallenges" será agendada.
 [functions."generateDailyChallenges"]
 
-  # Roda às 3:00 da manhã (UTC), todos os dias.
+  # AQUI está a mágica! Esta é a agenda.
+  # Significa: "Rode às 6:00 da manhã (UTC), todos os dias."
   # (minuto, hora, dia do mês, mês, dia da semana)
   schedule = "0 3 * * *"
+
+  # Esta seção é onde entregamos a SENHA para o gerente.
+  [functions."generateDailyChallenges".headers]
+
+    # Instrução: "Gerente, quando você for executar a função,
+    # apresente um cabeçalho chamado 'x-api-key' com este valor:"
+    # O '$' diz para a Netlify buscar o valor da variável de ambiente que criamos.
+    x-api-key = "$DAILY_CHALLENGE_API_KEY"

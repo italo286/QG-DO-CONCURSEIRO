@@ -3,24 +3,6 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from '../../src/types';
 
-// Initialize Firebase Admin only once
-if (admin.apps.length === 0) {
-    admin.initializeApp({
-        credential: admin.credential.cert({
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-        }),
-    });
-}
-const db = admin.firestore();
-
-// Initialize Gemini
-if (!process.env.VITE_GEMINI_API_KEY) {
-    throw new Error("Gemini API key is missing in environment variables.");
-}
-const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
-
 // --- Helper Functions ---
 
 const getBrasiliaDateISO = (): string => {
@@ -78,6 +60,7 @@ const questionSchema = {
 };
 
 const generatePortugueseChallengeQuestions = async (
+    ai: GoogleGenAI,
     questionCount: number,
     errorStats?: StudentProgress['portugueseErrorStats']
 ): Promise<Omit<Question, 'id'>[]> => {
@@ -125,12 +108,45 @@ const generatePortugueseChallengeQuestions = async (
 // --- Netlify Function Handler ---
 
 export const handler: Handler = async () => {
-    try {
-        const todayISO = getBrasiliaDateISO();
-        console.log(`Starting daily challenge generation for ${todayISO}`);
+    console.log("Handler da função 'generateDailyChallenges' iniciado.");
 
-        // 1. Fetch data
+    try {
+        // 1. Initialize Firebase Admin
+        if (admin.apps.length === 0) {
+            console.log("Inicializando Firebase Admin...");
+            const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+            if (!process.env.FIREBASE_PROJECT_ID || !privateKey || !process.env.FIREBASE_CLIENT_EMAIL) {
+                console.error("ERRO: Variáveis de ambiente do Firebase ausentes!");
+                throw new Error("Credenciais do Firebase ausentes nas variáveis de ambiente.");
+            }
+            admin.initializeApp({
+                credential: admin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    privateKey: privateKey.replace(/\\n/g, '\n'),
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                }),
+            });
+            console.log("Firebase Admin inicializado com sucesso.");
+        }
+        const db = admin.firestore();
+
+        // 2. Initialize Gemini
+        console.log("Inicializando Gemini AI...");
+        const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            console.error("ERRO: Chave da API do Gemini ausente!");
+            throw new Error("Chave da API do Gemini ausente nas variáveis de ambiente.");
+        }
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        console.log("Gemini AI inicializado com sucesso.");
+        
+        const todayISO = getBrasiliaDateISO();
+        console.log(`Iniciando geração de desafios diários para ${todayISO}`);
+
+        // 3. Fetch data
+        console.log("Buscando disciplinas (subjects) do Firestore...");
         const subjectsSnap = await db.collection('subjects').get();
+        console.log(`Encontradas ${subjectsSnap.docs.length} disciplinas.`);
         const allSubjects = subjectsSnap.docs.map(doc => doc.data() as Subject);
         
         const allQuestions: Question[] = [];
@@ -145,13 +161,21 @@ export const handler: Handler = async () => {
                 });
             });
         });
+        console.log(`Total de ${allQuestions.length} questões e ${allGlossaryTerms.length} termos de glossário carregados.`);
 
-        // 2. Process each student
+        // 4. Process each student
+        console.log("Buscando todos os alunos...");
         const studentsSnap = await db.collection('users').where('role', '==', 'aluno').get();
+        console.log(`Encontrados ${studentsSnap.docs.length} alunos para processar.`);
+
         for (const studentDoc of studentsSnap.docs) {
             const studentId = studentDoc.id;
+            console.log(`--- Processando aluno: ${studentId} ---`);
             const progressSnap = await db.collection('studentProgress').doc(studentId).get();
-            if (!progressSnap.exists) continue;
+            if (!progressSnap.exists) {
+                console.log(`Progresso não encontrado para o aluno ${studentId}. Pulando.`);
+                continue;
+            }
             
             const progress = progressSnap.data() as StudentProgress;
             const updatedProgress = { ...progress };
@@ -159,11 +183,12 @@ export const handler: Handler = async () => {
             
             // Generate Review Challenge
             if (!progress.reviewChallenge || progress.reviewChallenge.date !== todayISO) {
+                console.log(`Gerando Desafio da Revisão para ${studentId}...`);
                 const qCount = progress.advancedReviewQuestionCount || 5;
                 const reviewQuestions = shuffleArray(allQuestions).slice(0, qCount);
                 if (reviewQuestions.length > 0) {
                     updatedProgress.reviewChallenge = {
-                        date: todayISO, items: reviewQuestions, isCompleted: false, attemptsMade: 0,
+                        date: todayISO, generatedForDate: todayISO, items: reviewQuestions, isCompleted: false, attemptsMade: 0,
                     };
                     hasChanges = true;
                 }
@@ -171,6 +196,7 @@ export const handler: Handler = async () => {
 
             // Generate Glossary Challenge
             if (!progress.glossaryChallenge || progress.glossaryChallenge.date !== todayISO) {
+                console.log(`Gerando Desafio do Glossário para ${studentId}...`);
                 const qCount = progress.glossaryChallengeQuestionCount || 5;
                 const glossaryItems = shuffleArray(allGlossaryTerms);
                 const glossaryQuestions: Question[] = [];
@@ -189,7 +215,7 @@ export const handler: Handler = async () => {
                 }
                 if (glossaryQuestions.length > 0) {
                     updatedProgress.glossaryChallenge = {
-                        date: todayISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0
+                        date: todayISO, generatedForDate: todayISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0
                     };
                     hasChanges = true;
                 }
@@ -197,12 +223,14 @@ export const handler: Handler = async () => {
             
             // Generate Portuguese Challenge
             if (!progress.portugueseChallenge || progress.portugueseChallenge.date !== todayISO) {
-                 const qCount = progress.portugueseChallengeQuestionCount || 5;
+                 console.log(`Gerando Desafio de Português para ${studentId}...`);
+                 const qCount = progress.portugueseChallengeQuestionCount || 1;
                  try {
-                     const questions = await generatePortugueseChallengeQuestions(qCount, progress.portugueseErrorStats);
+                     const questions = await generatePortugueseChallengeQuestions(ai, qCount, progress.portugueseErrorStats);
                      if (questions.length > 0) {
                          updatedProgress.portugueseChallenge = {
                             date: todayISO,
+                            generatedForDate: todayISO,
                             items: questions.map(q => ({...q, id: `port-${todayISO}-${Math.random()}`})),
                             isCompleted: false,
                             attemptsMade: 0
@@ -210,19 +238,34 @@ export const handler: Handler = async () => {
                          hasChanges = true;
                      }
                  } catch (e) {
-                     console.error(`Failed to generate Portuguese challenge for ${studentId}:`, e);
+                     console.error(`Falha ao gerar Desafio de Português para ${studentId}:`, e);
                  }
             }
             
             if (hasChanges) {
                 await db.collection('studentProgress').doc(studentId).set(updatedProgress, { merge: true });
-                console.log(`Generated challenges for student ${studentId}`);
+                console.log(`Desafios gerados e salvos para o aluno ${studentId}`);
+            } else {
+                 console.log(`Nenhum novo desafio necessário para o aluno ${studentId}`);
             }
         }
 
+        console.log("Geração de desafios diários concluída com sucesso.");
         return { statusCode: 200, body: JSON.stringify({ message: "Success" }) };
+
     } catch (error: any) {
-        console.error("Error generating daily challenges:", error);
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        console.error("!!! ERRO FATAL NA FUNÇÃO generateDailyChallenges !!!");
+        console.error("Mensagem do Erro:", error.message);
+        console.error("Stack do Erro:", error.stack);
+        console.error("Objeto Completo do Erro:", JSON.stringify(error, null, 2));
+        
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ 
+                error: "Ocorreu um erro interno no servidor.",
+                message: error.message,
+                stack: error.stack 
+            }) 
+        };
     }
 };
