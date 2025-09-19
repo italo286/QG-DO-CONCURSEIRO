@@ -1,6 +1,6 @@
 import { Handler } from '@netlify/functions';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from '../../src/types';
 
 // Initialize Firebase Admin only once
@@ -25,9 +25,20 @@ const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
 
 const getBrasiliaDateISO = (): string => {
     const now = new Date();
-    // Brasilia is UTC-3
-    now.setHours(now.getHours() - 3);
-    return now.toISOString().split('T')[0];
+    const utcDate = new Date(Date.UTC(
+        now.getUTCFullYear(),
+        now.getUTCMonth(),
+        now.getUTCDate(),
+        now.getUTCHours(),
+        now.getUTCMinutes(),
+        now.getUTCSeconds(),
+        now.getUTCMilliseconds()
+    ));
+    utcDate.setUTCHours(utcDate.getUTCHours() - 3);
+    const year = utcDate.getUTCFullYear();
+    const month = (utcDate.getUTCMonth() + 1).toString().padStart(2, '0');
+    const day = utcDate.getUTCDate().toString().padStart(2, '0');
+    return `${year}-${month}-${day}`;
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -41,26 +52,26 @@ const shuffleArray = <T>(array: T[]): T[] => {
 };
 
 const questionSchema = {
-    type: "ARRAY",
+    type: Type.ARRAY,
     items: {
-      type: "OBJECT",
+      type: Type.OBJECT,
       properties: {
-        statement: { type: "STRING" },
-        options: { type: "ARRAY", items: { type: "STRING" } },
-        correctAnswer: { type: "STRING" },
-        justification: { type: "STRING" },
+        statement: { type: Type.STRING },
+        options: { type: Type.ARRAY, items: { type: Type.STRING } },
+        correctAnswer: { type: Type.STRING },
+        justification: { type: Type.STRING },
         optionJustifications: {
-          type: "ARRAY",
+          type: Type.ARRAY,
           items: {
-            type: "OBJECT",
+            type: Type.OBJECT,
             properties: {
-                option: { type: "STRING" },
-                justification: { type: "STRING" },
+                option: { type: Type.STRING },
+                justification: { type: Type.STRING },
             },
             required: ["option", "justification"]
           }
         },
-        errorCategory: { type: "STRING" }
+        errorCategory: { type: Type.STRING }
       },
       required: ["statement", "options", "correctAnswer", "justification"],
     },
@@ -113,12 +124,7 @@ const generatePortugueseChallengeQuestions = async (
 
 // --- Netlify Function Handler ---
 
-export const handler: Handler = async (event) => {
-    // Security check
-    if (event.headers['x-api-key'] !== process.env.DAILY_CHALLENGE_API_KEY) {
-        return { statusCode: 401, body: 'Unauthorized' };
-    }
-
+export const handler: Handler = async () => {
     try {
         const todayISO = getBrasiliaDateISO();
         console.log(`Starting daily challenge generation for ${todayISO}`);

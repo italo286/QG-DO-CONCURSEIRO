@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, Course } from '../types';
 import { Spinner, Button, Card, Modal, Toast } from './ui';
-import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon, CubeIcon } from './Icons';
+import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon } from './Icons';
 
 import { ProfessorAnnouncements } from './professor/ProfessorAnnouncements';
 import { ProfessorCourseEditor } from './professor/ProfessorCourseEditor';
@@ -12,7 +12,6 @@ import { ProfessorClassPerformance } from './professor/ProfessorClassPerformance
 import { ProfessorReviewsDashboard } from './professor/ProfessorReviewsDashboard';
 import { EditProfileModal } from './student/EditProfileModal';
 import { ProfessorSubjectsView } from './professor/ProfessorSubjectsView';
-import { ProfessorAdedonhaManager } from './professor/ProfessorAdedonhaManager';
 
 export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; onUpdateUser: (user: User) => void; }> = ({ user, onLogout, onUpdateUser }) => {
     const [courses, setCourses] = useState<Course[]>([]);
@@ -20,7 +19,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     const [students, setStudents] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [view, setView] = useState<'courses' | 'edit_course' | 'edit_subject' | 'scheduler' | 'performance' | 'reviews' | 'subjects' | 'adedonha'>('courses');
+    const [view, setView] = useState<'courses' | 'edit_course' | 'edit_subject' | 'scheduler' | 'performance' | 'reviews' | 'subjects'>('courses');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
@@ -174,10 +173,6 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                 onCreateSubject={() => setIsNewSubjectModalOpen(true)}
             />;
         }
-
-        if (view === 'adedonha') {
-            return <ProfessorAdedonhaManager courses={courses} allStudents={students} />;
-        }
         
         return (
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -251,7 +246,6 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     const navigationItems = [
         { label: 'Cursos', view: 'courses' as const },
         { label: 'Disciplinas', view: 'subjects' as const },
-        { label: 'Jogos em Turma', view: 'adedonha' as const },
         { label: 'Revisões', view: 'reviews' as const },
         { label: 'Planejamento', view: 'scheduler' as const },
         { label: 'Desempenho', view: 'performance' as const },
