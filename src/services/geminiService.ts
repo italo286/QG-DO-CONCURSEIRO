@@ -540,7 +540,7 @@ export const generateCustomQuizQuestions = async (params: {
 
 export const extractQuestionsFromTecPdf = async (
     pdfBase64: string,
-    _generateJustifications: boolean
+    generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
         const pdfPart = {
@@ -550,10 +550,12 @@ export const extractQuestionsFromTecPdf = async (
             },
         };
         
-        const justificationPromptPart = "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação).";
+        const justificationPromptPart = generateJustifications
+            ? "A partir do 'Comentário do Professor', gere também um array 'optionJustifications' com uma justificativa individual para CADA alternativa. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
+            : "O campo 'optionJustifications' deve ser um array vazio.";
         
         const textPart = {
-            text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação de negrito e sublinhado com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.`
+            text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). Gere também uma 'justification' principal para a alternativa correta baseada no 'Comentário do Professor'. ${justificationPromptPart} Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo estritamente o schema.`
         };
 
         // FIX: Added explicit type GenerateContentResponse to the response object.
@@ -597,12 +599,14 @@ export const extractQuestionsFromTecPdf = async (
 
 export const extractQuestionsFromTecText = async (
     text: string,
-    _generateJustifications: boolean
+    generateJustifications: boolean
 ): Promise<Omit<Question, 'id'>[]> => {
     try {
-        const justificationPromptPart = "e um array 'optionJustifications' com uma justificativa individual para CADA alternativa, baseada no 'Comentário do Professor'. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação).";
+        const justificationPromptPart = generateJustifications
+            ? "A partir do 'Comentário do Professor', gere também um array 'optionJustifications' com uma justificativa individual para CADA alternativa. Cada item no array deve ser um objeto com as chaves 'option' (o texto exato da alternativa) e 'justification' (a explicação)."
+            : "O campo 'optionJustifications' deve ser um array vazio.";
 
-        const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). A partir do 'Comentário do Professor', gere: 4) uma 'justification' principal para a alternativa correta ${justificationPromptPart} Se o comentário for geral, use-o para a justificativa principal e gere as individuais com base nele. Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo o schema.\n\nTexto: """${text}"""`;
+        const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). Gere também uma 'justification' principal para a alternativa correta baseada no 'Comentário do Professor'. ${justificationPromptPart} Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo estritamente o schema.\n\nTexto: """${text}"""`;
 
         // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
