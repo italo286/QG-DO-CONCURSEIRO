@@ -565,8 +565,6 @@ export const extractQuestionsFromTecPdf = async (
             config: {
                 responseMimeType: "application/json",
                 responseSchema: questionSchema,
-                maxOutputTokens: 16384,
-                thinkingConfig: { thinkingBudget: 1024 },
             }
         }));
 
@@ -617,8 +615,6 @@ export const extractQuestionsFromTecText = async (
             config: {
                 responseMimeType: "application/json",
                 responseSchema: questionSchema,
-                maxOutputTokens: 16384,
-                thinkingConfig: { thinkingBudget: 1024 },
             }
         }));
 

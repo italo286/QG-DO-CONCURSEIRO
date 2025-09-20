@@ -2,10 +2,10 @@ import { useState, useEffect } from 'react';
 import { auth } from './firebaseConfig';
 import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
-import { LoginPage } from './auth';
-import { ProfessorDashboard } from './ProfessorDashboard';
+import { LoginPage } from './components/auth';
+import { ProfessorDashboard } from './components/ProfessorDashboard';
 import { PaineldoAluno } from './components/student/PaineldoAluno';
-import { Spinner } from './ui';
+import { Spinner } from './components/ui';
 
 window.androidGoBack = () => {
   if (window.customGoBack && typeof window.customGoBack === 'function') {
