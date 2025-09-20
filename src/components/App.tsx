@@ -1,12 +1,11 @@
 import { useState, useEffect } from 'react';
-import { auth } from './firebaseConfig';
-import * as FirebaseService from './services/firebaseService';
-import { User } from './types';
-import { LoginPage } from './components/auth';
-import { ProfessorDashboard } from './components/ProfessorDashboard';
-// FIX: Corrected import to a valid component module.
-import { PaineldoAluno } from './components/student/PaineldoAluno';
-import { Spinner } from './components/ui';
+import { auth } from '../firebaseConfig';
+import * as FirebaseService from '../services/firebaseService';
+import { User } from '../types';
+import { LoginPage } from './auth';
+import { ProfessorDashboard } from './ProfessorDashboard';
+import { StudentDashboard } from './student/StudentDashboard';
+import { Spinner } from './ui';
 
 window.androidGoBack = () => {
   if (window.customGoBack && typeof window.customGoBack === 'function') {
@@ -75,7 +74,7 @@ export const App = () => {
     }
     
     if (isStudentView && currentUser.role === 'professor') {
-        return <PaineldoAluno 
+        return <StudentDashboard 
             user={currentUser} 
             onLogout={() => {}} 
             onUpdateUser={() => {}} 
@@ -88,5 +87,5 @@ export const App = () => {
         return <ProfessorDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
     }
     
-    return <PaineldoAluno user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
+    return <StudentDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
 };
