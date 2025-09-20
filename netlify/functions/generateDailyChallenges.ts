@@ -61,11 +61,10 @@ const questionSchema = {
 
 // --- MAIN HANDLER ---
 const handler: Handler = async (event) => {
+    console.log("--- Starting generateDailyChallenges function execution ---");
     try {
-        console.log("Function starting...");
-
         // --- INITIALIZE FIREBASE ADMIN ---
-        console.log("Initializing Firebase Admin...");
+        console.log("Step 1: Initializing Firebase Admin...");
         const serviceAccount = {
             projectId: process.env.FIREBASE_PROJECT_ID,
             privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
@@ -73,6 +72,7 @@ const handler: Handler = async (event) => {
         };
 
         if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
+            console.error("Firebase Admin environment variables are missing!");
             throw new Error("Required Firebase Admin environment variables are not fully set.");
         }
         
@@ -82,24 +82,26 @@ const handler: Handler = async (event) => {
             });
         }
         const db = admin.firestore();
-        console.log("Firebase Admin Initialized.");
+        console.log("Step 1: Firebase Admin Initialized successfully.");
         
         // --- INITIALIZE GEMINI API ---
-        console.log("Initializing Gemini API...");
+        console.log("Step 2: Initializing Gemini API...");
         if (!process.env.VITE_GEMINI_API_KEY) {
+             console.error("Gemini API Key is missing!");
             throw new Error("VITE_GEMINI_API_KEY environment variable for Gemini is not set.");
         }
         const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
-        console.log("Gemini API Initialized.");
+        console.log("Step 2: Gemini API Initialized successfully.");
 
         // --- AUTHENTICATION FOR MANUAL TRIGGER ---
         if (event.httpMethod === 'GET') {
+            console.log("Step 3: Detected manual GET trigger. Checking API key...");
             const apiKey = event.queryStringParameters?.apiKey;
             if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
                 console.log("Unauthorized manual trigger attempt.");
                 return { statusCode: 401, body: "Unauthorized" };
             }
-            console.log("Manual trigger authorized.");
+            console.log("Step 3: Manual trigger authorized.");
         }
 
         const nowBrasilia = getBrasiliaDate();
@@ -108,15 +110,15 @@ const handler: Handler = async (event) => {
         const currentTimeSlot = `${String(currentHour).padStart(2, '0')}:${String(Math.floor(currentMinute / 15) * 15).padStart(2, '0')}`;
         const todayISO = getLocalDateISOString(nowBrasilia);
 
-        console.log(`Current Brasilia time slot: ${currentTimeSlot}`);
+        console.log(`Step 4: Current Brasilia time slot: ${currentTimeSlot}`);
 
         const usersSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
 
         if (usersSnapshot.empty) {
-            console.log("No students found.");
+            console.log("No students found. Function will exit.");
             return { statusCode: 200, body: "No students found." };
         }
-        console.log(`Found ${usersSnapshot.docs.length} students to process.`);
+        console.log(`Step 5: Found ${usersSnapshot.docs.length} students to process.`);
 
         const promises = usersSnapshot.docs.map(async (doc) => {
             const student = { id: doc.id, ...doc.data() } as User;
@@ -149,6 +151,8 @@ const handler: Handler = async (event) => {
         });
 
         await Promise.all(promises);
+        
+        console.log("--- Function execution finished successfully. ---");
 
         return {
             statusCode: 200,
@@ -156,7 +160,7 @@ const handler: Handler = async (event) => {
         };
 
     } catch (error: any) {
-        console.error("FATAL ERROR in generateDailyChallenges handler:", error);
+        console.error("--- FATAL ERROR in generateDailyChallenges handler ---", error);
         return { statusCode: 500, body: JSON.stringify({ error: error.message, stack: error.stack }) };
     }
 };
