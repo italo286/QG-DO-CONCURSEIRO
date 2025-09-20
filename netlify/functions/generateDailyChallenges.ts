@@ -1,49 +1,40 @@
 import { Handler, schedule } from "@netlify/functions";
-import type { User, StudentProgress, Subject, Question, GlossaryTerm, Course } from "../../src/types.server";
+import type { User, StudentProgress, Subject, Question, GlossaryTerm, Course, Topic, SubTopic } from "../../src/types.server";
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import * as admin from "firebase-admin";
 
 // --- GLOBAL INITIALIZATION ---
-// We initialize services here to catch errors that happen on "cold starts"
-// before the handler is even invoked.
-
 let db: admin.firestore.Firestore;
 let ai: GoogleGenAI;
 let initializationError: Error | null = null;
 
 try {
-    console.log("[Global Scope] Initializing services...");
-
-    // 1. Initialize Firebase Admin
-    if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
-        throw new Error("Required Firebase Admin environment variables (FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL) are not fully set.");
-    }
     const serviceAccount = {
         projectId: process.env.FIREBASE_PROJECT_ID,
         privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
         clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    } as admin.ServiceAccount;
+    };
+
+    if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
+        throw new Error("Required Firebase Admin environment variables are not fully set.");
+    }
     
     if (!admin.apps.length) {
         admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount),
+            credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
         });
     }
     db = admin.firestore();
-    console.log("[Global Scope] Firebase Admin Initialized.");
 
-    // 2. Initialize Gemini API
     if (!process.env.VITE_GEMINI_API_KEY) {
         throw new Error("VITE_GEMINI_API_KEY environment variable for Gemini is not set.");
     }
     ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
-    console.log("[Global Scope] Gemini API Initialized.");
 
 } catch (e: any) {
     console.error("[Global Scope] FATAL ERROR during initialization:", e);
     initializationError = e;
 }
-
 
 // --- HELPER FUNCTIONS ---
 const getBrasiliaDate = (): Date => {
@@ -103,30 +94,19 @@ const questionSchema = {
 
 // --- MAIN HANDLER ---
 const myHandler: Handler = async (event) => {
-    // Check if initialization failed on cold start
     if (initializationError) {
         console.error("Handler invoked, but global initialization failed.", initializationError);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: "Initialization failed: " + initializationError.message }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ error: "Initialization failed: " + initializationError.message }) };
     }
     
     console.log("Function handler starting...");
 
     try {
-        // Manual Trigger Security Check
         if (event.httpMethod === 'GET') {
             const apiKey = event.queryStringParameters?.apiKey;
-            if (!process.env.DAILY_CHALLENGE_API_KEY) {
-                console.error("DAILY_CHALLENGE_API_KEY is not set for manual trigger.");
-                return { statusCode: 500, body: "Server configuration error for manual trigger." };
-            }
             if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
-                console.warn("Unauthorized manual trigger attempt.");
                 return { statusCode: 401, body: "Unauthorized" };
             }
-            console.log("Manual trigger authorized. Running for all students...");
         }
 
         const nowBrasilia = getBrasiliaDate();
@@ -147,43 +127,44 @@ const myHandler: Handler = async (event) => {
 
         const promises = usersSnapshot.docs.map(async (doc) => {
             const student = { id: doc.id, ...doc.data() } as User;
-            const progressRef = db.collection('studentProgress').doc(student.id);
-            const progressDoc = await progressRef.get();
-            if (!progressDoc.exists) {
-                console.log(`No progress document for student ${student.id}. Skipping.`);
-                return;
-            }
+            try {
+                const progressRef = db.collection('studentProgress').doc(student.id);
+                const progressDoc = await progressRef.get();
+                if (!progressDoc.exists) {
+                    console.log(`No progress document for student ${student.id}. Skipping.`);
+                    return;
+                }
 
-            const progress = progressDoc.data() as StudentProgress;
-            const challengeTime = progress.dailyChallengeTime || '06:00';
-            
-            if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) {
-                return; 
-            }
+                const progress = progressDoc.data() as StudentProgress;
+                const challengeTime = progress.dailyChallengeTime || '06:00';
+                
+                if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) {
+                    return;
+                }
 
-            console.log(`Processing student ${student.id} for time slot ${challengeTime}...`);
-            if (progress.reviewChallenge?.generatedForDate === todayISO && progress.glossaryChallenge?.generatedForDate === todayISO && progress.portugueseChallenge?.generatedForDate === todayISO) {
-                console.log(`Challenges already generated today for student ${student.id}. Skipping.`);
-                return;
-            }
+                console.log(`Processing student ${student.id} (${student.name || 'No Name'}) for time slot ${challengeTime}...`);
+                if (progress.reviewChallenge?.generatedForDate === todayISO && progress.glossaryChallenge?.generatedForDate === todayISO && progress.portugueseChallenge?.generatedForDate === todayISO) {
+                    console.log(`Challenges already generated today for student ${student.id}. Skipping.`);
+                    return;
+                }
 
-            await generateChallengesForStudent(student, progress, todayISO, db, ai);
-            console.log(`Successfully generated challenges for student ${student.id}.`);
+                await generateChallengesForStudent(student, progress, todayISO, db, ai);
+                console.log(`Successfully generated challenges for student ${student.id}.`);
+            } catch (e: any) {
+                console.error(`FAILED to process student ${student.id}: ${e.message}`, e.stack);
+            }
         });
 
         await Promise.all(promises);
 
         return {
             statusCode: 200,
-            body: event.httpMethod === 'GET' ? "Manual trigger successful. Check function logs for details." : `Processed challenges for time slot ${currentTimeSlot}.`
+            body: event.httpMethod === 'GET' ? "Manual trigger successful." : `Processed challenges for time slot ${currentTimeSlot}.`
         };
 
     } catch (error: any) {
         console.error("FATAL ERROR in generateDailyChallenges handler:", error);
-        return {
-            statusCode: 500,
-            body: JSON.stringify({ error: error.message, stack: error.stack }),
-        };
+        return { statusCode: 500, body: JSON.stringify({ error: error.message, stack: error.stack }) };
     }
 };
 
@@ -191,19 +172,24 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
     const coursesSnapshot = await db.collection('courses').where('enrolledStudentIds', 'array-contains', student.id).get();
     const enrolledCourses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
     const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
-    if (teacherIds.length === 0) return;
+    if (teacherIds.length === 0) {
+        console.log(`Student ${student.id} (${student.name}) is not enrolled in any courses. Skipping challenge generation.`);
+        return;
+    }
 
     const subjectsSnapshot = await db.collection('subjects').where('teacherId', 'in', teacherIds).get();
     const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
 
     const updatedProgress: Partial<StudentProgress> = {};
 
+    // --- Generate Portuguese Challenge ---
     try {
         const questionCount = progress.portugueseChallengeQuestionCount || 1;
         const questions = await generatePortugueseChallenge(questionCount, progress.portugueseErrorStats, ai);
         updatedProgress.portugueseChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     } catch (e) { console.error(`Failed to generate Portuguese challenge for ${student.id}:`, e); }
 
+    // --- Generate Glossary Challenge ---
     try {
         const questionCount = progress.glossaryChallengeQuestionCount || 5;
         let allGlossaryTerms: GlossaryTerm[] = [];
@@ -226,13 +212,58 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
         updatedProgress.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     } catch (e) { console.error(`Failed to generate Glossary challenge for ${student.id}:`, e); }
     
+    // --- Generate Review Challenge ---
     try {
         const questionCount = progress.advancedReviewQuestionCount || 5;
-        let questionPool: Question[] = [];
-        // ... (Logic to populate questionPool based on progress) ...
+        
+        // 1. Get all questions the student has access to, with context
+        const allQuestionsWithContext = allSubjects.flatMap(subject =>
+            subject.topics.flatMap(topic => [
+                ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
+                ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
+                ...topic.subtopics.flatMap(st => [
+                    ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
+                    ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id }))
+                ])
+            ])
+        );
+
+        let questionPool: Question[] = allQuestionsWithContext;
+        const subjectIdsToUse = progress.dailyReviewMode === 'advanced' && progress.advancedReviewSubjectIds?.length ? new Set(progress.advancedReviewSubjectIds) : null;
+        const topicIdsToUse = progress.dailyReviewMode === 'advanced' ? new Set(progress.advancedReviewTopicIds) : null;
+
+        // Filter by selected subjects/topics if in advanced mode
+        if (subjectIdsToUse) {
+            questionPool = questionPool.filter(q => subjectIdsToUse.has((q as any).subjectId));
+        }
+        if (topicIdsToUse) {
+            questionPool = questionPool.filter(q => topicIdsToUse.has((q as any).topicId));
+        }
+
+        // 2. Filter questions based on student settings
+        if (progress.dailyReviewMode === 'advanced') {
+            const questionType = progress.advancedReviewQuestionType || 'incorrect';
+            if (questionType !== 'mixed') {
+                const allAttempts = Object.values(progress.progressByTopic || {}).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt || []));
+                const attemptedIds = new Set(allAttempts.map(a => a.questionId));
+                const incorrectIds = new Set(allAttempts.filter(a => !a.isCorrect).map(a => a.questionId));
+                const correctIds = new Set();
+                attemptedIds.forEach(id => { if (!incorrectIds.has(id)) correctIds.add(id); });
+
+                if (questionType === 'unanswered') { questionPool = questionPool.filter(q => !attemptedIds.has(q.id)); } 
+                else if (questionType === 'incorrect') { questionPool = questionPool.filter(q => incorrectIds.has(q.id)); } 
+                else if (questionType === 'correct') { questionPool = questionPool.filter(q => correctIds.has(q.id)); }
+            }
+        } else { // Standard mode (SRS)
+            const srsData = progress.srsData || {};
+            const dueQuestionIds = new Set(Object.entries(srsData).filter(([, data]) => data.nextReviewDate <= todayISO).map(([id]) => id));
+            questionPool = allQuestionsWithContext.filter(q => dueQuestionIds.has(q.id));
+        }
+        
         const selectedQuestions = shuffleArray(questionPool).slice(0, questionCount);
         updatedProgress.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: selectedQuestions, isCompleted: false, attemptsMade: 0 };
     } catch (e) { console.error(`Failed to generate Review challenge for ${student.id}:`, e); }
+
 
     if (Object.keys(updatedProgress).length > 0) {
         await db.collection('studentProgress').doc(student.id).set(updatedProgress, { merge: true });
@@ -242,12 +273,15 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
 const generatePortugueseChallenge = async (
     questionCount: number, errorStats: StudentProgress['portugueseErrorStats'] | undefined, ai: GoogleGenAI
 ): Promise<Omit<Question, 'id'>[]> => {
-    // ... Full prompt logic ...
-    const prompt = `Crie ${questionCount} questões de português...`;
+    const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
+
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa... (prompt content)... Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.`;
     const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json', responseSchema: questionSchema } });
     const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '');
     if (!generatedQuestions) throw new Error("Failed to parse response from Gemini API.");
-    return generatedQuestions.map((q: any) => ({ ...q }));
+    return generatedQuestions.map((q: any) => ({ 
+        statement: q.statement, options: q.options, correctAnswer: q.correctAnswer, justification: q.justification, optionJustifications: q.optionJustifications, errorCategory: q.errorCategory
+    }));
 };
 
 const generateGlossaryChallengeQuestions = (
@@ -263,7 +297,7 @@ const generateGlossaryChallengeQuestions = (
             statement: `Qual termo corresponde à definição: "${term.definition}"?`,
             options, correctAnswer, justification: `A definição apresentada corresponde ao termo "${correctAnswer}".`,
         };
-    }).filter(q => q.options.length > 1); // Ensure we have valid questions
+    }).filter(q => q.options.length > 1);
 };
 
-export const handler = schedule("0 3 * * *", myHandler);
+export const handler = schedule("*/15 * * * *", myHandler);
