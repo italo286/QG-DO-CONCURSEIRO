@@ -1,7 +1,7 @@
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, Type } from "@google/genai";
-import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from '../../src/types';
+import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from '../../src/types.server';
 
 // --- Helper Functions ---
 
