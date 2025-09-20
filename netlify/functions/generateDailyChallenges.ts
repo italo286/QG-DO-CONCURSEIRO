@@ -1,40 +1,7 @@
-import { Handler, schedule } from "@netlify/functions";
-import type { User, StudentProgress, Subject, Question, GlossaryTerm, Course, Topic, SubTopic } from "../../src/types.server";
+import { Handler } from "@netlify/functions";
+import type { User, StudentProgress, Subject, Question, GlossaryTerm, Course } from "../../src/types.server";
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import * as admin from "firebase-admin";
-
-// --- GLOBAL INITIALIZATION ---
-let db: admin.firestore.Firestore;
-let ai: GoogleGenAI;
-let initializationError: Error | null = null;
-
-try {
-    const serviceAccount = {
-        projectId: process.env.FIREBASE_PROJECT_ID,
-        privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-        clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    };
-
-    if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
-        throw new Error("Required Firebase Admin environment variables are not fully set.");
-    }
-    
-    if (!admin.apps.length) {
-        admin.initializeApp({
-            credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-        });
-    }
-    db = admin.firestore();
-
-    if (!process.env.VITE_GEMINI_API_KEY) {
-        throw new Error("VITE_GEMINI_API_KEY environment variable for Gemini is not set.");
-    }
-    ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
-
-} catch (e: any) {
-    console.error("[Global Scope] FATAL ERROR during initialization:", e);
-    initializationError = e;
-}
 
 // --- HELPER FUNCTIONS ---
 const getBrasiliaDate = (): Date => {
@@ -93,20 +60,46 @@ const questionSchema = {
 };
 
 // --- MAIN HANDLER ---
-const myHandler: Handler = async (event) => {
-    if (initializationError) {
-        console.error("Handler invoked, but global initialization failed.", initializationError);
-        return { statusCode: 500, body: JSON.stringify({ error: "Initialization failed: " + initializationError.message }) };
-    }
-    
-    console.log("Function handler starting...");
-
+const handler: Handler = async (event) => {
     try {
+        console.log("Function starting...");
+
+        // --- INITIALIZE FIREBASE ADMIN ---
+        console.log("Initializing Firebase Admin...");
+        const serviceAccount = {
+            projectId: process.env.FIREBASE_PROJECT_ID,
+            privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+        };
+
+        if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
+            throw new Error("Required Firebase Admin environment variables are not fully set.");
+        }
+        
+        if (!admin.apps.length) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+            });
+        }
+        const db = admin.firestore();
+        console.log("Firebase Admin Initialized.");
+        
+        // --- INITIALIZE GEMINI API ---
+        console.log("Initializing Gemini API...");
+        if (!process.env.VITE_GEMINI_API_KEY) {
+            throw new Error("VITE_GEMINI_API_KEY environment variable for Gemini is not set.");
+        }
+        const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
+        console.log("Gemini API Initialized.");
+
+        // --- AUTHENTICATION FOR MANUAL TRIGGER ---
         if (event.httpMethod === 'GET') {
             const apiKey = event.queryStringParameters?.apiKey;
             if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
+                console.log("Unauthorized manual trigger attempt.");
                 return { statusCode: 401, body: "Unauthorized" };
             }
+            console.log("Manual trigger authorized.");
         }
 
         const nowBrasilia = getBrasiliaDate();
@@ -139,7 +132,7 @@ const myHandler: Handler = async (event) => {
                 const challengeTime = progress.dailyChallengeTime || '06:00';
                 
                 if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) {
-                    return;
+                    return; // Skip if it's not the student's scheduled time for cron job
                 }
 
                 console.log(`Processing student ${student.id} (${student.name || 'No Name'}) for time slot ${challengeTime}...`);
@@ -216,7 +209,6 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
     try {
         const questionCount = progress.advancedReviewQuestionCount || 5;
         
-        // 1. Get all questions the student has access to, with context
         const allQuestionsWithContext = allSubjects.flatMap(subject =>
             subject.topics.flatMap(topic => [
                 ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
@@ -232,7 +224,6 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
         const subjectIdsToUse = progress.dailyReviewMode === 'advanced' && progress.advancedReviewSubjectIds?.length ? new Set(progress.advancedReviewSubjectIds) : null;
         const topicIdsToUse = progress.dailyReviewMode === 'advanced' ? new Set(progress.advancedReviewTopicIds) : null;
 
-        // Filter by selected subjects/topics if in advanced mode
         if (subjectIdsToUse) {
             questionPool = questionPool.filter(q => subjectIdsToUse.has((q as any).subjectId));
         }
@@ -240,7 +231,6 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
             questionPool = questionPool.filter(q => topicIdsToUse.has((q as any).topicId));
         }
 
-        // 2. Filter questions based on student settings
         if (progress.dailyReviewMode === 'advanced') {
             const questionType = progress.advancedReviewQuestionType || 'incorrect';
             if (questionType !== 'mixed') {
@@ -300,4 +290,4 @@ const generateGlossaryChallengeQuestions = (
     }).filter(q => q.options.length > 1);
 };
 
-export const handler = schedule("*/15 * * * *", myHandler);
+export { handler };
