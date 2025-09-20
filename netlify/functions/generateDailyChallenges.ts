@@ -154,16 +154,12 @@ async function runChallengeGenerationLogic() {
 
         (allSubjects || []).forEach(subject => {
             if (!subject || !Array.isArray(subject.topics)) return;
-
             subject.topics.forEach(topic => {
                 if (!topic) return;
-
                 allQuestions.push(...(topic.questions || []));
                 allQuestions.push(...(topic.tecQuestions || []));
                 allGlossaryTerms.push(...(topic.glossary || []));
-
                 if (!Array.isArray(topic.subtopics)) return;
-
                 topic.subtopics.forEach(subtopic => {
                     if (!subtopic) return;
                     allQuestions.push(...(subtopic.questions || []));
@@ -172,8 +168,12 @@ async function runChallengeGenerationLogic() {
                 });
             });
         });
+
+        // --- Data Validation ---
+        const validQuestions = allQuestions.filter(q => q && q.id && q.statement && q.options && q.correctAnswer);
+        const validGlossaryTerms = allGlossaryTerms.filter(g => g && g.term && g.definition);
         
-        console.log(`Total de ${allQuestions.length} questões e ${allGlossaryTerms.length} termos de glossário carregados.`);
+        console.log(`Total de ${validQuestions.length} questões válidas e ${validGlossaryTerms.length} termos de glossário válidos carregados.`);
 
         // 4. Process each student
         console.log("Buscando todos os alunos...");
@@ -197,7 +197,7 @@ async function runChallengeGenerationLogic() {
             if (!progress.reviewChallenge || progress.reviewChallenge.date !== todayISO) {
                 console.log(`Gerando Desafio da Revisão para ${studentId}...`);
                 const qCount = progress.advancedReviewQuestionCount || 5;
-                const reviewQuestions = shuffleArray(allQuestions).slice(0, qCount);
+                const reviewQuestions = shuffleArray(validQuestions).slice(0, qCount);
                 if (reviewQuestions.length > 0) {
                     updatedProgress.reviewChallenge = {
                         date: todayISO, generatedForDate: todayISO, items: reviewQuestions, isCompleted: false, attemptsMade: 0,
@@ -210,21 +210,24 @@ async function runChallengeGenerationLogic() {
             if (!progress.glossaryChallenge || progress.glossaryChallenge.date !== todayISO) {
                 console.log(`Gerando Desafio do Glossário para ${studentId}...`);
                 const qCount = progress.glossaryChallengeQuestionCount || 5;
-                const glossaryItems = shuffleArray(allGlossaryTerms);
+                const glossaryItems = shuffleArray(validGlossaryTerms);
                 const glossaryQuestions: Question[] = [];
 
-                for (let i = 0; i < Math.min(qCount, glossaryItems.length); i++) {
-                    const term = glossaryItems[i];
-                    const incorrectOptions = shuffleArray(glossaryItems.filter(g => g.term !== term.term)).slice(0, 4).map(g => g.definition);
-                    if(incorrectOptions.length < 4) continue;
+                for (const term of glossaryItems) {
+                    if (glossaryQuestions.length >= qCount) break;
+                    const otherTerms = glossaryItems.filter(g => g.term !== term.term);
+                    if (otherTerms.length < 4) continue;
+                    const incorrectOptions = shuffleArray(otherTerms).slice(0, 4).map(g => g.definition);
+
                     glossaryQuestions.push({
-                        id: `glossary-${todayISO}-${i}`,
+                        id: `glossary-${todayISO}-${glossaryQuestions.length}`,
                         statement: `Qual a definição de "${term.term}"?`,
                         options: shuffleArray([term.definition, ...incorrectOptions]),
                         correctAnswer: term.definition,
                         justification: `"${term.term}" significa: ${term.definition}.`
                     });
                 }
+
                 if (glossaryQuestions.length > 0) {
                     updatedProgress.glossaryChallenge = {
                         date: todayISO, generatedForDate: todayISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0
