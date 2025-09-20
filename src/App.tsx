@@ -2,11 +2,10 @@ import { useState, useEffect } from 'react';
 import { auth } from './firebaseConfig';
 import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
-import { LoginPage } from './components/auth';
-import { ProfessorDashboard } from './components/ProfessorDashboard';
-// FIX: Corrected import to a valid component module.
+import { LoginPage } from './auth';
+import { ProfessorDashboard } from './ProfessorDashboard';
 import { PaineldoAluno } from './components/student/PaineldoAluno';
-import { Spinner } from './components/ui';
+import { Spinner } from './ui';
 
 window.androidGoBack = () => {
   if (window.customGoBack && typeof window.customGoBack === 'function') {
