@@ -151,10 +151,10 @@ async function runChallengeGenerationLogic() {
         const allQuestions: Question[] = [];
         const allGlossaryTerms: GlossaryTerm[] = [];
         allSubjects.forEach(subject => {
-            subject.topics.forEach(topic => {
+            (subject.topics || []).forEach(topic => {
                 allQuestions.push(...(topic.questions || []));
                 if(topic.glossary) allGlossaryTerms.push(...topic.glossary);
-                topic.subtopics.forEach(subtopic => {
+                (topic.subtopics || []).forEach(subtopic => {
                     allQuestions.push(...(subtopic.questions || []));
                     if(subtopic.glossary) allGlossaryTerms.push(...subtopic.glossary);
                 });
