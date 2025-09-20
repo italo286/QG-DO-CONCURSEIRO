@@ -23,7 +23,7 @@ const getBrasiliaDateISO = (): string => {
     return `${year}-${month}-${day}`;
 };
 
-const shuffleArray = <T>(array: T[]): T[] => {
+const shuffleArray = <T,>(array: T[]): T[] => {
     if(!array) return [];
     const newArray = [...array];
     for (let i = newArray.length - 1; i > 0; i--) {
@@ -148,18 +148,31 @@ async function runChallengeGenerationLogic() {
         console.log(`Encontradas ${subjectsSnap.docs.length} disciplinas.`);
         const allSubjects = subjectsSnap.docs.map(doc => doc.data() as Subject);
         
+        // --- Robust Data Aggregation ---
         const allQuestions: Question[] = [];
         const allGlossaryTerms: GlossaryTerm[] = [];
-        allSubjects.forEach(subject => {
-            (subject.topics || []).forEach(topic => {
+
+        (allSubjects || []).forEach(subject => {
+            if (!subject || !Array.isArray(subject.topics)) return;
+
+            subject.topics.forEach(topic => {
+                if (!topic) return;
+
                 allQuestions.push(...(topic.questions || []));
-                if(topic.glossary) allGlossaryTerms.push(...topic.glossary);
-                (topic.subtopics || []).forEach(subtopic => {
+                allQuestions.push(...(topic.tecQuestions || []));
+                allGlossaryTerms.push(...(topic.glossary || []));
+
+                if (!Array.isArray(topic.subtopics)) return;
+
+                topic.subtopics.forEach(subtopic => {
+                    if (!subtopic) return;
                     allQuestions.push(...(subtopic.questions || []));
-                    if(subtopic.glossary) allGlossaryTerms.push(...subtopic.glossary);
+                    allQuestions.push(...(subtopic.tecQuestions || []));
+                    allGlossaryTerms.push(...(subtopic.glossary || []));
                 });
             });
         });
+        
         console.log(`Total de ${allQuestions.length} questões e ${allGlossaryTerms.length} termos de glossário carregados.`);
 
         // 4. Process each student
