@@ -1,4 +1,4 @@
-import { Handler } from '@netlify/functions';
+import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, Type } from "@google/genai";
 import { Question, StudentProgress, Subject, DailyChallenge, GlossaryTerm } from '../../src/types';
@@ -105,11 +105,10 @@ const generatePortugueseChallengeQuestions = async (
 };
 
 
-// --- Netlify Function Handler ---
+// --- Core Logic separated for reusability ---
 
-export const handler: Handler = async () => {
-    console.log("Handler da função 'generateDailyChallenges' iniciado.");
-
+async function runChallengeGenerationLogic() {
+    console.log("Iniciando lógica principal de geração de desafios...");
     try {
         // 1. Initialize Firebase Admin
         if (admin.apps.length === 0) {
@@ -254,7 +253,7 @@ export const handler: Handler = async () => {
         return { statusCode: 200, body: JSON.stringify({ message: "Success" }) };
 
     } catch (error: any) {
-        console.error("!!! ERRO FATAL NA FUNÇÃO generateDailyChallenges !!!");
+        console.error("!!! ERRO FATAL NA LÓGICA DE GERAÇÃO !!!");
         console.error("Mensagem do Erro:", error.message);
         console.error("Stack do Erro:", error.stack);
         console.error("Objeto Completo do Erro:", JSON.stringify(error, null, 2));
@@ -268,4 +267,35 @@ export const handler: Handler = async () => {
             }) 
         };
     }
+}
+
+
+// --- Netlify Function Handler ---
+
+export const handler: Handler = async (event: HandlerEvent) => {
+    console.log("Função 'generateDailyChallenges' acionada.");
+    console.log(`Método HTTP: ${event.httpMethod}`);
+
+    // Manual trigger check for testing
+    if (event.httpMethod === 'GET') {
+        console.log("Acionamento manual (GET) detectado. Verificando a chave da API...");
+        const providedApiKey = event.queryStringParameters?.apiKey;
+        const expectedApiKey = process.env.DAILY_CHALLENGE_API_KEY;
+
+        if (!providedApiKey || providedApiKey !== expectedApiKey) {
+            console.error("ERRO: Tentativa de acionamento manual com chave da API inválida ou ausente.");
+            return {
+                statusCode: 401,
+                body: JSON.stringify({ error: "Não autorizado." }),
+            };
+        }
+        console.log("Chave da API validada com sucesso. Iniciando a geração de desafios...");
+    } 
+    // Scheduled trigger has no httpMethod or is 'POST' from Netlify's scheduler
+    else {
+        console.log("Acionamento agendado (schedule) detectado. Iniciando a geração de desafios...");
+    }
+
+    // Now, run the actual logic
+    return runChallengeGenerationLogic();
 };
