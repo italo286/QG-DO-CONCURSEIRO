@@ -46,6 +46,52 @@ export const createUserProfile = async (uid: string, username: string, name: str
     role,
     avatarUrl: 'https://cdn-icons-png.flaticon.com/512/921/921124.png', // Default avatar
   });
+
+  if (role === 'aluno') {
+    const progressRef = db.collection('studentProgress').doc(uid);
+    const initialProgress: StudentProgress = {
+        studentId: uid,
+        progressByTopic: {},
+        reviewSessions: [],
+        xp: 0,
+        earnedBadgeIds: [],
+        notesByTopic: {},
+        dailyActivity: {},
+        srsData: {},
+        customGames: [],
+        earnedTopicBadgeIds: {},
+        earnedGameBadgeIds: {},
+        customQuizzes: [],
+        targetCargoByCourse: {},
+        aiGeneratedFlashcards: [],
+        srsFlashcardData: {},
+        dailyReviewMode: 'standard',
+        advancedReviewSubjectIds: [],
+        advancedReviewTopicIds: [],
+        advancedReviewQuestionType: 'incorrect',
+        advancedReviewQuestionCount: 5,
+        advancedReviewTimerDuration: 300,
+        advancedReviewMaxAttempts: 1,
+        glossaryChallengeMode: 'standard',
+        advancedGlossarySubjectIds: [],
+        advancedGlossaryTopicIds: [],
+        glossaryChallengeQuestionCount: 5,
+        glossaryChallengeTimerDuration: 300,
+        glossaryChallengeMaxAttempts: 1,
+        portugueseChallengeQuestionCount: 1,
+        portugueseChallengeTimerDuration: 300,
+        portugueseChallengeMaxAttempts: 1,
+        portugueseErrorStats: {},
+        gamesCompletedCount: 0,
+        dailyChallengeTime: '06:00',
+        dailyChallengeStreak: {
+            current: 0,
+            longest: 0,
+            lastCompletedDate: '',
+        },
+    };
+    await progressRef.set(initialProgress);
+  }
 };
 
 export const updateUserProfile = async (uid: string, data: Partial<User>): Promise<void> => {
@@ -272,9 +318,9 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
         if(doc.exists) {
             callback(doc.data() as StudentProgress);
         } else {
-            // Create initial progress if it doesn't exist
+            // Create initial progress if it doesn't exist (e.g., for existing users without this doc)
             const initialProgress: StudentProgress = {
-                studentId,
+                studentId: studentId,
                 progressByTopic: {},
                 reviewSessions: [],
                 xp: 0,
@@ -283,7 +329,40 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                 dailyActivity: {},
                 srsData: {},
                 customGames: [],
+                earnedTopicBadgeIds: {},
+                earnedGameBadgeIds: {},
+                customQuizzes: [],
+                targetCargoByCourse: {},
+                aiGeneratedFlashcards: [],
+                srsFlashcardData: {},
+                dailyReviewMode: 'standard',
+                advancedReviewSubjectIds: [],
+                advancedReviewTopicIds: [],
+                advancedReviewQuestionType: 'incorrect',
+                advancedReviewQuestionCount: 5,
+                advancedReviewTimerDuration: 300,
+                advancedReviewMaxAttempts: 1,
+                glossaryChallengeMode: 'standard',
+                advancedGlossarySubjectIds: [],
+                advancedGlossaryTopicIds: [],
+                glossaryChallengeQuestionCount: 5,
+                glossaryChallengeTimerDuration: 300,
+                glossaryChallengeMaxAttempts: 1,
+                portugueseChallengeQuestionCount: 1,
+                portugueseChallengeTimerDuration: 300,
+                portugueseChallengeMaxAttempts: 1,
+                portugueseErrorStats: {},
+                gamesCompletedCount: 0,
+                dailyChallengeTime: '06:00',
+                dailyChallengeStreak: {
+                    current: 0,
+                    longest: 0,
+                    lastCompletedDate: '',
+                },
             };
+            // Asynchronously create the document in Firestore
+            progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
+            // Immediately call back with the new object for a responsive UI
             callback(initialProgress);
         }
     });

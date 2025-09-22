@@ -37,7 +37,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
-        // FIX: Replaced the chained `flatMap` for collecting all attempts with a more robust and type-safe version. This prevents runtime errors from malformed data and resolves the TypeScript error where the type of `p` was inferred as `unknown`.
+        // FIX: The original chained `flatMap` was not robust against malformed progress data, causing a TypeScript error where a parameter was inferred as `unknown`. The logic is updated to safely filter and map the attempts.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
             .filter((p): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))

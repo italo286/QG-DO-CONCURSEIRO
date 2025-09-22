@@ -64,33 +64,58 @@ const handler: Handler = async (event) => {
     console.log("--- Starting generateDailyChallenges function execution ---");
     try {
         // --- INITIALIZE FIREBASE ADMIN ---
-        console.log("Step 1: Initializing Firebase Admin...");
+        console.log("Step 1: Checking Firebase Admin environment variables...");
+        const projectId = process.env.FIREBASE_PROJECT_ID;
+        const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+        const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+
+        if (!projectId) {
+            const errorMsg = "Firebase Admin environment variable FIREBASE_PROJECT_ID is not set.";
+            console.error(`FATAL: ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+        if (!privateKey) {
+            const errorMsg = "Firebase Admin environment variable FIREBASE_PRIVATE_KEY is not set.";
+            console.error(`FATAL: ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+        if (!clientEmail) {
+            const errorMsg = "Firebase Admin environment variable FIREBASE_CLIENT_EMAIL is not set.";
+            console.error(`FATAL: ${errorMsg}`);
+            throw new Error(errorMsg);
+        }
+        console.log("Step 1.1: All required Firebase environment variables are present.");
+
         const serviceAccount = {
-            projectId: process.env.FIREBASE_PROJECT_ID,
-            privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-            clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            projectId,
+            privateKey: privateKey.replace(/\\n/g, '\n'),
+            clientEmail,
         };
 
-        if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
-            console.error("Firebase Admin environment variables are missing!");
-            throw new Error("Required Firebase Admin environment variables are not fully set.");
-        }
-        
         if (!admin.apps.length) {
-            admin.initializeApp({
-                credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
-            });
+            console.log("Step 1.2: Initializing Firebase Admin...");
+            try {
+                admin.initializeApp({
+                    credential: admin.credential.cert(serviceAccount as admin.ServiceAccount),
+                });
+                console.log("Step 1.3: Firebase Admin initialized successfully.");
+            } catch (e: any) {
+                console.error("CRITICAL: Firebase Admin initialization failed!", e.message);
+                console.error("This is likely due to a malformed FIREBASE_PRIVATE_KEY or other service account credential issue.");
+                throw e;
+            }
         }
         const db = admin.firestore();
-        console.log("Step 1: Firebase Admin Initialized successfully.");
         
         // --- INITIALIZE GEMINI API ---
         console.log("Step 2: Initializing Gemini API...");
-        if (!process.env.VITE_GEMINI_API_KEY) {
-             console.error("Gemini API Key is missing!");
-            throw new Error("VITE_GEMINI_API_KEY environment variable for Gemini is not set.");
+        const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
+        if (!geminiApiKey) {
+            const errorMsg = "VITE_GEMINI_API_KEY environment variable for Gemini is not set.";
+            console.error(`FATAL: ${errorMsg}`);
+            throw new Error(errorMsg);
         }
-        const ai = new GoogleGenAI({ apiKey: process.env.VITE_GEMINI_API_KEY });
+        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
         console.log("Step 2: Gemini API Initialized successfully.");
 
         // --- AUTHENTICATION FOR MANUAL TRIGGER ---
