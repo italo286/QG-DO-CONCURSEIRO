@@ -69,14 +69,12 @@ export const handler: Handler = async (event) => {
         if (event.queryStringParameters?.apiKey !== secretKey) {
             return { statusCode: 401, body: "Unauthorized" };
         }
-        console.log("[AUTH] API Key validated.");
-
+        
         const db = admin.firestore();
         const geminiApiKey = GEMINI_API_KEY || VITE_GEMINI_API_KEY;
         const ai = new GoogleGenAI({ apiKey: geminiApiKey! });
 
         // 2. Coleta de Dados
-        console.log("[DATA] Fetching subjects and students...");
         const studentsSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
         const allStudents = studentsSnapshot.docs.map(doc => doc.id);
 
@@ -86,8 +84,6 @@ export const handler: Handler = async (event) => {
         }
 
         // 3. Processamento de Alunos em Paralelo
-        console.log(`[PROCESS] Starting parallel processing for ${allStudents.length} students...`);
-
         const studentProcessingPromises = allStudents.map(async (studentId) => {
             try {
                 const progressRef = db.collection('studentProgress').doc(studentId);
@@ -106,7 +102,6 @@ export const handler: Handler = async (event) => {
                 
                 // Gerar desafio de português
                 const questionCount = progress.portugueseChallengeQuestionCount || 1;
-                console.log(`[GEMINI] Generating ${questionCount} Portuguese questions for student ${studentId}...`);
                 const prompt = `Crie ${questionCount} questão de português... (seu prompt aqui)`;
                 const response = await ai.models.generateContent({
                     model: 'gemini-2.5-flash',
@@ -140,7 +135,7 @@ export const handler: Handler = async (event) => {
                 };
             } catch (studentError: any) {
                 console.error(`[STUDENT_ERROR] Failed to process student ${studentId}:`, studentError.message);
-                return null; // Retorna nulo em caso de erro para Promise.allSettled
+                return null;
             }
         });
         
@@ -161,11 +156,7 @@ export const handler: Handler = async (event) => {
         });
 
         if (successfulUpdates > 0) {
-            console.log(`[FIRESTORE] Committing batch with ${successfulUpdates} updates...`);
             await batch.commit();
-            console.log("[FIRESTORE] Batch commit successful.");
-        } else {
-            console.log("[FIRESTORE] No successful updates to commit.");
         }
 
         console.log(`[HANDLER] Execution finished. Successful updates: ${successfulUpdates}/${allStudents.length}`);
