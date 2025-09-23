@@ -126,7 +126,11 @@ export const handler: Handler = async (event) => {
                 const reviewMode = progress.dailyReviewMode || 'standard';
                 const reviewQuestionCount = progress.advancedReviewQuestionCount || 5;
 
-                const allAttempts = Object.values(progress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt));
+                const topicAttempts = Object.values(progress.progressByTopic)
+                    .flatMap(subject => Object.values(subject).flatMap(topic => topic.lastAttempt));
+                const reviewAttempts = (progress.reviewSessions || []).flatMap(session => session.attempts || []);
+                const allAttempts = [...topicAttempts, ...reviewAttempts];
+
                 const attemptedIds = new Set(allAttempts.map(a => a.questionId));
                 const correctIds = new Set(allAttempts.filter(a => a.isCorrect).map(a => a.questionId));
                 const incorrectIds = new Set(Array.from(attemptedIds).filter(id => !correctIds.has(id)));
@@ -158,21 +162,27 @@ export const handler: Handler = async (event) => {
                 let glossaryQuestions: Question[] = [];
                 const glossaryMode = progress.glossaryChallengeMode || 'standard';
                 const glossaryQuestionCount = progress.glossaryChallengeQuestionCount || 5;
-                let candidateTerms: GlossaryTerm[] = allSubjects.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
                 
+                const allGlossaryTermsWithContext = allSubjects.flatMap(subject =>
+                    subject.topics.flatMap(topic => [
+                        ...(topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id })),
+                        ...topic.subtopics.flatMap(subtopic =>
+                            (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
+                        )
+                    ])
+                );
+
+                let candidateTerms: GlossaryTerm[] = allGlossaryTermsWithContext;
+
                 if (glossaryMode === 'advanced' && progress.advancedGlossarySubjectIds && progress.advancedGlossarySubjectIds.length > 0) {
-                     const subjectIdSet = new Set(progress.advancedGlossarySubjectIds);
-                     const topicIdSet = progress.advancedGlossaryTopicIds ? new Set(progress.advancedGlossaryTopicIds) : null;
-                     
-                     candidateTerms = allSubjects
-                        .filter(s => subjectIdSet.has(s.id))
-                        .flatMap(s => s.topics.flatMap(t => 
-                            (topicIdSet === null || topicIdSet.has(t.id)) ? t.glossary || [] : []
-                        ).concat(
-                            s.topics.flatMap(t => t.subtopics.flatMap(st => 
-                                (topicIdSet === null || topicIdSet.has(st.id)) ? st.glossary || [] : []
-                            ))
-                        ));
+                    const subjectIdSet = new Set(progress.advancedGlossarySubjectIds);
+                    let filteredTerms = allGlossaryTermsWithContext.filter(term => subjectIdSet.has(term.subjectId));
+
+                    if (progress.advancedGlossaryTopicIds && progress.advancedGlossaryTopicIds.length > 0) {
+                        const topicIdSet = new Set(progress.advancedGlossaryTopicIds);
+                        filteredTerms = filteredTerms.filter(term => topicIdSet.has(term.topicId));
+                    }
+                    candidateTerms = filteredTerms;
                 }
 
                 const uniqueTerms = Array.from(new Map(candidateTerms.map(item => [item.term, item])).values());
