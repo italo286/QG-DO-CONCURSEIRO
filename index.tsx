@@ -1,4 +1,1 @@
-    
 VITE_DAILY_CHALLENGE_API_KEY="desafio-qg-secreto-2025-!"
-
-  
