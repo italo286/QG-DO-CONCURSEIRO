@@ -224,7 +224,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     };
     
     const startDailyChallenge = (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp = false) => {
-        if (challenge && challenge.items.length > 0) {
+        if (challenge && challenge.items && challenge.items.length > 0) {
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');
@@ -253,9 +253,9 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             if (challengeData) {
                 const existingAttempts = (challengeData.sessionAttempts || []).filter(a => a.questionId !== attempt.questionId);
                 const updatedAttempts = [...existingAttempts, attempt];
+                
                 newProgress[challengeKey] = { ...challengeData, sessionAttempts: updatedAttempts };
 
-                // Save silently to Firestore
                 if (!isPreview) {
                     FirebaseService.saveStudentProgress(newProgress).catch(err => {
                         console.error("Failed to save daily challenge progress:", err);
@@ -265,7 +265,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
 
             return newProgress;
         });
-    }, [isPreview, setStudentProgress, setActiveChallenge]);
+    }, [isPreview, setStudentProgress]);
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;

@@ -291,7 +291,11 @@ export const handler: Handler = async (event) => {
                 
                 const portugueseChallenge: DailyChallenge<Question> = {
                     date: dateISO,
-                    items: parsedQuestions.map((q, i) => ({ ...q, id: `port-challenge-${dateISO}-${i}` })),
+                    items: parsedQuestions.map((q, i) => ({ 
+                        ...q, 
+                        options: q.options || [], // Safeguard for missing options
+                        id: `port-challenge-${dateISO}-${i}` 
+                    })),
                     isCompleted: false,
                     attemptsMade: 0,
                 };
