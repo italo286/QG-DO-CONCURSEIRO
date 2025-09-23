@@ -105,6 +105,13 @@ const handler: Handler = async (event) => {
 
         const usersSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
         if (usersSnapshot.empty) return { statusCode: 200, body: "No students found." };
+
+        // --- OPTIMIZATION: Fetch all courses and subjects ONCE ---
+        const allCoursesSnapshot = await db.collection('courses').get();
+        const allCourses = allCoursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+        
+        const allSubjectsSnapshot = await db.collection('subjects').get();
+        const allSubjects = allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
         
         console.log(`Found ${usersSnapshot.docs.length} students. Processing sequentially...`);
 
@@ -138,8 +145,17 @@ const handler: Handler = async (event) => {
                     console.log(`Challenges already generated today for student ${student.id}. Skipping.`);
                     continue;
                 }
+                
+                // --- Use pre-fetched data ---
+                const enrolledCourses = allCourses.filter(c => c.enrolledStudentIds.includes(student.id));
+                const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
+                if (teacherIds.length === 0) {
+                    console.log(`Student ${student.id} is not in any courses with teachers. Skipping.`);
+                    continue;
+                }
+                const studentSubjects = allSubjects.filter(s => teacherIds.includes(s.teacherId));
 
-                await generateChallengesForStudent(student, progress, todayISO, db, ai);
+                await generateChallengesForStudent(student, progress, todayISO, db, ai, studentSubjects);
                 console.log(`Successfully generated challenges for student ${student.id}.`);
 
             } catch (e: any) {
@@ -155,25 +171,31 @@ const handler: Handler = async (event) => {
         };
 
     } catch (error: any) {
-        console.error("--- FATAL ERROR in generateDailyChallenges handler ---", error);
+        console.error("--- FATAL ERROR in generateDailyChallenges handler ---", error.stack);
         return { 
             statusCode: 500, 
-            body: `Internal Server Error: ${error.message}`
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                message: `Internal Server Error: ${error.message}`,
+                stack: error.stack,
+            }),
         };
     }
 };
 
-const generateChallengesForStudent = async (student: User, progress: StudentProgress, todayISO: string, db: admin.firestore.Firestore, ai: GoogleGenAI) => {
-    const coursesSnapshot = await db.collection('courses').where('enrolledStudentIds', 'array-contains', student.id).get();
-    const enrolledCourses = coursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-    const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
-    if (teacherIds.length === 0) {
-        console.log(`Student ${student.id} is not in any courses. Skipping.`);
+const generateChallengesForStudent = async (
+    student: User, 
+    progress: StudentProgress, 
+    todayISO: string, 
+    db: admin.firestore.Firestore, 
+    ai: GoogleGenAI,
+    studentSubjects: Subject[]
+) => {
+    
+    if (studentSubjects.length === 0) {
+        console.log(`Student ${student.id} has no subjects available. Skipping.`);
         return;
     }
-
-    const subjectsSnapshot = await db.collection('subjects').where('teacherId', 'in', teacherIds).get();
-    const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
 
     const updatedProgress: Partial<StudentProgress> = {};
 
@@ -187,10 +209,10 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
     // Generate Glossary Challenge
     if (progress.glossaryChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.glossaryChallengeQuestionCount || 5;
-        const subjectIdsToUse = progress.glossaryChallengeMode === 'advanced' && progress.advancedGlossarySubjectIds?.length ? progress.advancedGlossarySubjectIds : allSubjects.map(s => s.id);
+        const subjectIdsToUse = progress.glossaryChallengeMode === 'advanced' && progress.advancedGlossarySubjectIds?.length ? progress.advancedGlossarySubjectIds : studentSubjects.map(s => s.id);
         const topicIdsToUse = progress.glossaryChallengeMode === 'advanced' ? new Set(progress.advancedGlossaryTopicIds) : null;
         
-        const allGlossaryTerms = allSubjects
+        const allGlossaryTerms = studentSubjects
             .filter(s => subjectIdsToUse.includes(s.id))
             .flatMap(s => s.topics.flatMap(t => [
                 ...(topicIdsToUse === null || topicIdsToUse.has(t.id) ? (t.glossary || []) : []),
@@ -207,7 +229,7 @@ const generateChallengesForStudent = async (student: User, progress: StudentProg
         const questionCount = progress.advancedReviewQuestionCount || 5;
         const srsData = progress.srsData || {};
         const dueQuestionIds = new Set(Object.entries(srsData).filter(([, data]) => data.nextReviewDate <= todayISO).map(([id]) => id));
-        const allQuestions = allSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
+        const allQuestions = studentSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
         const dueQuestions = allQuestions.filter(q => dueQuestionIds.has(q.id));
         const selectedQuestions = shuffleArray(dueQuestions).slice(0, questionCount);
         updatedProgress.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: selectedQuestions, isCompleted: false, attemptsMade: 0 };
