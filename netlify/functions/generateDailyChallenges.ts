@@ -109,9 +109,10 @@ const handler: Handler = async (event) => {
         
         // --- INITIALIZE GEMINI API ---
         console.log("Step 2: Initializing Gemini API...");
-        const geminiApiKey = process.env.VITE_GEMINI_API_KEY;
+        // Check for backend-specific and fallback to Vite-prefixed env var for robustness
+        const geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
         if (!geminiApiKey) {
-            const errorMsg = "VITE_GEMINI_API_KEY environment variable for Gemini is not set.";
+            const errorMsg = "GEMINI_API_KEY or VITE_GEMINI_API_KEY environment variable for Gemini is not set.";
             console.error(`FATAL: ${errorMsg}`);
             throw new Error(errorMsg);
         }
@@ -295,8 +296,8 @@ const generatePortugueseChallenge = async (
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
 
     const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa... (prompt content)... Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.`;
-    const response = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json', responseSchema: questionSchema } });
-    const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '');
+    const response: GenerateContentResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json', responseSchema: questionSchema } });
+    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '');
     if (!generatedQuestions) throw new Error("Failed to parse response from Gemini API.");
     return generatedQuestions.map((q: any) => ({ 
         statement: q.statement, options: q.options, correctAnswer: q.correctAnswer, justification: q.justification, optionJustifications: q.optionJustifications, errorCategory: q.errorCategory
