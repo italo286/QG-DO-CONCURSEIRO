@@ -28,7 +28,7 @@ const shuffleArray = <T,>(array: T[]): T[] => {
     return newArray;
 };
 
-const parseJsonResponse = <T,>(jsonString: string): T | null => {
+const parseJsonResponse = <T,>(jsonString: string): T => {
     try {
         let cleanJsonString = jsonString;
         const codeBlockRegex = /```(json)?\s*([\s\S]*?)\s*```/;
@@ -39,7 +39,8 @@ const parseJsonResponse = <T,>(jsonString: string): T | null => {
         return JSON.parse(cleanJsonString);
     } catch (e) {
         console.error("Error parsing Gemini JSON response:", e, "String was:", jsonString);
-        return null;
+        // Throw a more informative error to help debugging
+        throw new Error(`Failed to parse JSON response from AI. The response started with: "${jsonString.substring(0, 100)}..."`);
     }
 };
 
@@ -295,13 +296,58 @@ const generatePortugueseChallenge = async (
 ): Promise<Omit<Question, 'id'>[]> => {
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
 
-    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa... (prompt content)... Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.`;
-    const response: GenerateContentResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: prompt, config: { responseMimeType: 'application/json', responseSchema: questionSchema } });
-    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '');
-    if (!generatedQuestions) throw new Error("Failed to parse response from Gemini API.");
-    return generatedQuestions.map((q: any) => ({ 
-        statement: q.statement, options: q.options, correctAnswer: q.correctAnswer, justification: q.justification, optionJustifications: q.optionJustifications, errorCategory: q.errorCategory
-    }));
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
+1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
+2. ${errorFocusPrompt}
+3. A frase deve ser dividida em 5 partes (alternativas).
+4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
+
+Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
+Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
+Resposta Correta: "que aguardavam"
+errorCategory: "Concordância Verbal"
+Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
+OptionJustifications: [
+    { "option": "A multidão,", "justification": "Este trecho não contém erros." },
+    { "option": "que aguardavam", "justification": "O verbo 'aguardar' deveria estar no singular ('aguardava') para concordar com 'A multidão'." }
+]
+
+Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+`;
+    
+    const response: GenerateContentResponse = await ai.models.generateContent({ 
+        model: 'gemini-2.5-flash', 
+        contents: prompt, 
+        config: { responseMimeType: 'application/json', responseSchema: questionSchema } 
+    });
+
+    const generatedQuestions = parseJsonResponse<any[]>(response.text);
+    if (!generatedQuestions) {
+        throw new Error("Received null or invalid JSON from Gemini API for Portuguese challenge.");
+    }
+    
+    return generatedQuestions.map((q: any) => {
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (Array.isArray(q.optionJustifications)) {
+            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                if (item.option && item.justification) {
+                    cleanedOptionJustifications[item.option] = item.justification;
+                }
+            });
+        }
+        
+        return {
+            statement: q.statement,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            justification: q.justification,
+            optionJustifications: cleanedOptionJustifications,
+            errorCategory: q.errorCategory,
+        };
+    });
 };
 
 const generateGlossaryChallengeQuestions = (
