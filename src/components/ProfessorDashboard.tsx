@@ -13,6 +13,8 @@ import { ProfessorReviewsDashboard } from './professor/ProfessorReviewsDashboard
 import { EditProfileModal } from './student/EditProfileModal';
 import { ProfessorSubjectsView } from './professor/ProfessorSubjectsView';
 
+const isTriggerConfigured = !!import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
+
 export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; onUpdateUser: (user: User) => void; }> = ({ user, onLogout, onUpdateUser }) => {
     const [courses, setCourses] = useState<Course[]>([]);
     const [subjects, setSubjects] = useState<Subject[]>([]);
@@ -131,12 +133,17 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     };
 
     const handleTriggerDailyChallenges = async () => {
+        if (!isTriggerConfigured) {
+            console.error("Attempted to trigger challenges, but the API key is not configured in the environment.");
+            return;
+        }
+
         setIsTriggeringChallenges(true);
         try {
             const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
+            // Safeguard check, though the button should be disabled
             if (!apiKey) {
-                setToastMessage("Erro: Chave de API para o gatilho não configurada no ambiente.");
-                console.error("VITE_DAILY_CHALLENGE_API_KEY is not set in .env file");
+                console.error("VITE_DAILY_CHALLENGE_API_KEY is not set in .env file, but the trigger was attempted.");
                 return;
             }
             const response = await fetch(`/.netlify/functions/generateDailyChallenges?apiKey=${apiKey}`);
@@ -288,7 +295,12 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                     </div>
                 </div>
                  <div className="flex items-center space-x-4">
-                    <Button onClick={handleTriggerDailyChallenges} disabled={isTriggeringChallenges} className="text-sm py-2 px-4 bg-purple-600 hover:bg-purple-700" title="Acionar manualmente a geração de desafios diários para todos os alunos.">
+                    <Button
+                        onClick={handleTriggerDailyChallenges}
+                        disabled={isTriggeringChallenges || !isTriggerConfigured}
+                        className="text-sm py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:hover:bg-gray-600 disabled:cursor-not-allowed"
+                        title={isTriggerConfigured ? "Acionar manualmente a geração de desafios diários para todos os alunos." : "Funcionalidade desabilitada: Chave de API não configurada."}
+                    >
                         {isTriggeringChallenges ? <Spinner /> : <SparklesIcon className="h-5 w-5" />}
                         <span className="ml-2 hidden sm:inline">Gerar Desafios</span>
                     </Button>
