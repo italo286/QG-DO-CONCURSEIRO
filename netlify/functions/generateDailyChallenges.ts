@@ -71,12 +71,20 @@ async function initializeServices() {
     }
     console.log("Attempting to initialize services...");
 
-    const requiredEnv = ['FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL', 'GEMINI_API_KEY', 'DAILY_CHALLENGE_API_KEY'];
+    // Check for Firebase and Challenge keys
+    const requiredEnv = ['FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL', 'DAILY_CHALLENGE_API_KEY'];
     const missingEnv = requiredEnv.filter(key => !process.env[key]);
     if (missingEnv.length > 0) {
         throw new Error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
     }
+
+    // Specifically check for Gemini API Key with fallback
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    if (!geminiApiKey) {
+        throw new Error('FATAL: Missing required environment variable: GEMINI_API_KEY or VITE_GEMINI_API_KEY');
+    }
     console.log("All required environment variables are present.");
+
 
     if (!admin.apps.length) {
         admin.initializeApp({
@@ -90,8 +98,7 @@ async function initializeServices() {
     }
     db = admin.firestore();
 
-    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-    ai = new GoogleGenAI({ apiKey: geminiApiKey! });
+    ai = new GoogleGenAI({ apiKey: geminiApiKey });
     console.log("Gemini API client initialized successfully.");
     
     servicesInitialized = true;
@@ -165,13 +172,13 @@ const handler: Handler = async (event) => {
                 }
                 
                 const enrolledCourses = allCourses.filter(c => c.enrolledStudentIds.includes(student.id));
-                const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
-                if (teacherIds.length === 0) {
-                     console.log(`[${student.id}] Skipping: Not enrolled in any courses.`);
+                const enrolledSubjectIds = new Set(enrolledCourses.flatMap(c => c.disciplines.map(d => d.subjectId)));
+                if (enrolledSubjectIds.size === 0) {
+                     console.log(`[${student.id}] Skipping: Not enrolled in any subjects.`);
                     return;
                 }
                 
-                const studentSubjects = allSubjects.filter(s => teacherIds.includes(s.teacherId));
+                const studentSubjects = allSubjects.filter(s => enrolledSubjectIds.has(s.id));
                  console.log(`[${student.id}] Found ${enrolledCourses.length} enrolled courses and ${studentSubjects.length} relevant subjects.`);
 
                 await generateChallengesForStudent(student, progress, todayISO, db, ai, studentSubjects);
@@ -216,40 +223,52 @@ const generateChallengesForStudent = async (
     if (progress.portugueseChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.portugueseChallengeQuestionCount || 1;
         console.log(`[${student.id}] Generating Portuguese challenge (${questionCount} questions).`);
-        const questions = await generatePortugueseChallenge(questionCount, progress.portugueseErrorStats, ai);
-        console.log(`[${student.id}] Generated ${questions.length} Portuguese questions.`);
-        updatedProgress.portugueseChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
+        try {
+            const questions = await generatePortugueseChallenge(questionCount, progress.portugueseErrorStats, ai);
+            console.log(`[${student.id}] Generated ${questions.length} Portuguese questions.`);
+            updatedProgress.portugueseChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
+        } catch (e: any) {
+             console.error(`[${student.id}] Failed to generate Portuguese challenge: ${e.message}`);
+        }
     }
 
     if (progress.glossaryChallenge?.generatedForDate !== todayISO) {
-        const questionCount = progress.glossaryChallengeQuestionCount || 5;
-        const subjectIdsToUse = progress.glossaryChallengeMode === 'advanced' && progress.advancedGlossarySubjectIds?.length ? progress.advancedGlossarySubjectIds : studentSubjects.map(s => s.id);
-        const topicIdsToUse = progress.glossaryChallengeMode === 'advanced' ? new Set(progress.advancedGlossaryTopicIds) : null;
-        
-        const allGlossaryTerms = studentSubjects
-            .filter(s => subjectIdsToUse.includes(s.id))
-            .flatMap(s => s.topics.flatMap(t => [
-                ...(topicIdsToUse === null || topicIdsToUse.has(t.id) ? (t.glossary || []) : []),
-                ...t.subtopics.flatMap(st => topicIdsToUse === null || topicIdsToUse.has(st.id) ? (st.glossary || []) : [])
-            ]));
-        
-        const uniqueGlossaryTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
-        console.log(`[${student.id}] Generating Glossary challenge (${questionCount} questions) from ${uniqueGlossaryTerms.length} available terms.`);
-        const questions = generateGlossaryChallengeQuestions(uniqueGlossaryTerms, questionCount);
-        console.log(`[${student.id}] Generated ${questions.length} Glossary questions.`);
-        updatedProgress.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
+        try {
+            const questionCount = progress.glossaryChallengeQuestionCount || 5;
+            const subjectIdsToUse = progress.glossaryChallengeMode === 'advanced' && progress.advancedGlossarySubjectIds?.length ? progress.advancedGlossarySubjectIds : studentSubjects.map(s => s.id);
+            const topicIdsToUse = progress.glossaryChallengeMode === 'advanced' ? new Set(progress.advancedGlossaryTopicIds) : null;
+            
+            const allGlossaryTerms = studentSubjects
+                .filter(s => subjectIdsToUse.includes(s.id))
+                .flatMap(s => s.topics.flatMap(t => [
+                    ...(topicIdsToUse === null || topicIdsToUse.has(t.id) ? (t.glossary || []) : []),
+                    ...t.subtopics.flatMap(st => topicIdsToUse === null || topicIdsToUse.has(st.id) ? (st.glossary || []) : [])
+                ]));
+            
+            const uniqueGlossaryTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
+            console.log(`[${student.id}] Generating Glossary challenge (${questionCount} questions) from ${uniqueGlossaryTerms.length} available terms.`);
+            const questions = generateGlossaryChallengeQuestions(uniqueGlossaryTerms, questionCount);
+            console.log(`[${student.id}] Generated ${questions.length} Glossary questions.`);
+            updatedProgress.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
+        } catch (e: any) {
+            console.error(`[${student.id}] Failed to generate Glossary challenge: ${e.message}`);
+        }
     }
     
     if (progress.reviewChallenge?.generatedForDate !== todayISO) {
-        const questionCount = progress.advancedReviewQuestionCount || 5;
-        const srsData = progress.srsData || {};
-        const dueQuestionIds = new Set(Object.entries(srsData).filter(([, data]) => data.nextReviewDate <= todayISO).map(([id]) => id));
-        const allQuestions = studentSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
-        const dueQuestions = allQuestions.filter(q => dueQuestionIds.has(q.id));
-        console.log(`[${student.id}] Generating Review challenge (${questionCount} questions) from ${dueQuestions.length} due questions.`);
-        const selectedQuestions = shuffleArray(dueQuestions).slice(0, questionCount);
-        console.log(`[${student.id}] Selected ${selectedQuestions.length} Review questions.`);
-        updatedProgress.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: selectedQuestions, isCompleted: false, attemptsMade: 0 };
+        try {
+            const questionCount = progress.advancedReviewQuestionCount || 5;
+            const srsData = progress.srsData || {};
+            const dueQuestionIds = new Set(Object.entries(srsData).filter(([, data]) => data.nextReviewDate <= todayISO).map(([id]) => id));
+            const allQuestions = studentSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
+            const dueQuestions = allQuestions.filter(q => dueQuestionIds.has(q.id));
+            console.log(`[${student.id}] Generating Review challenge (${questionCount} questions) from ${dueQuestions.length} due questions.`);
+            const selectedQuestions = shuffleArray(dueQuestions).slice(0, questionCount);
+            console.log(`[${student.id}] Selected ${selectedQuestions.length} Review questions.`);
+            updatedProgress.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: selectedQuestions, isCompleted: false, attemptsMade: 0 };
+        } catch (e: any) {
+            console.error(`[${student.id}] Failed to generate Review challenge: ${e.message}`);
+        }
     }
 
     if (Object.keys(updatedProgress).length > 0) {
