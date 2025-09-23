@@ -1,6 +1,2 @@
-# Define que a função "generateDailyChallenges" será agendada.
-[functions."generateDailyChallenges"]
-
-  # Roda às 3:00 da manhã (UTC), todos os dias.
-  # (minuto, hora, dia do mês, mês, dia da semana)
-  schedule = "0 3 * * *"
+[functions]
+  node_bundler = "esbuild"
