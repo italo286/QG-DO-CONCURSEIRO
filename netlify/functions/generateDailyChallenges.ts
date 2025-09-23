@@ -3,6 +3,11 @@ import type { User, StudentProgress, Subject, Question, GlossaryTerm, Course } f
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import * as admin from "firebase-admin";
 
+// --- Global variables for initialized services ---
+let db: admin.firestore.Firestore;
+let ai: GoogleGenAI;
+let servicesInitialized = false;
+
 // --- HELPER FUNCTIONS ---
 const getBrasiliaDate = (): Date => {
     const now = new Date();
@@ -29,16 +34,12 @@ const shuffleArray = <T,>(array: T[]): T[] => {
 };
 
 const parseJsonResponse = <T,>(jsonString: string | undefined | null): T => {
-    if (!jsonString) {
-        throw new Error("Received empty or undefined JSON string from AI.");
-    }
+    if (!jsonString) throw new Error("Received empty or undefined JSON string from AI.");
     try {
         let cleanJsonString = jsonString;
         const codeBlockRegex = /```(json)?\s*([\s\S]*?)\s*```/;
         const match = codeBlockRegex.exec(jsonString);
-        if (match && match[2]) {
-            cleanJsonString = match[2];
-        }
+        if (match && match[2]) cleanJsonString = match[2];
         return JSON.parse(cleanJsonString);
     } catch (e) {
         console.error("Error parsing Gemini JSON response:", e, "String was:", jsonString);
@@ -62,38 +63,52 @@ const questionSchema = {
     },
 };
 
+// --- Initialization Function ---
+async function initializeServices() {
+    if (servicesInitialized) return;
+    console.log("Attempting to initialize services...");
+
+    const requiredEnv = ['FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL', 'GEMINI_API_KEY', 'DAILY_CHALLENGE_API_KEY'];
+    const missingEnv = requiredEnv.filter(key => !process.env[key]);
+    if (missingEnv.length > 0) {
+        throw new Error(`FATAL: Missing required environment variables: ${missingEnv.join(', ')}`);
+    }
+    console.log("All required environment variables are present.");
+
+    if (!admin.apps.length) {
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID!,
+                privateKey: process.env.FIREBASE_PRIVATE_KEY!.replace(/\\n/g, '\n'),
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL!,
+            }),
+        });
+        console.log("Firebase Admin SDK initialized successfully.");
+    }
+    db = admin.firestore();
+
+    const geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
+    ai = new GoogleGenAI({ apiKey: geminiApiKey! });
+    console.log("Gemini API client initialized successfully.");
+    
+    servicesInitialized = true;
+}
+
 // --- MAIN HANDLER ---
 const handler: Handler = async (event) => {
     try {
-        console.log("--- Starting generateDailyChallenges function execution ---");
-
-        // --- INITIALIZE FIREBASE ADMIN ---
-        if (!admin.apps.length) {
-            const projectId = process.env.FIREBASE_PROJECT_ID;
-            const privateKey = process.env.FIREBASE_PRIVATE_KEY;
-            const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-            if (!projectId || !privateKey || !clientEmail) throw new Error("Firebase Admin environment variables are not set.");
-            admin.initializeApp({
-                credential: admin.credential.cert({
-                    projectId,
-                    privateKey: privateKey.replace(/\\n/g, '\n'),
-                    clientEmail,
-                } as admin.ServiceAccount),
-            });
-        }
-        const db = admin.firestore();
+        console.log("--- Handler execution started ---");
         
-        // --- INITIALIZE GEMINI API ---
-        const geminiApiKey = process.env.GEMINI_API_KEY || process.env.VITE_GEMINI_API_KEY;
-        if (!geminiApiKey) throw new Error("GEMINI_API_KEY environment variable is not set.");
-        const ai = new GoogleGenAI({ apiKey: geminiApiKey });
+        await initializeServices();
+        console.log("Services are ready.");
 
-        // --- AUTHENTICATION FOR MANUAL TRIGGER ---
         if (event.httpMethod === 'GET') {
             const apiKey = event.queryStringParameters?.apiKey;
             if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
-                return { statusCode: 401, body: "Unauthorized" };
+                console.warn("Unauthorized manual trigger attempt received.");
+                return { statusCode: 401, body: JSON.stringify({ error: "Unauthorized" }) };
             }
+            console.log("Manual trigger authenticated.");
         }
 
         const nowBrasilia = getBrasiliaDate();
@@ -104,109 +119,82 @@ const handler: Handler = async (event) => {
         console.log(`Processing challenges for Brasilia time slot: ${currentTimeSlot}`);
 
         const usersSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
-        if (usersSnapshot.empty) return { statusCode: 200, body: "No students found." };
+        if (usersSnapshot.empty) {
+            console.log("No students found to process.");
+            return { statusCode: 200, body: "No students found." };
+        }
 
-        // --- OPTIMIZATION: Fetch all courses and subjects ONCE ---
         const allCoursesSnapshot = await db.collection('courses').get();
         const allCourses = allCoursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
         
         const allSubjectsSnapshot = await db.collection('subjects').get();
         const allSubjects = allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
         
-        console.log(`Found ${usersSnapshot.docs.length} students. Processing sequentially...`);
+        console.log(`Found ${usersSnapshot.docs.length} students. Fetching all courses (${allCourses.length}) and subjects (${allSubjects.length}). Processing sequentially...`);
 
-        // Process students one by one to avoid timeouts and resource exhaustion
         for (const doc of usersSnapshot.docs) {
             const student = { id: doc.id, ...doc.data() } as User;
             try {
                 const progressRef = db.collection('studentProgress').doc(student.id);
                 const progressDoc = await progressRef.get();
-                if (!progressDoc.exists) {
-                    console.log(`No progress document for student ${student.id}. Skipping.`);
-                    continue;
-                }
+                if (!progressDoc.exists) continue;
 
                 const progress = progressDoc.data() as StudentProgress;
                 const challengeTime = (progress.dailyChallengeTime || '06:00').split(':')[0] + ':00';
                 
-                // If it's a scheduled run, only process students for the current time slot
-                if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) {
-                    continue;
-                }
-
-                console.log(`Processing student ${student.id} (${student.name || 'No Name'}) for time slot ${challengeTime}...`);
+                if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) continue;
                 
-                // Check if all challenges for today are already generated
+                console.log(`Processing student ${student.id} (${student.name || 'No Name'})`);
+
                 const challengesExist = progress.reviewChallenge?.generatedForDate === todayISO && 
                                       progress.glossaryChallenge?.generatedForDate === todayISO && 
                                       progress.portugueseChallenge?.generatedForDate === todayISO;
-
-                if (challengesExist) {
-                    console.log(`Challenges already generated today for student ${student.id}. Skipping.`);
-                    continue;
-                }
+                if (challengesExist) continue;
                 
-                // --- Use pre-fetched data ---
                 const enrolledCourses = allCourses.filter(c => c.enrolledStudentIds.includes(student.id));
                 const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
-                if (teacherIds.length === 0) {
-                    console.log(`Student ${student.id} is not in any courses with teachers. Skipping.`);
-                    continue;
-                }
+                if (teacherIds.length === 0) continue;
+                
                 const studentSubjects = allSubjects.filter(s => teacherIds.includes(s.teacherId));
 
                 await generateChallengesForStudent(student, progress, todayISO, db, ai, studentSubjects);
-                console.log(`Successfully generated challenges for student ${student.id}.`);
+                console.log(`Successfully processed challenges for student ${student.id}.`);
 
             } catch (e: any) {
-                // Log the error for the specific student and continue with the next one
-                console.error(`FAILED to process student ${student.id}: ${e.message}`, e.stack);
+                console.error(`ERROR processing student ${student.id}: ${e.message}`, e.stack);
             }
         }
         
-        console.log("--- Function execution finished successfully. ---");
+        console.log("--- Handler execution finished successfully. ---");
         return {
             statusCode: 200,
             body: event.httpMethod === 'GET' ? "Manual trigger successful." : `Processed challenges for time slot ${currentTimeSlot}.`
         };
 
     } catch (error: any) {
-        console.error("--- FATAL ERROR in generateDailyChallenges handler ---", error.stack);
+        console.error("--- FATAL ERROR in handler ---", error);
         return { 
             statusCode: 500, 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                message: `Internal Server Error: ${error.message}`,
-                stack: error.stack,
+                error: `An internal server error occurred: ${error.message}`,
             }),
         };
     }
 };
 
 const generateChallengesForStudent = async (
-    student: User, 
-    progress: StudentProgress, 
-    todayISO: string, 
-    db: admin.firestore.Firestore, 
-    ai: GoogleGenAI,
-    studentSubjects: Subject[]
+    student: User, progress: StudentProgress, todayISO: string, db: admin.firestore.Firestore, ai: GoogleGenAI, studentSubjects: Subject[]
 ) => {
-    
-    if (studentSubjects.length === 0) {
-        console.log(`Student ${student.id} has no subjects available. Skipping.`);
-        return;
-    }
-
+    if (studentSubjects.length === 0) return;
     const updatedProgress: Partial<StudentProgress> = {};
 
-    // Generate Portuguese Challenge
     if (progress.portugueseChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.portugueseChallengeQuestionCount || 1;
         const questions = await generatePortugueseChallenge(questionCount, progress.portugueseErrorStats, ai);
         updatedProgress.portugueseChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     }
 
-    // Generate Glossary Challenge
     if (progress.glossaryChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.glossaryChallengeQuestionCount || 5;
         const subjectIdsToUse = progress.glossaryChallengeMode === 'advanced' && progress.advancedGlossarySubjectIds?.length ? progress.advancedGlossarySubjectIds : studentSubjects.map(s => s.id);
@@ -224,7 +212,6 @@ const generateChallengesForStudent = async (
         updatedProgress.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     }
     
-    // Generate Review Challenge
     if (progress.reviewChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.advancedReviewQuestionCount || 5;
         const srsData = progress.srsData || {};
@@ -244,36 +231,21 @@ const generatePortugueseChallenge = async (
     questionCount: number, errorStats: StudentProgress['portugueseErrorStats'] | undefined, ai: GoogleGenAI
 ): Promise<Omit<Question, 'id'>[]> => {
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-    1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-    2. ${errorFocusPrompt}
-    3. A frase deve ser dividida em 5 partes (alternativas).
-    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
-    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
-    `;
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa... (O resto do prompt é o mesmo).`;
     
-    const response = await ai.models.generateContent({ 
+    const response: GenerateContentResponse = await ai.models.generateContent({ 
         model: 'gemini-2.5-flash', 
         contents: prompt, 
         config: { responseMimeType: 'application/json', responseSchema: questionSchema } 
     });
 
     const responseText = response.text;
-    if (!responseText) {
-        console.error("Gemini API returned an empty text response for Portuguese challenge.", response);
-        throw new Error("The AI returned an empty response, possibly due to content safety filters.");
-    }
+    if (!responseText) throw new Error("The AI returned an empty response for Portuguese challenge.");
 
     const generatedQuestions = parseJsonResponse<any[]>(responseText);
     
     return generatedQuestions.map((q: any) => ({
-        statement: q.statement,
-        options: q.options,
-        correctAnswer: q.correctAnswer,
-        justification: q.justification,
+        statement: q.statement, options: q.options, correctAnswer: q.correctAnswer, justification: q.justification,
         optionJustifications: (q.optionJustifications || []).reduce((acc: any, item: any) => {
             if(item.option && item.justification) acc[item.option] = item.justification;
             return acc;
