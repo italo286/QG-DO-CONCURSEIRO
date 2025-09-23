@@ -39,7 +39,6 @@ let servicesInitialized = false;
 const initializeServices = () => {
     if (servicesInitialized) return;
 
-    console.log("[DIAGNOSTIC] Initializing services...");
     const requiredFirebaseVars = { FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL };
     for (const [key, value] of Object.entries(requiredFirebaseVars)) {
         if (!value) throw new Error(`FATAL: Missing required environment variable: ${key}`);
@@ -51,7 +50,6 @@ const initializeServices = () => {
     }
 
     if (admin.apps.length === 0) {
-        console.log("[DIAGNOSTIC] Initializing Firebase Admin SDK...");
         admin.initializeApp({
             credential: admin.credential.cert({
                 projectId: FIREBASE_PROJECT_ID,
@@ -59,11 +57,9 @@ const initializeServices = () => {
                 clientEmail: FIREBASE_CLIENT_EMAIL,
             }),
         });
-        console.log("[DIAGNOSTIC] Firebase Admin SDK initialized successfully.");
     }
 
     servicesInitialized = true;
-    console.log("[DIAGNOSTIC] All services initialized successfully.");
 };
 
 // --- Lógica Principal do Handler ---
@@ -206,16 +202,35 @@ export const handler: Handler = async (event) => {
                 
                 // --- Geração do Desafio de Português ---
                 const ptQuestionCount = progress.portugueseChallengeQuestionCount || 1;
-                const ptPrompt = `Crie ${ptQuestionCount} questão de português... (seu prompt aqui)`;
-                const ptResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: ptPrompt, config: { responseMimeType: 'application/json' /*, responseSchema: ...*/ } });
+                const errorFocusPrompt = progress.portugueseErrorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(progress.portugueseErrorStats)}.` : '';
 
-                let portugueseQuestions: Question[] = [];
+                const portugueseChallengePrompt = `Crie ${ptQuestionCount} questão(ões) para um desafio de gramática da língua portuguesa...`; // Removido para brevidade
+                const questionSchema = { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { /* schema aqui */ } } };
+
+                console.log(`[GEMINI] Generating ${ptQuestionCount} Portuguese questions for student ${studentId}...`);
+                const ptResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: portugueseChallengePrompt, config: { responseMimeType: 'application/json' } });
+
+                let parsedQuestions: any[] = [];
                 if (ptResponse.text) {
-                     try { portugueseQuestions = JSON.parse(ptResponse.text.trim()); } catch (e) { console.error(`[PARSE_ERROR] PT Student ${studentId}:`, e); }
+                    try {
+                        const parsedData = JSON.parse(ptResponse.text.trim());
+                        if (Array.isArray(parsedData)) {
+                            parsedQuestions = parsedData;
+                        } else if (typeof parsedData === 'object' && parsedData !== null) {
+                            parsedQuestions = [parsedData]; // Wrap single object
+                        } else {
+                            console.warn(`[GEMINI_WARN] Unexpected JSON type for student ${studentId}. Type: ${typeof parsedData}`);
+                        }
+                    } catch (e) {
+                        console.error(`[PARSE_ERROR] PT Student ${studentId}:`, e);
+                    }
+                } else {
+                    console.warn(`[GEMINI_WARN] Empty response from Gemini for student ${studentId}. Might be due to safety filters.`);
                 }
+                
                 const portugueseChallenge: DailyChallenge<Question> = {
                     date: dateISO,
-                    items: portugueseQuestions.map((q, i) => ({ ...q, id: `port-challenge-${dateISO}-${i}` })),
+                    items: parsedQuestions.map((q, i) => ({ ...q, id: `port-challenge-${dateISO}-${i}` })),
                     isCompleted: false,
                     attemptsMade: 0,
                 };
