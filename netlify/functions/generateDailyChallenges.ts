@@ -65,7 +65,10 @@ const questionSchema = {
 
 // --- Initialization Function ---
 async function initializeServices() {
-    if (servicesInitialized) return;
+    if (servicesInitialized) {
+        console.log("Services already initialized.");
+        return;
+    }
     console.log("Attempting to initialize services...");
 
     const requiredEnv = ['FIREBASE_PROJECT_ID', 'FIREBASE_PRIVATE_KEY', 'FIREBASE_CLIENT_EMAIL', 'GEMINI_API_KEY', 'DAILY_CHALLENGE_API_KEY'];
@@ -116,54 +119,70 @@ const handler: Handler = async (event) => {
         const currentTimeSlot = `${String(currentHour).padStart(2, '0')}:00`;
         const todayISO = getLocalDateISOString(nowBrasilia);
 
-        console.log(`Processing challenges for Brasilia time slot: ${currentTimeSlot}`);
+        console.log(`Processing challenges for Brasilia time slot: ${currentTimeSlot} on date ${todayISO}`);
 
         const usersSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
         if (usersSnapshot.empty) {
             console.log("No students found to process.");
             return { statusCode: 200, body: "No students found." };
         }
+        console.log(`Found ${usersSnapshot.docs.length} students.`);
 
         const allCoursesSnapshot = await db.collection('courses').get();
         const allCourses = allCoursesSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
+        console.log(`Found ${allCourses.length} total courses.`);
         
         const allSubjectsSnapshot = await db.collection('subjects').get();
         const allSubjects = allSubjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
+        console.log(`Found ${allSubjects.length} total subjects. Processing all students in parallel...`);
         
-        console.log(`Found ${usersSnapshot.docs.length} students. Fetching all courses (${allCourses.length}) and subjects (${allSubjects.length}). Processing sequentially...`);
-
-        for (const doc of usersSnapshot.docs) {
+        const processingPromises = usersSnapshot.docs.map(async (doc) => {
             const student = { id: doc.id, ...doc.data() } as User;
+            console.log(`[${student.id}] Starting processing for student.`);
             try {
                 const progressRef = db.collection('studentProgress').doc(student.id);
                 const progressDoc = await progressRef.get();
-                if (!progressDoc.exists) continue;
+                if (!progressDoc.exists) {
+                    console.log(`[${student.id}] Skipping: No progress document found.`);
+                    return;
+                }
 
                 const progress = progressDoc.data() as StudentProgress;
                 const challengeTime = (progress.dailyChallengeTime || '06:00').split(':')[0] + ':00';
+                console.log(`[${student.id}] Configured challenge time: ${challengeTime}`);
                 
-                if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) continue;
+                if (event.httpMethod !== 'GET' && challengeTime !== currentTimeSlot) {
+                    console.log(`[${student.id}] Skipping: Time slot mismatch (current: ${currentTimeSlot}).`);
+                    return;
+                }
                 
-                console.log(`Processing student ${student.id} (${student.name || 'No Name'})`);
-
                 const challengesExist = progress.reviewChallenge?.generatedForDate === todayISO && 
                                       progress.glossaryChallenge?.generatedForDate === todayISO && 
                                       progress.portugueseChallenge?.generatedForDate === todayISO;
-                if (challengesExist) continue;
+                if (challengesExist) {
+                    console.log(`[${student.id}] Skipping: Challenges for ${todayISO} already exist.`);
+                    return;
+                }
                 
                 const enrolledCourses = allCourses.filter(c => c.enrolledStudentIds.includes(student.id));
                 const teacherIds = [...new Set(enrolledCourses.map(c => c.teacherId))];
-                if (teacherIds.length === 0) continue;
+                if (teacherIds.length === 0) {
+                     console.log(`[${student.id}] Skipping: Not enrolled in any courses.`);
+                    return;
+                }
                 
                 const studentSubjects = allSubjects.filter(s => teacherIds.includes(s.teacherId));
+                 console.log(`[${student.id}] Found ${enrolledCourses.length} enrolled courses and ${studentSubjects.length} relevant subjects.`);
 
                 await generateChallengesForStudent(student, progress, todayISO, db, ai, studentSubjects);
-                console.log(`Successfully processed challenges for student ${student.id}.`);
+                console.log(`[${student.id}] Successfully processed and updated challenges.`);
 
             } catch (e: any) {
-                console.error(`ERROR processing student ${student.id}: ${e.message}`, e.stack);
+                console.error(`[${student.id}] ERROR during processing: ${e.message}`, e.stack);
             }
-        }
+        });
+
+        await Promise.all(processingPromises);
         
         console.log("--- Handler execution finished successfully. ---");
         return {
@@ -172,12 +191,13 @@ const handler: Handler = async (event) => {
         };
 
     } catch (error: any) {
-        console.error("--- FATAL ERROR in handler ---", error);
+        console.error("--- FATAL ERROR in handler ---", error.message, error.stack);
         return { 
             statusCode: 500, 
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 error: `An internal server error occurred: ${error.message}`,
+                stack: error.stack,
             }),
         };
     }
@@ -186,12 +206,18 @@ const handler: Handler = async (event) => {
 const generateChallengesForStudent = async (
     student: User, progress: StudentProgress, todayISO: string, db: admin.firestore.Firestore, ai: GoogleGenAI, studentSubjects: Subject[]
 ) => {
-    if (studentSubjects.length === 0) return;
+    console.log(`[${student.id}] Starting generation of challenges for date ${todayISO}.`);
+    if (studentSubjects.length === 0) {
+        console.log(`[${student.id}] No subjects found for this student. Aborting challenge generation.`);
+        return;
+    }
     const updatedProgress: Partial<StudentProgress> = {};
 
     if (progress.portugueseChallenge?.generatedForDate !== todayISO) {
         const questionCount = progress.portugueseChallengeQuestionCount || 1;
+        console.log(`[${student.id}] Generating Portuguese challenge (${questionCount} questions).`);
         const questions = await generatePortugueseChallenge(questionCount, progress.portugueseErrorStats, ai);
+        console.log(`[${student.id}] Generated ${questions.length} Portuguese questions.`);
         updatedProgress.portugueseChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     }
 
@@ -208,7 +234,9 @@ const generateChallengesForStudent = async (
             ]));
         
         const uniqueGlossaryTerms = Array.from(new Map(allGlossaryTerms.map(item => [item.term, item])).values());
+        console.log(`[${student.id}] Generating Glossary challenge (${questionCount} questions) from ${uniqueGlossaryTerms.length} available terms.`);
         const questions = generateGlossaryChallengeQuestions(uniqueGlossaryTerms, questionCount);
+        console.log(`[${student.id}] Generated ${questions.length} Glossary questions.`);
         updatedProgress.glossaryChallenge = { date: todayISO, generatedForDate: todayISO, items: questions.map((q, i) => ({ ...q, id: `gloss-challenge-${todayISO}-${i}` })), isCompleted: false, attemptsMade: 0 };
     }
     
@@ -218,12 +246,18 @@ const generateChallengesForStudent = async (
         const dueQuestionIds = new Set(Object.entries(srsData).filter(([, data]) => data.nextReviewDate <= todayISO).map(([id]) => id));
         const allQuestions = studentSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
         const dueQuestions = allQuestions.filter(q => dueQuestionIds.has(q.id));
+        console.log(`[${student.id}] Generating Review challenge (${questionCount} questions) from ${dueQuestions.length} due questions.`);
         const selectedQuestions = shuffleArray(dueQuestions).slice(0, questionCount);
+        console.log(`[${student.id}] Selected ${selectedQuestions.length} Review questions.`);
         updatedProgress.reviewChallenge = { date: todayISO, generatedForDate: todayISO, items: selectedQuestions, isCompleted: false, attemptsMade: 0 };
     }
 
     if (Object.keys(updatedProgress).length > 0) {
+        console.log(`[${student.id}] Updating Firestore with new challenges.`);
         await db.collection('studentProgress').doc(student.id).set(updatedProgress, { merge: true });
+        console.log(`[${student.id}] Firestore update successful.`);
+    } else {
+         console.log(`[${student.id}] No new challenges needed to be generated.`);
     }
 };
 
@@ -231,7 +265,7 @@ const generatePortugueseChallenge = async (
     questionCount: number, errorStats: StudentProgress['portugueseErrorStats'] | undefined, ai: GoogleGenAI
 ): Promise<Omit<Question, 'id'>[]> => {
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa... (O resto do prompt é o mesmo).`;
+    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato: 1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.). 2. ${errorFocusPrompt} 3. A frase deve ser dividida em 5 partes (alternativas). 4. A alternativa correta ('correctAnswer') é o trecho que contém o erro. 5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação'). 6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo. 7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.". Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.`;
     
     const response: GenerateContentResponse = await ai.models.generateContent({ 
         model: 'gemini-2.5-flash', 
