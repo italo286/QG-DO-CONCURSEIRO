@@ -1,2 +1,10 @@
+# netlify.toml
+
+# Configuração para as funções do servidor
 [functions]
   node_bundler = "esbuild"
+
+# Agendamento específico para a função de desafios diários
+[functions."generateDailyChallenges"]
+  # Esta é uma "expressão cron"
+  schedule = "0 3 * * *" 
