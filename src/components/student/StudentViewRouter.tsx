@@ -83,6 +83,7 @@ interface StudentViewRouterProps {
     handleGameError: () => void;
     onReportQuestion: (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => void;
     onCloseDailyChallengeResults: () => void;
+    onNavigateToDailyChallengeResults?: () => void;
     onOpenCreator: () => void;
     onStartQuiz: (quiz: CustomQuiz) => void;
     onDeleteQuiz: (quizId: string) => void;
@@ -148,7 +149,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
 
     switch (props.view) {
         case 'dashboard':
-            // FIX: Removed incorrect props 'onGenerateChallenge' and 'isGeneratingChallenge' that are not expected by DashboardHome.
             return <DashboardHome {...props} />;
         case 'course':
             if (!props.selectedCourse) return null;
@@ -192,6 +192,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 isDailyChallenge={true}
                 dailyChallengeType={props.activeChallenge.type}
                 hideBackButtonOnResults={true}
+                onNavigateToDailyChallengeResults={props.onNavigateToDailyChallengeResults}
             />;
         case 'daily_challenge_results':
             if (!props.dailyChallengeResults) return null;
@@ -219,7 +220,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onAddBonusXp={props.onAddBonusXp}
             />;
         default:
-            // FIX: Removed incorrect props 'onGenerateChallenge' and 'isGeneratingChallenge' that are not expected by DashboardHome.
             return <DashboardHome {...props} />;
     }
 };

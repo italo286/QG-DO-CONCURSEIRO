@@ -177,6 +177,34 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
     const onStartReview = (session: ReviewSession) => { setSelectedReview(session); setQuizInstanceKey(Date.now()); setView('review_quiz'); };
 
+    const saveDailyChallengeAttempt = (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => {
+        if (!studentProgress || isPreview) return;
+    
+        const newProgress = { ...studentProgress };
+        const challengeKey = `${challengeType}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+        const challenge = newProgress[challengeKey];
+    
+        if (!challenge) return;
+    
+        if (!challenge.sessionAttempts) {
+            challenge.sessionAttempts = [];
+        }
+    
+        const existingAttemptIndex = challenge.sessionAttempts.findIndex(a => a.questionId === attempt.questionId);
+        if (existingAttemptIndex > -1) {
+            challenge.sessionAttempts[existingAttemptIndex] = attempt;
+        } else {
+            challenge.sessionAttempts.push(attempt);
+        }
+        
+        setActiveChallenge(prev => {
+            if (!prev) return null;
+            return { ...prev, sessionAttempts: challenge.sessionAttempts || [] };
+        });
+    
+        handleUpdateStudentProgress(newProgress, studentProgress);
+    };
+
     const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[], isCatchUp: boolean = false) => {
         if (!activeChallenge || !studentProgress) return;
 
@@ -218,8 +246,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             }
         }
         
-        setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
         handleUpdateStudentProgress(newProgress, studentProgress);
+    };
+
+    const handleNavigateToDailyChallengeResults = () => {
+        if (!activeChallenge) return;
+        setDailyChallengeResults({ 
+            questions: activeChallenge.questions, 
+            sessionAttempts: activeChallenge.sessionAttempts 
+        });
         setView('daily_challenge_results');
         setActiveChallenge(null);
     };
@@ -377,15 +412,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={(_, attempt) => {
-                        setActiveChallenge(prev => {
-                            if(!prev) return null;
-                            const updatedChallenge = {...prev};
-                            if (!updatedChallenge.sessionAttempts) updatedChallenge.sessionAttempts = [];
-                            updatedChallenge.sessionAttempts.push(attempt);
-                            return updatedChallenge;
-                        });
-                    }}
+                    onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
                     handleGameComplete={(gameId) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -396,6 +423,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         FirebaseService.createReportNotification(allSubjects.find(s=>s.id === subjectId)!.teacherId, user, allSubjects.find(s => s.id === subjectId)!.name, selectedSubtopic?.name || selectedTopic!.name, (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A', reason);
                     }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
+                    onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
                     onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
                     onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
                     onDeleteQuiz={(quizId) => {

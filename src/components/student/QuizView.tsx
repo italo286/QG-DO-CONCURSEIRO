@@ -110,8 +110,9 @@ export const QuizView: React.FC<{
     isDailyChallenge?: boolean;
     dailyChallengeType?: 'review' | 'glossary' | 'portuguese';
     hideBackButtonOnResults?: boolean;
+    onNavigateToDailyChallengeResults?: () => void;
 }> = ({ 
-    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion
+    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion, onNavigateToDailyChallengeResults
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -139,7 +140,6 @@ export const QuizView: React.FC<{
     const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
     const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
     
-    // New state for motivational messages
     const [motivationalMessage, setMotivationalMessage] = useState<string | null>(null);
     const [thresholdsMet, setThresholdsMet] = useState<Set<number>>(new Set());
 
@@ -177,9 +177,9 @@ export const QuizView: React.FC<{
             setSessionAttempts(initialAttempts);
             setShowResults(false);
             setSelectedOption(null);
-            setHasCompleted(false);
+            setHasCompleted(initialAttempts.length === questions.length);
             setTimeLeft(durationInSeconds);
-            setCurrentIndex(0);
+            setCurrentIndex(initialAttempts.length < questions.length ? initialAttempts.length : 0);
             setReportedQuestions(new Set());
             setThresholdsMet(new Set());
             setMotivationalMessage(null);
@@ -196,9 +196,14 @@ export const QuizView: React.FC<{
     }, [motivationalMessage]);
 
     useEffect(() => {
-        if (durationInSeconds !== undefined && !showResults) {
+        if (durationInSeconds !== undefined && !showResults && !hasCompleted) {
             if (timeLeft === 0) {
-                setShowResults(true);
+                 if (isDailyChallenge) {
+                    onComplete(sessionAttempts);
+                    setHasCompleted(true);
+                } else {
+                    setShowResults(true);
+                }
                 return;
             }
             const timer = setInterval(() => {
@@ -206,7 +211,7 @@ export const QuizView: React.FC<{
             }, 1000);
             return () => clearInterval(timer);
         }
-    }, [timeLeft, durationInSeconds, showResults]);
+    }, [timeLeft, durationInSeconds, showResults, hasCompleted, isDailyChallenge, onComplete, sessionAttempts]);
 
     useEffect(() => {
         if (showResults && !hasCompleted) {
@@ -218,6 +223,7 @@ export const QuizView: React.FC<{
     const questionToDisplay = questions[currentIndex];
     const attemptForCurrentQuestion = sessionAttempts.find(a => a.questionId === questionToDisplay?.id);
     const isCurrentQuestionAnswered = !!attemptForCurrentQuestion;
+    const isLastQuestion = currentIndex === questions.length - 1;
 
     const handleRespond = () => {
         if (!selectedOption || !questionToDisplay || isCurrentQuestionAnswered) return;
@@ -229,7 +235,8 @@ export const QuizView: React.FC<{
             isCorrect: isCorrect,
         };
         
-        setSessionAttempts(prev => [...prev, newAttempt]);
+        const updatedAttempts = [...sessionAttempts, newAttempt];
+        setSessionAttempts(updatedAttempts);
         onSaveAttempt(newAttempt);
         
         setMotivationalMessage(null);
@@ -277,13 +284,18 @@ export const QuizView: React.FC<{
         } else {
             setComboStreak(0);
         }
+
+        if (isLastQuestion) {
+            onComplete(updatedAttempts);
+            setHasCompleted(true);
+        }
     };
 
     const handleNext = () => {
         setSelectedOption(null);
         setEliminatedOptions(new Set());
         setMotivationalMessage(null);
-        if (currentIndex < questions.length - 1) {
+        if (!isLastQuestion) {
             setCurrentIndex(prev => prev + 1);
         } else {
             setShowResults(true);
@@ -579,7 +591,7 @@ export const QuizView: React.FC<{
                 {imageUrl && <img src={imageUrl} alt="Imagem da questão" className="max-h-60 w-auto rounded-lg mx-auto mb-4"/>}
                 
                 {isDailyChallenge && dailyChallengeType === 'review' && questionToDisplay.subjectName && questionToDisplay.topicName && (
-                    <div className="mb-2 text-xs text-gray-400 font-semibold uppercase tracking-wider">
+                    <div className="mb-4 text-base font-bold text-cyan-300">
                         {questionToDisplay.subjectName} &gt; {questionToDisplay.topicName}
                     </div>
                 )}
@@ -660,29 +672,34 @@ export const QuizView: React.FC<{
                     </div>
                 )}
 
-                <div className="flex justify-center items-center mt-6 space-x-4">
-                    {!showResults && (
-                        <Button
-                            onClick={handleGoToLastAnswered}
-                            disabled={sessionAttempts.length === 0}
-                            className="bg-gray-600 hover:bg-gray-500 text-sm py-2 px-4"
-                            title="Ir para a última questão respondida"
-                        >
-                            Última Respondida
-                        </Button>
-                    )}
-                    <Button onClick={handlePrevious} disabled={currentIndex === 0} className="bg-gray-600 hover:bg-gray-500">
-                        <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
-                    </Button>
-                    {!isCurrentQuestionAnswered ? (
-                        <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
+                <div className="mt-6">
+                    {hasCompleted && isDailyChallenge ? (
+                        <div className="text-center mt-6 flex justify-center flex-wrap gap-2">
+                            <p className="w-full text-green-400 font-semibold mb-2">Desafio Concluído!</p>
+                            <Button onClick={onNavigateToDailyChallengeResults}>Ver Resumo Final</Button>
+                            <Button onClick={onBack} className="bg-gray-600 hover:bg-gray-500">Voltar ao Painel</Button>
+                        </div>
                     ) : (
-                        <Button onClick={handleNext}>
-                            {currentIndex === questions.length - 1 ? 'Ver Resultados' : 'Próxima'}
-                        </Button>
+                        <div className="flex justify-center items-center mt-6 space-x-4">
+                            {!showResults && (
+                                <Button onClick={handleGoToLastAnswered} disabled={sessionAttempts.length === 0} className="bg-gray-600 hover:bg-gray-500 text-sm py-2 px-4" title="Ir para a última questão respondida">
+                                    Última Respondida
+                                </Button>
+                            )}
+                            <Button onClick={handlePrevious} disabled={currentIndex === 0} className="bg-gray-600 hover:bg-gray-500">
+                                <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
+                            </Button>
+                            {!isCurrentQuestionAnswered ? (
+                                <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
+                            ) : (
+                                <Button onClick={handleNext}>
+                                    {isLastQuestion ? 'Ver Resultados' : 'Próxima'}
+                                </Button>
+                            )}
+                        </div>
                     )}
                 </div>
-                
+
                 {isCurrentQuestionAnswered && (
                     <div className="mt-6 p-4 bg-gray-900/50 rounded-lg animate-fade-in">
                         <p className={`font-bold text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
