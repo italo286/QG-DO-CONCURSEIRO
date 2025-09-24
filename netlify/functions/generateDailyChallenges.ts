@@ -112,43 +112,69 @@ const initializeServices = () => {
 export const handler: Handler = async (event) => {
     const today = new Date();
     const dateISO = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-    console.log(`[HANDLER] Running for date: ${dateISO}`);
+    console.log(`[HANDLER_START] Running for date: ${dateISO}`);
 
     try {
         // 1. Inicialização e Autenticação
+        console.log("[INIT] Initializing services...");
         initializeServices();
+        console.log("[INIT] Services initialized successfully.");
 
         const secretKey = DAILY_CHALLENGE_API_KEY;
-        if (!secretKey) throw new Error("Server configuration error: Missing trigger secret key.");
+        if (!secretKey) {
+            console.error("[AUTH_FAIL] Server configuration error: Missing trigger secret key.");
+            throw new Error("Server configuration error: Missing trigger secret key.");
+        }
         if (event.queryStringParameters?.apiKey !== secretKey) {
+            console.error("[AUTH_FAIL] Unauthorized access attempt.");
             return { statusCode: 401, body: "Unauthorized" };
         }
-        console.log("[AUTH] API Key validated.");
+        console.log("[AUTH_SUCCESS] API Key validated.");
         
         const db = admin.firestore();
         const geminiApiKey = GEMINI_API_KEY || VITE_GEMINI_API_KEY;
         const ai = new GoogleGenAI({ apiKey: geminiApiKey! });
 
-        // 2. Coleta de Dados Globais (Otimizada)
+        // 2. Coleta de Dados Globais (Otimizada e Robustecida)
         console.log("[DATA] Fetching subjects and students...");
         const subjectsSnapshot = await db.collection('subjects').get();
         const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
-        const allQuestionsWithContext = allSubjects.flatMap(subject =>
-            subject.topics.flatMap(topic => [
-                ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
-                ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
-                ...topic.subtopics.flatMap(st => [
-                    ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
-                    ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
-                ])
-            ])
-        );
+        
+        // FIX: Added defensive checks to prevent crashes from malformed Firestore data.
+        const allQuestionsWithContext = allSubjects.flatMap(subject => {
+            if (!subject.topics || !Array.isArray(subject.topics)) {
+                console.warn(`[DATA_WARN] Subject ${subject.id} ('${subject.name}') has missing or invalid 'topics' array.`);
+                return [];
+            }
+            return subject.topics.flatMap(topic => {
+                if (!topic) return [];
+                const topicQuestions = (topic.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id }));
+                const tecQuestions = (topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id }));
+                
+                if (!topic.subtopics || !Array.isArray(topic.subtopics)) {
+                     console.warn(`[DATA_WARN] Topic ${topic.id} in Subject ${subject.id} has missing or invalid 'subtopics' array.`);
+                     return [...topicQuestions, ...tecQuestions];
+                }
+
+                const subtopicQuestions = topic.subtopics.flatMap(st => {
+                    if (!st) return [];
+                    const stQuestions = (st.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id }));
+                    const stTecQuestions = (st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id }));
+                    return [...stQuestions, ...stTecQuestions];
+                });
+                
+                return [...topicQuestions, ...tecQuestions, ...subtopicQuestions];
+            });
+        });
 
         const studentsSnapshot = await db.collection('users').where('role', '==', 'aluno').get();
         const allStudents = studentsSnapshot.docs.map(doc => doc.id);
 
         console.log(`[DATA] Found ${allStudents.length} students.`);
-        if (allStudents.length === 0) return { statusCode: 200, body: "No students to process." };
+        if (allStudents.length === 0) {
+            console.log("[PROCESS] No students to process. Exiting.");
+            return { statusCode: 200, body: "No students to process." };
+        }
 
         // 3. Processamento de Alunos em Paralelo
         console.log(`[PROCESS] Starting parallel processing for ${allStudents.length} students...`);
@@ -204,14 +230,22 @@ export const handler: Handler = async (event) => {
                 const glossaryMode = progress.glossaryChallengeMode || 'standard';
                 const glossaryQuestionCount = progress.glossaryChallengeQuestionCount || 5;
                 
-                const allGlossaryTermsWithContext = allSubjects.flatMap(subject =>
-                    subject.topics.flatMap(topic => [
-                        ...(topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id })),
-                        ...topic.subtopics.flatMap(subtopic =>
-                            (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
-                        )
-                    ])
-                );
+                // FIX: Added defensive checks to glossary term collection
+                const allGlossaryTermsWithContext = allSubjects.flatMap(subject => {
+                    if (!subject.topics || !Array.isArray(subject.topics)) return [];
+                    return subject.topics.flatMap(topic => {
+                        if (!topic) return [];
+                        const topicGlossary = (topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id }));
+                        if (!topic.subtopics || !Array.isArray(topic.subtopics)) return [...topicGlossary];
+
+                        const subtopicGlossary = topic.subtopics.flatMap(subtopic => {
+                            if (!subtopic) return [];
+                            return (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
+                        });
+
+                        return [...topicGlossary, ...subtopicGlossary];
+                    })
+                });
 
                 let candidateTerms: GlossaryTerm[] = allGlossaryTermsWithContext;
 
@@ -326,7 +360,9 @@ export const handler: Handler = async (event) => {
             }
         });
         
+        console.log("[PROCESS] All student promises created. Awaiting settlement...");
         const results = await Promise.allSettled(studentProcessingPromises);
+        console.log("[PROCESS] All promises settled.");
         
         // 4. Commit das Alterações
         const batch = db.batch();
@@ -347,8 +383,9 @@ export const handler: Handler = async (event) => {
             console.log("[FIRESTORE] Batch commit successful.");
         }
 
-        console.log(`[HANDLER] Execution finished. Successful updates: ${successfulUpdates}/${allStudents.length}`);
-        return { statusCode: 200, body: JSON.stringify({ message: `Processed ${successfulUpdates}/${allStudents.length} students.` }) };
+        const successMessage = `Execution finished successfully. Daily challenges generated for ${successfulUpdates}/${allStudents.length} students.`;
+        console.log(`[HANDLER_END] ${successMessage}`);
+        return { statusCode: 200, body: JSON.stringify({ message: successMessage }) };
 
     } catch (error: any) {
         console.error("[FATAL_HANDLER_ERROR]", { message: error.message, stack: error.stack });
