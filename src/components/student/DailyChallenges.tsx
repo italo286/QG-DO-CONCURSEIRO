@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon } from '../Icons';
+import { TranslateIcon, FireIcon, CycleIcon, TagIcon } from '../Icons';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
