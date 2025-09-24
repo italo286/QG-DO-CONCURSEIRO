@@ -584,14 +584,16 @@ export const QuizView: React.FC<{
                     </div>
                 )}
 
-                {dailyChallengeType !== 'portuguese' && (
+                {dailyChallengeType === 'portuguese' ? (
+                     <div className="prose prose-invert max-w-none mb-4 text-center italic p-4 bg-gray-800/50 rounded-lg" dangerouslySetInnerHTML={{ __html: markdownToHtml(statement) }}></div>
+                ) : (
                     <div className="prose prose-invert max-w-none mb-4" dangerouslySetInnerHTML={{ __html: markdownToHtml(statement) }}></div>
                 )}
 
                 {dailyChallengeType === 'portuguese' ? (
                     <div className="text-lg leading-relaxed my-4 p-4 bg-gray-900/50 rounded-lg">
-                        <p className="text-sm text-gray-400 mb-2">Clique no trecho que contém o erro gramatical:</p>
-                        <div className="flex flex-wrap gap-x-2 gap-y-2 items-center">
+                        <p className="text-sm text-gray-400 mb-2">Na frase acima, clique no trecho que contém o erro gramatical:</p>
+                        <div className="flex flex-wrap gap-x-2 gap-y-2 items-center justify-center">
                             {(options || []).map((option, i) => {
                                 const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion.selectedAnswer === option : selectedOption === option;
                                 const isTheCorrectAnswer = correctAnswer === option;
