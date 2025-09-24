@@ -224,7 +224,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     };
     
     const startDailyChallenge = (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp = false) => {
-        if (challenge && challenge.items.length > 0) {
+        if (challenge && challenge.items && challenge.items.length > 0) {
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');

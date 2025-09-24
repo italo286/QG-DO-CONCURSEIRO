@@ -451,7 +451,7 @@ export const QuizView: React.FC<{
                                     <div key={question.id} className="p-4 bg-gray-900/50 rounded-lg space-y-2">
                                         <div className="font-semibold" dangerouslySetInnerHTML={{ __html: markdownToHtml(question.statement) }} />
                                         <ul className="space-y-1 text-sm">
-                                            {question.options.map(option => {
+                                            {(question.options || []).map(option => {
                                                 const isSelected = attempt.selectedAnswer === option;
                                                 const isCorrect = question.correctAnswer === option;
                                                 const justifications = fetchedJustifications[question.id] || question.optionJustifications;
@@ -592,7 +592,7 @@ export const QuizView: React.FC<{
                     <div className="text-lg leading-relaxed my-4 p-4 bg-gray-900/50 rounded-lg">
                         <p className="text-sm text-gray-400 mb-2">Clique no trecho que contém o erro gramatical:</p>
                         <div className="flex flex-wrap gap-x-2 gap-y-2 items-center">
-                            {options.map((option, i) => {
+                            {(options || []).map((option, i) => {
                                 const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion.selectedAnswer === option : selectedOption === option;
                                 const isTheCorrectAnswer = correctAnswer === option;
                                 const colorIndex = i % PORTUGUESE_HIGHLIGHT_COLORS.length;
@@ -629,7 +629,7 @@ export const QuizView: React.FC<{
                     </div>
                 ) : (
                     <div className="space-y-3">
-                        {options.map((option, i) => {
+                        {(options || []).map((option, i) => {
                             const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion.selectedAnswer === option : selectedOption === option;
                             const isCorrectAnswer = correctAnswer === option;
                             const colorIndex = i % HIGHLIGHT_COLORS.length;
@@ -690,7 +690,7 @@ export const QuizView: React.FC<{
                         </p>
                          {currentJustifications ? (
                             <div className="mt-2 space-y-3">
-                                {options.map((option, i) => {
+                                {(options || []).map((option, i) => {
                                     const isCorrectAnswer = correctAnswer === option;
                                     const justificationText = currentJustifications[option];
                                     return (
