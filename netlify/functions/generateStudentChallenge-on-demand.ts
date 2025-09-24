@@ -36,8 +36,7 @@ const getEnrolledSubjects = async (studentId: string): Promise<Subject[]> => {
     if (coursesSnap.empty) return [];
 
     const courses = coursesSnap.docs.map(doc => doc.data() as Course);
-    // FIX: Replaced `flatMap` with `reduce` to ensure correct type inference for `allSubjectIds` as `string[]`, resolving a TypeScript error where it was being inferred as `unknown[]`.
-    const allSubjectIds = [...new Set(courses.reduce((acc, c) => acc.concat((c.disciplines || []).map(d => d.subjectId)), [] as string[]))];
+    const allSubjectIds = [...new Set(courses.flatMap(c => c.disciplines.map(d => d.subjectId)))];
     
     if (allSubjectIds.length === 0) return [];
     
