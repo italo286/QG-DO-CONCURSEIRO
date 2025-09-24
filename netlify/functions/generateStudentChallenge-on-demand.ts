@@ -129,89 +129,133 @@ const shuffleArray = <T>(array: T[]): T[] => {
 
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
+    const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
 
-    // 1. Identify weak topics (lowest scores)
-    const topicScores: { topicId: string; subjectId: string; score: number }[] = [];
-    Object.entries(studentProgress.progressByTopic).forEach(([subjectId, topics]) => {
-        Object.entries(topics).forEach(([topicId, progress]) => {
-            if (progress && typeof progress.score === 'number') {
-                topicScores.push({ topicId, subjectId, score: progress.score });
+    // 1. Get all questions from all enrolled subjects, with context
+    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; topicName: string, subjectName: string })[] = [];
+    subjects.forEach(subject => {
+        subject.topics.forEach(topic => {
+            const addQuestions = (content: Topic | SubTopic, topicName: string) => {
+                const questions = [...(content.questions || []), ...(content.tecQuestions || [])];
+                questions.forEach(q => {
+                    allQuestionsWithContext.push({
+                        ...q,
+                        subjectId: subject.id,
+                        topicId: content.id,
+                        topicName: topicName,
+                        subjectName: subject.name
+                    });
+                });
+            };
+            addQuestions(topic, topic.name);
+            topic.subtopics.forEach(subtopic => addQuestions(subtopic, `${topic.name} / ${subtopic.name}`));
+        });
+    });
+
+    if (allQuestionsWithContext.length === 0) return [];
+
+    // 2. Create sets of question IDs based on student's history
+    const attemptedIds = new Set<string>();
+    const correctIds = new Set<string>();
+    const incorrectIds = new Set<string>();
+
+    Object.values(studentProgress.progressByTopic).forEach(subjectProgress => {
+        Object.values(subjectProgress).forEach(topicProgress => {
+            (topicProgress.lastAttempt || []).forEach(attempt => {
+                attemptedIds.add(attempt.questionId);
+                if (attempt.isCorrect) {
+                    correctIds.add(attempt.questionId);
+                } else {
+                    incorrectIds.add(attempt.questionId);
+                }
+            });
+        });
+    });
+    (studentProgress.reviewSessions || []).forEach(session => {
+        (session.attempts || []).forEach(attempt => {
+            attemptedIds.add(attempt.questionId);
+            if (attempt.isCorrect) {
+                correctIds.add(attempt.questionId);
+            } else {
+                incorrectIds.add(attempt.questionId);
             }
         });
     });
-
+    
+    // 3. Identify weak topics (lowest scores) for prioritization
+    const topicScores: { topicId: string; score: number }[] = [];
+    Object.entries(studentProgress.progressByTopic).forEach(([, topics]) => {
+        Object.entries(topics).forEach(([topicId, progress]) => {
+            if (progress && typeof progress.score === 'number') {
+                topicScores.push({ topicId, score: progress.score });
+            }
+        });
+    });
     topicScores.sort((a, b) => a.score - b.score);
-    const weakTopicIds = new Set(topicScores.slice(0, 15).map(t => t.topicId));
+    const weakTopicIds = new Set(topicScores.map(t => t.topicId));
 
-    // 2. Build a targeted question bank ONLY from weak topics first.
-    const questionBank: (Question & { subjectName: string, topicName: string })[] = [];
-    
-    subjects.forEach(subject => {
-        subject.topics.forEach(topic => {
-            const addQuestionsToBank = (content: Topic | SubTopic, topicName: string) => {
-                if (weakTopicIds.has(content.id)) {
-                    const questions = [...(content.questions || []), ...(content.tecQuestions || [])];
-                    questions.forEach(q => questionBank.push({ ...q, subjectName: subject.name, topicName }));
-                }
-            };
-            
-            addQuestionsToBank(topic, topic.name);
-            topic.subtopics.forEach(subtopic => addQuestionsToBank(subtopic, `${topic.name} / ${subtopic.name}`));
-        });
+    // 4. Create pools of questions based on type and weakness
+    const pools = {
+        incorrect: allQuestionsWithContext.filter(q => incorrectIds.has(q.id)),
+        unanswered: allQuestionsWithContext.filter(q => !attemptedIds.has(q.id)),
+        correct: allQuestionsWithContext.filter(q => correctIds.has(q.id)),
+        all: allQuestionsWithContext
+    };
+
+    // Prioritize questions from weak topics within each pool
+    const prioritizeByWeakness = (pool: (typeof allQuestionsWithContext)) => {
+        const weak = pool.filter(q => weakTopicIds.has(q.topicId));
+        const other = pool.filter(q => !weakTopicIds.has(q.topicId));
+        return shuffleArray([...weak, ...other]);
+    };
+
+    Object.keys(pools).forEach(key => {
+        pools[key as keyof typeof pools] = prioritizeByWeakness(pools[key as keyof typeof pools]);
     });
-    
-    // 3. If targeted bank is too small, supplement with random questions
-    if (questionBank.length < questionCount) {
-        const allQuestionsFromSubjects: (Question & { subjectName: string, topicName: string })[] = [];
-        subjects.forEach(subject => {
-            subject.topics.forEach(topic => {
-                const baseTopicName = topic.name;
-                [...(topic.questions || []), ...(topic.tecQuestions || [])].forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: baseTopicName }));
-                topic.subtopics.forEach(subtopic => {
-                    const fullTopicName = `${baseTopicName} / ${subtopic.name}`;
-                    [...(subtopic.questions || []), ...(subtopic.tecQuestions || [])].forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: fullTopicName }));
-                });
-            });
-        });
 
-        const existingIds = new Set(questionBank.map(q => q.id));
-        const randomQuestions = shuffleArray(allQuestionsFromSubjects.filter(q => !existingIds.has(q.id)));
-        const needed = questionCount - questionBank.length;
-        questionBank.push(...randomQuestions.slice(0, needed));
-    }
+    // 5. Build the final quiz
+    const finalQuestions: Question[] = [];
+    const usedIds = new Set<string>();
 
-    if (questionBank.length === 0) {
-        console.warn("No questions found for review challenge for student:", studentProgress.studentId);
-        return [];
-    }
-
-    // 4. Let Gemini choose from a slightly larger, shuffled pool. This prevents sending thousands of questions.
-    const finalQuestionBank = shuffleArray(questionBank).slice(0, questionCount * 4);
-
-    const promptForGemini = `
-        Você é um tutor de IA especialista. Com base no banco de questões fornecido, que é focado nos pontos fracos de um aluno, selecione ${questionCount} questões variadas para uma sessão de revisão.
-        Retorne um array JSON contendo APENAS os ${questionCount} objetos de questão selecionados, seguindo estritamente o schema fornecido.
-
-        Banco de Questões: ${JSON.stringify(finalQuestionBank)}
-    `;
-
-    const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: promptForGemini,
-        config: {
-            responseMimeType: "application/json",
-            responseSchema: questionSchema,
+    const addQuestion = (q: Question) => {
+        if (q && !usedIds.has(q.id)) {
+            finalQuestions.push(q);
+            usedIds.add(q.id);
         }
-    });
+    };
+
+    const fillFromPool = (pool: Question[]) => {
+        for (const q of pool) {
+            if (finalQuestions.length >= questionCount) break;
+            addQuestion(q);
+        }
+    };
     
-    try {
-        const reviewQuestions = JSON.parse(response.text.trim());
-        return shuffleArray(reviewQuestions as Question[]);
-    } catch (e) {
-        console.error("Failed to parse Gemini response for review challenge:", e, "Response text:", response.text);
-        // Fallback: if Gemini fails to produce valid JSON, return a random slice from the bank
-        return shuffleArray(finalQuestionBank).slice(0, questionCount);
+    // Determine the order of pools based on questionType
+    if (questionType === 'incorrect') {
+        fillFromPool(pools.incorrect);
+        fillFromPool(pools.unanswered);
+        fillFromPool(pools.all); // Fallback
+    } else if (questionType === 'unanswered') {
+        fillFromPool(pools.unanswered);
+        fillFromPool(pools.incorrect);
+        fillFromPool(pools.all); // Fallback
+    } else if (questionType === 'correct') {
+        fillFromPool(pools.correct);
+        fillFromPool(pools.unanswered);
+        fillFromPool(pools.incorrect);
+        fillFromPool(pools.all); // Fallback
+    } else { // mixed
+        const mixedPool = shuffleArray([
+            ...pools.incorrect,
+            ...pools.unanswered.slice(0, pools.unanswered.length / 2), // Don't overwhelm with new questions
+            ...pools.correct.slice(0, pools.correct.length / 4) // Few correct questions
+        ]);
+        fillFromPool(mixedPool);
+        fillFromPool(pools.all); // Fallback
     }
+    
+    return finalQuestions.slice(0, questionCount);
 }
 
 
