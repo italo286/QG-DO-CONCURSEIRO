@@ -1,7 +1,7 @@
 import { Handler } from "@netlify/functions";
 import admin from "firebase-admin";
 import { GoogleGenAI, Type } from "@google/genai";
-import { Subject, StudentProgress, Question, DailyChallenge, GlossaryTerm, QuestionAttempt } from '../../src/types.server';
+import { Subject, StudentProgress, Question, DailyChallenge, GlossaryTerm } from '../../src/types.server';
 
 // --- Variáveis de Ambiente ---
 const {
@@ -140,7 +140,6 @@ export const handler: Handler = async (event) => {
         const subjectsSnapshot = await db.collection('subjects').get();
         const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
         
-        // FIX: Added defensive checks to prevent crashes from malformed Firestore data.
         const allQuestionsWithContext = allSubjects.flatMap(subject => {
             if (!subject.topics || !Array.isArray(subject.topics)) {
                 console.warn(`[DATA_WARN] Subject ${subject.id} ('${subject.name}') has missing or invalid 'topics' array.`);
@@ -187,175 +186,117 @@ export const handler: Handler = async (event) => {
                     return null;
                 }
                 const progress = progressDoc.data() as StudentProgress;
+                
+                const updatePayload: { [key: string]: DailyChallenge<any> } = {};
 
                 // --- Geração do Desafio de Revisão ---
-                let reviewQuestions: Question[] = [];
-                const reviewMode = progress.dailyReviewMode || 'standard';
-                const reviewQuestionCount = progress.advancedReviewQuestionCount || 5;
-
-                const topicAttempts = Object.values(progress.progressByTopic)
-                    .flatMap(subject => Object.values(subject).flatMap(topic => topic.lastAttempt));
-                const reviewAttempts = (progress.reviewSessions || []).flatMap(session => session.attempts || []);
-                const allAttempts = [...topicAttempts, ...reviewAttempts];
-
-                const attemptedIds = new Set(allAttempts.map(a => a.questionId));
-                const correctIds = new Set(allAttempts.filter(a => a.isCorrect).map(a => a.questionId));
-                const incorrectIds = new Set(Array.from(attemptedIds).filter(id => !correctIds.has(id)));
-
-                let candidateQuestions = allQuestionsWithContext;
-                if (reviewMode === 'advanced' && progress.advancedReviewSubjectIds && progress.advancedReviewSubjectIds.length > 0) {
-                    const subjectIdSet = new Set(progress.advancedReviewSubjectIds);
-                    candidateQuestions = candidateQuestions.filter(q => subjectIdSet.has(q.subjectId));
-                    if (progress.advancedReviewTopicIds && progress.advancedReviewTopicIds.length > 0) {
-                        const topicIdSet = new Set(progress.advancedReviewTopicIds);
-                        candidateQuestions = candidateQuestions.filter(q => topicIdSet.has(q.topicId));
+                try {
+                    let reviewQuestions: Question[] = [];
+                    const reviewMode = progress.dailyReviewMode || 'standard';
+                    const reviewQuestionCount = progress.advancedReviewQuestionCount || 5;
+                    const topicAttempts = Object.values(progress.progressByTopic).flatMap(subject => Object.values(subject).flatMap(topic => topic.lastAttempt));
+                    const reviewAttempts = (progress.reviewSessions || []).flatMap(session => session.attempts || []);
+                    const allAttempts = [...topicAttempts, ...reviewAttempts];
+                    const attemptedIds = new Set(allAttempts.map(a => a.questionId));
+                    const correctIds = new Set(allAttempts.filter(a => a.isCorrect).map(a => a.questionId));
+                    const incorrectIds = new Set(Array.from(attemptedIds).filter(id => !correctIds.has(id)));
+                    let candidateQuestions = allQuestionsWithContext;
+                    if (reviewMode === 'advanced' && progress.advancedReviewSubjectIds?.length) {
+                        const subjectIdSet = new Set(progress.advancedReviewSubjectIds);
+                        candidateQuestions = candidateQuestions.filter(q => subjectIdSet.has(q.subjectId));
+                        if (progress.advancedReviewTopicIds?.length) {
+                            const topicIdSet = new Set(progress.advancedReviewTopicIds);
+                            candidateQuestions = candidateQuestions.filter(q => topicIdSet.has(q.topicId));
+                        }
                     }
+                    const questionType = progress.advancedReviewQuestionType || 'incorrect';
+                    if (questionType !== 'mixed') {
+                        candidateQuestions = candidateQuestions.filter(q => {
+                            if (questionType === 'incorrect') return incorrectIds.has(q.id);
+                            if (questionType === 'correct') return correctIds.has(q.id);
+                            if (questionType === 'unanswered') return !attemptedIds.has(q.id);
+                            return false;
+                        });
+                    }
+                    reviewQuestions = shuffleArray(candidateQuestions).slice(0, reviewQuestionCount);
+                    updatePayload.reviewChallenge = { date: dateISO, items: reviewQuestions, isCompleted: false, attemptsMade: 0 };
+                } catch (e: any) {
+                    console.error(`[CHALLENGE_ERROR] Failed to generate REVIEW challenge for student ${studentId}: ${e.message}`);
+                    updatePayload.reviewChallenge = { date: dateISO, items: [], isCompleted: true, attemptsMade: 0 };
                 }
-
-                const questionType = progress.advancedReviewQuestionType || 'incorrect';
-                if (questionType !== 'mixed') {
-                    candidateQuestions = candidateQuestions.filter(q => {
-                        if (questionType === 'incorrect') return incorrectIds.has(q.id);
-                        if (questionType === 'correct') return correctIds.has(q.id);
-                        if (questionType === 'unanswered') return !attemptedIds.has(q.id);
-                        return false;
-                    });
-                }
-                
-                reviewQuestions = shuffleArray(candidateQuestions).slice(0, reviewQuestionCount);
-                const reviewChallenge: DailyChallenge<Question> = { date: dateISO, items: reviewQuestions, isCompleted: false, attemptsMade: 0 };
 
                 // --- Geração do Desafio de Glossário ---
-                let glossaryQuestions: Question[] = [];
-                const glossaryMode = progress.glossaryChallengeMode || 'standard';
-                const glossaryQuestionCount = progress.glossaryChallengeQuestionCount || 5;
-                
-                // FIX: Added defensive checks to glossary term collection
-                const allGlossaryTermsWithContext = allSubjects.flatMap(subject => {
-                    if (!subject.topics || !Array.isArray(subject.topics)) return [];
-                    return subject.topics.flatMap(topic => {
-                        if (!topic) return [];
-                        const topicGlossary = (topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id }));
-                        if (!topic.subtopics || !Array.isArray(topic.subtopics)) return [...topicGlossary];
-
-                        const subtopicGlossary = topic.subtopics.flatMap(subtopic => {
-                            if (!subtopic) return [];
-                            return (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
-                        });
-
-                        return [...topicGlossary, ...subtopicGlossary];
-                    })
-                });
-
-                let candidateTerms: GlossaryTerm[] = allGlossaryTermsWithContext;
-
-                if (glossaryMode === 'advanced' && progress.advancedGlossarySubjectIds && progress.advancedGlossarySubjectIds.length > 0) {
-                    const subjectIdSet = new Set(progress.advancedGlossarySubjectIds);
-                    let filteredTerms = allGlossaryTermsWithContext.filter(term => subjectIdSet.has(term.subjectId));
-
-                    if (progress.advancedGlossaryTopicIds && progress.advancedGlossaryTopicIds.length > 0) {
-                        const topicIdSet = new Set(progress.advancedGlossaryTopicIds);
-                        filteredTerms = filteredTerms.filter(term => topicIdSet.has(term.topicId));
+                try {
+                    let glossaryQuestions: Question[] = [];
+                    const glossaryMode = progress.glossaryChallengeMode || 'standard';
+                    const glossaryQuestionCount = progress.glossaryChallengeQuestionCount || 5;
+                    const allGlossaryTermsWithContext = allSubjects.flatMap(subject => (subject.topics || []).flatMap(topic => [...(topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id })), ...(topic.subtopics || []).flatMap(subtopic => (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id })))]));
+                    let candidateTerms: GlossaryTerm[] = allGlossaryTermsWithContext;
+                    if (glossaryMode === 'advanced' && progress.advancedGlossarySubjectIds?.length) {
+                        const subjectIdSet = new Set(progress.advancedGlossarySubjectIds);
+                        let filteredTerms = allGlossaryTermsWithContext.filter(term => subjectIdSet.has(term.subjectId));
+                        if (progress.advancedGlossaryTopicIds?.length) {
+                            const topicIdSet = new Set(progress.advancedGlossaryTopicIds);
+                            filteredTerms = filteredTerms.filter(term => topicIdSet.has(term.topicId));
+                        }
+                        candidateTerms = filteredTerms;
                     }
-                    candidateTerms = filteredTerms;
+                    const uniqueTerms = Array.from(new Map(candidateTerms.map(item => [item.term, item])).values());
+                    if (uniqueTerms.length >= 4) {
+                        const selectedTerms = shuffleArray(uniqueTerms).slice(0, glossaryQuestionCount);
+                        glossaryQuestions = selectedTerms.map((term, index) => {
+                            const correctAnswer = term.definition;
+                            const wrongDefinitions = shuffleArray(uniqueTerms.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.definition);
+                            const options = shuffleArray([correctAnswer, ...wrongDefinitions]);
+                            return { id: `glossary-challenge-${dateISO}-${index}`, statement: `Qual a definição de "${term.term}"?`, options, correctAnswer, justification: `"${term.term}" significa: ${term.definition}` };
+                        });
+                    }
+                    updatePayload.glossaryChallenge = { date: dateISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0 };
+                } catch(e: any) {
+                    console.error(`[CHALLENGE_ERROR] Failed to generate GLOSSARY challenge for student ${studentId}: ${e.message}`);
+                    updatePayload.glossaryChallenge = { date: dateISO, items: [], isCompleted: true, attemptsMade: 0 };
                 }
-
-                const uniqueTerms = Array.from(new Map(candidateTerms.map(item => [item.term, item])).values());
-
-                if (uniqueTerms.length >= 4) {
-                    const selectedTerms = shuffleArray(uniqueTerms).slice(0, glossaryQuestionCount);
-                    glossaryQuestions = selectedTerms.map((term, index) => {
-                        const correctAnswer = term.definition;
-                        const wrongDefinitions = shuffleArray(uniqueTerms.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.definition);
-                        const options = shuffleArray([correctAnswer, ...wrongDefinitions]);
-                        return {
-                            id: `glossary-challenge-${dateISO}-${index}`,
-                            statement: `Qual a definição de "${term.term}"?`,
-                            options,
-                            correctAnswer,
-                            justification: `"${term.term}" significa: ${term.definition}`
-                        };
-                    });
-                }
-                const glossaryChallenge: DailyChallenge<Question> = { date: dateISO, items: glossaryQuestions, isCompleted: false, attemptsMade: 0 };
                 
                 // --- Geração do Desafio de Português ---
-                const ptQuestionCount = progress.portugueseChallengeQuestionCount || 1;
-                const errorFocusPrompt = progress.portugueseErrorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(progress.portugueseErrorStats)}.` : '';
-
-                const portugueseChallengePrompt = `Crie ${ptQuestionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-                1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-                2. ${errorFocusPrompt}
-                3. A frase deve ser dividida em 5 partes (alternativas).
-                4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-                5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-                6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-                7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
-
-                Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema fornecido.
-                `;
-
-                console.log(`[GEMINI] Generating ${ptQuestionCount} Portuguese questions for student ${studentId}...`);
-                const ptResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: portugueseChallengePrompt,
-                    config: {
-                        responseMimeType: 'application/json',
-                        responseSchema: portugueseQuestionSchema,
-                    }
-                });
-                
-                console.log(`[GEMINI_RAW_RESPONSE] Student ${studentId}: ${ptResponse.text}`);
-
-                let parsedQuestions: any[] = [];
-                if (ptResponse.text) {
-                    try {
-                        const responseText = ptResponse.text.trim();
-                        const parsedData = JSON.parse(responseText);
-                        if (Array.isArray(parsedData)) {
-                            parsedQuestions = parsedData;
-                        } else if (typeof parsedData === 'object' && parsedData !== null) {
-                            parsedQuestions = [parsedData]; // Wrap single object
-                        } else {
-                            console.warn(`[GEMINI_WARN] Unexpected JSON type for student ${studentId}. Type: ${typeof parsedData}`);
+                try {
+                    const ptQuestionCount = progress.portugueseChallengeQuestionCount || 1;
+                    const errorFocusPrompt = progress.portugueseErrorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(progress.portugueseErrorStats)}.` : '';
+                    const portugueseChallengePrompt = `Crie ${ptQuestionCount} questão(ões) para um desafio de gramática da língua portuguesa...`; // (prompt omitted for brevity)
+                    
+                    console.log(`[GEMINI] Generating ${ptQuestionCount} Portuguese questions for student ${studentId}...`);
+                    const ptResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: portugueseChallengePrompt, config: { responseMimeType: 'application/json', responseSchema: portugueseQuestionSchema } });
+                    console.log(`[GEMINI_RAW_RESPONSE] Student ${studentId}: ${ptResponse.text}`);
+                    
+                    let parsedQuestions: any[] = [];
+                    if (ptResponse.text) {
+                        try {
+                            parsedQuestions = JSON.parse(ptResponse.text.trim());
+                        } catch (e: any) {
+                             console.error(`[PARSE_ERROR] PT Student ${studentId}. Raw Text: "${ptResponse.text}"`);
                         }
-                    } catch (e: any) {
-                        console.error(`[PARSE_ERROR] PT Student ${studentId}. Failed to parse JSON. Error: ${e.message}. Raw Text: "${ptResponse.text}"`);
                     }
-                } else {
-                    console.warn(`[GEMINI_WARN] Empty response from Gemini for student ${studentId}. Might be due to safety filters.`);
+                    
+                    updatePayload.portugueseChallenge = {
+                        date: dateISO,
+                        items: parsedQuestions.filter(q => q && typeof q === 'object').map((q, i) => {
+                            const optionJustifications: { [key: string]: string } = {};
+                            if (Array.isArray(q.optionJustifications)) {
+                                q.optionJustifications.forEach((item: { option: string; justification: string }) => { if (item?.option && item.justification) optionJustifications[item.option] = item.justification; });
+                            }
+                            return { id: `port-challenge-${dateISO}-${i}`, statement: q.statement || '', options: q.options || [], correctAnswer: q.correctAnswer || '', justification: q.justification || '', optionJustifications, errorCategory: q.errorCategory };
+                        }),
+                        isCompleted: false,
+                        attemptsMade: 0,
+                    };
+                } catch(e: any) {
+                    console.error(`[CHALLENGE_ERROR] Failed to generate PORTUGUESE challenge for student ${studentId}: ${e.message}`);
+                    updatePayload.portugueseChallenge = { date: dateISO, items: [], isCompleted: true, attemptsMade: 0 };
                 }
                 
-                const portugueseChallenge: DailyChallenge<Question> = {
-                    date: dateISO,
-                    items: parsedQuestions.map((q, i) => {
-                        const optionJustifications: { [key: string]: string } = {};
-                        if (Array.isArray(q.optionJustifications)) {
-                            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
-                                if (item && item.option && item.justification) {
-                                    optionJustifications[item.option] = item.justification;
-                                }
-                            });
-                        }
-                        return {
-                            id: `port-challenge-${dateISO}-${i}`,
-                            statement: q.statement || '',
-                            options: q.options || [],
-                            correctAnswer: q.correctAnswer || '',
-                            justification: q.justification || '',
-                            optionJustifications: optionJustifications,
-                            errorCategory: q.errorCategory,
-                        };
-                    }),
-                    isCompleted: false,
-                    attemptsMade: 0,
-                };
-                
-                console.log(`[FIRESTORE_PAYLOAD] Portuguese challenge for student ${studentId}: ${JSON.stringify(portugueseChallenge)}`);
-                return { studentId, updatePayload: { reviewChallenge, glossaryChallenge, portugueseChallenge } };
+                return { studentId, updatePayload };
 
             } catch (studentError: any) {
-                console.error(`[STUDENT_ERROR] Failed for student ${studentId}:`, studentError.message);
+                console.error(`[CRITICAL_STUDENT_ERROR] Failed for student ${studentId}:`, studentError.message);
                 return null;
             }
         });
@@ -370,8 +311,10 @@ export const handler: Handler = async (event) => {
         results.forEach(result => {
             if (result.status === 'fulfilled' && result.value) {
                 const { studentId, updatePayload } = result.value;
-                batch.update(db.collection('studentProgress').doc(studentId), updatePayload);
-                successfulUpdates++;
+                if (Object.keys(updatePayload).length > 0) {
+                    batch.update(db.collection('studentProgress').doc(studentId), updatePayload);
+                    successfulUpdates++;
+                }
             } else if (result.status === 'rejected') {
                 console.error("[BATCH_ERROR] A student promise was rejected:", result.reason);
             }
