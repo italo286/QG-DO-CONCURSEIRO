@@ -130,77 +130,73 @@ const shuffleArray = <T>(array: T[]): T[] => {
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
 
-    // 1. Get all topic progress data with scores
-    const topicScores: { topicId: string; subjectId: string; score: number }[] = [];
+    // 1. Identify Weak Topics in Code
+    const topicScores: { topicId: string, subjectId: string, score: number }[] = [];
     for (const subjectId in studentProgress.progressByTopic) {
         for (const topicId in studentProgress.progressByTopic[subjectId]) {
-            const topicProgress = studentProgress.progressByTopic[subjectId][topicId];
-            if (topicProgress && typeof topicProgress.score === 'number') {
-                topicScores.push({ topicId, subjectId, score: topicProgress.score });
+            const progress = studentProgress.progressByTopic[subjectId][topicId];
+            if (!progress.completed || progress.score < 0.8) { // Focus on incomplete or <80% score
+                topicScores.push({
+                    topicId: topicId.replace('-tec', ''), // Use original topic ID for lookups
+                    subjectId,
+                    score: progress.score,
+                });
             }
         }
     }
 
-    // 2. Identify weak topics (lowest scores)
+    // Sort by score (ascending) and take the weakest ones. Let's take up to 10.
     topicScores.sort((a, b) => a.score - b.score);
-    const weakTopics = topicScores.slice(0, 10); // Take the 10 weakest topics
-    const weakTopicIds = new Set(weakTopics.map(t => t.topicId));
+    const weakestTopics = topicScores.slice(0, 10);
+    const weakestTopicIds = new Set(weakestTopics.map(t => t.topicId));
 
-    const allQuestionsFromSubjects: (Question & { subjectName: string, topicName: string })[] = [];
+    // 2. Build a Focused Question Bank
+    const questionBank: (Question & {subjectName: string, topicName: string})[] = [];
     subjects.forEach(subject => {
         subject.topics.forEach(topic => {
-            const baseTopicName = topic.name;
-            topic.questions.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: baseTopicName }));
-            topic.tecQuestions?.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: baseTopicName }));
+            if (weakestTopicIds.has(topic.id)) {
+                topic.questions.forEach(q => questionBank.push({ ...q, subjectName: subject.name, topicName: topic.name }));
+            }
             topic.subtopics.forEach(subtopic => {
-                const fullTopicName = `${baseTopicName} / ${subtopic.name}`;
-                subtopic.questions.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: fullTopicName }));
-                subtopic.tecQuestions?.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: fullTopicName }));
+                if (weakestTopicIds.has(subtopic.id)) {
+                    subtopic.questions.forEach(q => questionBank.push({ ...q, subjectName: subject.name, topicName: `${topic.name} / ${subtopic.name}` }));
+                }
             });
         });
     });
 
-    if (allQuestionsFromSubjects.length === 0) return [];
-    
-    // 3. Filter question bank to only include questions from weak topics, or fallback
-    let questionBank = allQuestionsFromSubjects.filter(q => weakTopicIds.has(q.id));
-    
-    // Fallback if no progress or if weak topics have no questions
-    if (questionBank.length < questionCount) {
-        const randomQuestions = shuffleArray(allQuestionsFromSubjects.filter(q => !questionBank.some(qb => qb.id === q.id)));
-        const needed = questionCount - questionBank.length;
-        questionBank.push(...randomQuestions.slice(0, needed));
+    // If there are no weak topics with questions, fall back to a random selection to avoid errors.
+    if (questionBank.length === 0) {
+        const fallbackBank: Question[] = [];
+        subjects.forEach(s => s.topics.forEach(t => {
+            fallbackBank.push(...t.questions);
+            t.subtopics.forEach(st => fallbackBank.push(...st.questions));
+        }));
+        if (fallbackBank.length === 0) return [];
+        return shuffleArray(fallbackBank).slice(0, questionCount);
     }
     
-    if (questionBank.length === 0) return [];
+    // Ensure we have enough questions to choose from, if not, just return what we have, shuffled.
+    if (questionBank.length <= questionCount) {
+        return shuffleArray(questionBank);
+    }
 
-    // 4. Create a summarized version of student progress
-    const summarizedProgress: any = {
-        weakTopics: {},
-        recentIncorrectAttempts: []
-    };
-    weakTopics.forEach(t => {
-        summarizedProgress.weakTopics[t.topicId] = studentProgress.progressByTopic[t.subjectId][t.topicId];
-    });
+    // 3. Summarize Student Progress
+    const progressSummary = weakestTopics.map(({ topicId, subjectId, score }) => ({
+        topicId,
+        subjectId,
+        score
+    }));
 
-    const allAttempts = [
-        ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt || [])),
-        ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || [])
-    ];
-    summarizedProgress.recentIncorrectAttempts = allAttempts.filter(a => !a.isCorrect).slice(-20); // Last 20 incorrect
-
+    // 4. Construct a Smaller, More Efficient Prompt
     const prompt = `
-        Você é um tutor de IA especialista em preparação para concursos. Sua tarefa é criar uma sessão de revisão inteligente e personalizada para um aluno.
-        Abaixo estão os dados:
-        1. 'summarizedProgress': Contém o desempenho do aluno nos seus tópicos mais fracos e seus erros recentes.
-        2. 'questionBank': Uma lista de questões focada APENAS nesses tópicos fracos (ou uma seleção geral se não houver dados de progresso).
-
-        Selecione um conjunto de ${questionCount} questões do 'questionBank' que reforcem os pontos fracos do aluno. Varie os tópicos se possível.
-        Retorne um array JSON contendo APENAS os ${questionCount} objetos de questão selecionados, seguindo estritamente o schema fornecido.
-
-        ### DADOS ###
-        'summarizedProgress': ${JSON.stringify(summarizedProgress)}
+        Você é um tutor de IA especialista. Selecione ${questionCount} questões de revisão do 'questionBank' fornecido.
+        Foque nas questões dos tópicos onde o aluno tem pior desempenho, conforme indicado no 'progressSummary'.
+        
+        'progressSummary': ${JSON.stringify(progressSummary)}
         'questionBank': ${JSON.stringify(questionBank)}
+        
+        Retorne um array JSON com os ${questionCount} objetos de questão selecionados, seguindo estritamente o schema.
     `;
 
     const response: GenerateContentResponse = await ai.models.generateContent({
@@ -212,10 +208,23 @@ async function generateReviewChallenge(studentProgress: StudentProgress, subject
         }
     });
     
-    const reviewQuestions = JSON.parse(response.text.trim());
-    return shuffleArray(reviewQuestions as Question[]);
+    const responseText = response.text.trim();
+    if (!responseText) {
+        console.error("Gemini API returned an empty response for review challenge.");
+        // Fallback: return random questions from the focused bank if AI fails
+        return shuffleArray(questionBank).slice(0, questionCount);
+    }
+    
+    try {
+        const reviewQuestions = JSON.parse(responseText);
+        return reviewQuestions as Question[];
+    } catch (e) {
+        console.error("Error parsing Gemini response for review challenge:", e);
+        console.error("Response text was:", responseText);
+        // Fallback on JSON parse error
+        return shuffleArray(questionBank).slice(0, questionCount);
+    }
 }
-
 
 const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: Subject[]): Question[] => {
     const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
