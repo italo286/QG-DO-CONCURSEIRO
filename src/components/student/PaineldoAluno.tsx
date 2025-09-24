@@ -58,6 +58,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
+    const [isGeneratingChallenge, setIsGeneratingChallenge] = useState({ review: false, glossary: false, portuguese: false });
 
     const {
         isLoading,
@@ -231,6 +232,45 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         }
     };
 
+    const handleGenerateDailyChallenge = async (type: 'review' | 'glossary' | 'portuguese') => {
+        if (isPreview || !studentProgress) return;
+
+        setIsGeneratingChallenge(prev => ({ ...prev, [type]: true }));
+        try {
+            const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
+            const response = await fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
+
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`O servidor respondeu com o status: ${response.status}. Detalhes: ${errorBody}`);
+            }
+            
+            const items: Question[] = await response.json();
+            const todayISO = getLocalDateISOString(getBrasiliaDate());
+
+            const newChallenge: DailyChallenge<Question> = {
+                date: todayISO,
+                items,
+                isCompleted: false,
+                attemptsMade: 0
+            };
+            
+            const challengeKey = `${type}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+            const newProgress = {
+                ...studentProgress,
+                [challengeKey]: newChallenge
+            };
+
+            handleUpdateStudentProgress(newProgress, studentProgress);
+
+        } catch (error) {
+            console.error(`Error generating ${type} challenge:`, error);
+            alert(`Não foi possível gerar o desafio de ${type}. Tente novamente.`);
+        } finally {
+            setIsGeneratingChallenge(prev => ({ ...prev, [type]: false }));
+        }
+    };
+
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
 
@@ -250,6 +290,8 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
+                    onGenerateChallenge={handleGenerateDailyChallenge}
+                    isGeneratingChallenge={isGeneratingChallenge}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };

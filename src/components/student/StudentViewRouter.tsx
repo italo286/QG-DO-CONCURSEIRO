@@ -43,6 +43,7 @@ interface StudentViewRouterProps {
     isSidebarCollapsed: boolean;
     quizInstanceKey: number;
     activeCustomQuiz: CustomQuiz | null;
+    isGeneratingChallenge: { review: boolean; glossary: boolean; portuguese: boolean; };
 
     // Callbacks
     onAcknowledgeMessage: (messageId: string) => void;
@@ -50,6 +51,7 @@ interface StudentViewRouterProps {
     onSubjectSelect: (subject: Subject) => void;
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
     onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
+    onGenerateChallenge: (type: 'review' | 'glossary' | 'portuguese') => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;

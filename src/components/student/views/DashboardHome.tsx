@@ -17,7 +17,9 @@ interface DashboardHomeProps {
     teacherProfiles: User[];
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
-    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese') => void;
+    onGenerateChallenge: (type: 'review' | 'glossary' | 'portuguese') => void;
+    isGeneratingChallenge: { review: boolean; glossary: boolean; portuguese: boolean; };
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
@@ -34,6 +36,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     onAcknowledgeMessage,
     onCourseSelect,
     onStartDailyChallenge,
+    onGenerateChallenge,
+    isGeneratingChallenge,
     onNavigateToTopic,
     onToggleTopicCompletion,
     onOpenNewMessageModal,
@@ -79,6 +83,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <DailyChallenges 
                     studentProgress={studentProgress}
                     onStartDailyChallenge={onStartDailyChallenge}
+                    onGenerateChallenge={onGenerateChallenge}
+                    isGenerating={isGeneratingChallenge}
                 />
 
                 <StudentFocusPanel enrolledCourses={enrolledCourses} studentProgress={studentProgress} />

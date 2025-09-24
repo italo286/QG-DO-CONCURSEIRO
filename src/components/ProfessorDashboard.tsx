@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, Course } from '../types';
 import { Spinner, Button, Card, Modal, Toast } from './ui';
-import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon, SparklesIcon } from './Icons';
+import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon } from './Icons';
 
 import { ProfessorAnnouncements } from './professor/ProfessorAnnouncements';
 import { ProfessorCourseEditor } from './professor/ProfessorCourseEditor';
@@ -12,8 +12,6 @@ import { ProfessorClassPerformance } from './professor/ProfessorClassPerformance
 import { ProfessorReviewsDashboard } from './professor/ProfessorReviewsDashboard';
 import { EditProfileModal } from './student/EditProfileModal';
 import { ProfessorSubjectsView } from './professor/ProfessorSubjectsView';
-
-const isTriggerConfigured = !!import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
 
 export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; onUpdateUser: (user: User) => void; }> = ({ user, onLogout, onUpdateUser }) => {
     const [courses, setCourses] = useState<Course[]>([]);
@@ -36,7 +34,6 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isNavOpen, setIsNavOpen] = useState(false);
     const navRef = useRef<HTMLDivElement>(null);
-    const [isTriggeringChallenges, setIsTriggeringChallenges] = useState(false);
 
     useEffect(() => {
         setIsLoading(true);
@@ -130,35 +127,6 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
 
     const handleProfileSave = (updatedUser: User) => {
         onUpdateUser(updatedUser);
-    };
-
-    const handleTriggerDailyChallenges = async () => {
-        if (!isTriggerConfigured) {
-            console.error("Attempted to trigger challenges, but the API key is not configured in the environment.");
-            return;
-        }
-
-        setIsTriggeringChallenges(true);
-        try {
-            const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
-            // Safeguard check, though the button should be disabled
-            if (!apiKey) {
-                console.error("VITE_DAILY_CHALLENGE_API_KEY is not set in .env file, but the trigger was attempted.");
-                return;
-            }
-            const response = await fetch(`/.netlify/functions/generateDailyChallenges?apiKey=${apiKey}`);
-            if (!response.ok) {
-                const errorBody = await response.text();
-                console.error("Server error response:", errorBody);
-                throw new Error(`O servidor respondeu com o status: ${response.status}`);
-            }
-            setToastMessage("Gatilho manual de desafios diários enviado com sucesso!");
-        } catch (error) {
-            console.error("Erro ao acionar o gatilho:", error);
-            setToastMessage("Erro ao acionar o gatilho de desafios diários.");
-        } finally {
-            setIsTriggeringChallenges(false);
-        }
     };
 
     const renderContent = () => {
@@ -295,15 +263,6 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                     </div>
                 </div>
                  <div className="flex items-center space-x-4">
-                    <Button
-                        onClick={handleTriggerDailyChallenges}
-                        disabled={isTriggeringChallenges || !isTriggerConfigured}
-                        className="text-sm py-2 px-4 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:hover:bg-gray-600 disabled:cursor-not-allowed"
-                        title={isTriggerConfigured ? "Acionar manualmente a geração de desafios diários para todos os alunos." : "Funcionalidade desabilitada: Chave de API não configurada."}
-                    >
-                        {isTriggeringChallenges ? <Spinner /> : <SparklesIcon className="h-5 w-5" />}
-                        <span className="ml-2 hidden sm:inline">Gerar Desafios</span>
-                    </Button>
                     <div ref={navRef} className="relative">
                         <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600">
                             <span>Navegação</span>
