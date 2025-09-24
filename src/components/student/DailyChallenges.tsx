@@ -1,7 +1,7 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon } from '../Icons';
+import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon, CheckIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 interface DailyChallengesProps {
@@ -71,11 +71,53 @@ const ChallengeCard: React.FC<{
     );
 };
 
+const WeeklyProgressTracker: React.FC<{ completions: StudentProgress['dailyChallengeCompletions'] }> = ({ completions }) => {
+    const today = getBrasiliaDate();
+    const todayIndex = today.getUTCDay(); // Sunday = 0, Monday = 1, ...
+
+    const weekDays = Array.from({ length: 7 }).map((_, i) => {
+        const date = new Date(today);
+        date.setUTCDate(today.getUTCDate() - (todayIndex - i));
+        return {
+            date,
+            dayInitial: ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'][i],
+        };
+    });
+
+    return (
+        <div className="flex justify-around items-center p-3 bg-gray-900/50 rounded-lg">
+            {weekDays.map(({ date, dayInitial }, index) => {
+                const dateISO = getLocalDateISOString(date);
+                const dayCompletion = completions?.[dateISO];
+                const isCompleted = dayCompletion?.review && dayCompletion?.glossary && dayCompletion?.portuguese;
+                const isToday = index === todayIndex;
+
+                return (
+                    <div key={dateISO} className="flex flex-col items-center gap-2">
+                        <span className={`text-xs font-bold ${isToday ? 'text-cyan-400' : 'text-gray-400'}`}>
+                            {dayInitial}
+                        </span>
+                        <div
+                            className={`w-8 h-8 rounded-full flex items-center justify-center transition-all
+                                ${isCompleted ? 'bg-green-500' : 'bg-gray-700'}
+                                ${isToday ? 'ring-2 ring-cyan-400' : ''}`
+                            }
+                            title={isCompleted ? `Desafios concluídos em ${date.toLocaleDateString('pt-BR')}` : date.toLocaleDateString('pt-BR')}
+                        >
+                            {isCompleted && <CheckIcon className="w-5 h-5 text-white" />}
+                        </div>
+                    </div>
+                );
+            })}
+        </div>
+    );
+};
+
 
 export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge, onGenerateAllChallenges, isGeneratingAll }) => {
     if (!studentProgress) return null;
 
-    const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak } = studentProgress;
+    const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak, dailyChallengeCompletions } = studentProgress;
     const streak = dailyChallengeStreak?.current || 0;
 
     const todayISO = getLocalDateISOString(getBrasiliaDate());
@@ -98,7 +140,10 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     </div>
                 )}
             </div>
-            <div className="mb-6 text-center border-t border-b border-gray-700/50 py-4">
+
+            <WeeklyProgressTracker completions={dailyChallengeCompletions} />
+
+            <div className="my-6 text-center border-t border-b border-gray-700/50 py-4">
                 <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
                     {isGeneratingAll ? <Spinner /> : <SparklesIcon className="h-5 w-5 mr-2" />}
                     {isGeneratingAll ? 'Gerando...' : 'Gerar / Refazer Desafios Diários'}

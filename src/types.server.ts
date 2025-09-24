@@ -263,6 +263,13 @@ export interface StudentProgress {
       longest: number;
       lastCompletedDate: string; // ISO Date 'YYYY-MM-DD'
   };
+  dailyChallengeCompletions?: {
+    [dateISO: string]: {
+        review?: boolean;
+        glossary?: boolean;
+        portuguese?: boolean;
+    }
+  };
 }
 
 

@@ -89,6 +89,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
             longest: 0,
             lastCompletedDate: '',
         },
+        dailyChallengeCompletions: {},
     };
     await progressRef.set(initialProgress);
   }
@@ -359,6 +360,7 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                     longest: 0,
                     lastCompletedDate: '',
                 },
+                dailyChallengeCompletions: {},
             };
             // Asynchronously create the document in Firestore
             progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
