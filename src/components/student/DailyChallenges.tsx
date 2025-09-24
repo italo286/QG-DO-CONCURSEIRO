@@ -1,7 +1,7 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge, Question } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { CycleIcon, TagIcon, TranslateIcon, CheckCircleIcon, CheckIcon, FireIcon } from '../Icons';
+import { CycleIcon, TagIcon, TranslateIcon, CheckCircleIcon, CheckIcon, FireIcon, XCircleIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 interface DailyChallengesProps {
@@ -15,9 +15,12 @@ const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
     const today = getBrasiliaDate();
+    today.setUTCHours(0, 0, 0, 0); // Normalize to start of day for comparison
     const todayIndex = today.getUTCDay();
+
     const weekStart = getBrasiliaDate();
     weekStart.setUTCDate(today.getUTCDate() - todayIndex);
+    weekStart.setUTCHours(0, 0, 0, 0);
 
     const weekDates = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(weekStart.getTime());
@@ -28,13 +31,21 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
     return (
         <div className="flex justify-center items-center gap-3 md:gap-4 my-4">
             {weekDates.map((dateISO, index) => {
+                const dateObj = new Date(dateISO + 'T00:00:00Z');
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
-                const isCompleted = completions?.review && completions?.glossary && completions?.portuguese;
-                const isCurrentDay = index === todayIndex;
+                const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
+                const isPastDay = dateObj < today;
+                const isCurrentDay = dateObj.getTime() === today.getTime();
 
-                let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ';
-                if (isCompleted) {
+                let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ';
+                let content: React.ReactNode = WEEK_DAYS[index];
+
+                if (isFullyCompleted) {
                     styles += 'bg-green-500 text-white';
+                    content = <CheckIcon className="h-6 w-6" />;
+                } else if (isPastDay && completions) { // A past day with partial (but not full) completion
+                    styles += 'bg-red-800 text-red-300';
+                    content = <XCircleIcon className="h-8 w-8" />;
                 } else if (isCurrentDay) {
                     styles += 'bg-cyan-500 text-white ring-2 ring-offset-2 ring-offset-gray-800 ring-cyan-400';
                 } else {
@@ -43,7 +54,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
 
                 return (
                     <div key={dateISO} className={styles} title={new Date(dateISO + 'T12:00:00Z').toLocaleDateString('pt-BR')}>
-                        {isCompleted ? <CheckIcon className="h-6 w-6" /> : WEEK_DAYS[index]}
+                        {content}
                     </div>
                 );
             })}
@@ -108,7 +119,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     const shouldHighlight = needsGeneration || hasPendingChallenges;
 
     return (
-        <Card className={`p-6 transition-shadow ${shouldHighlight ? 'animate-pulse-border' : ''}`}>
+        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg shadow-orange-500/20' : ''}`}>
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-bold text-white">Sua Trilha Diária</h3>
                 {streak > 0 && (
