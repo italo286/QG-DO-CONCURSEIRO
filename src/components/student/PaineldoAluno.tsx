@@ -224,7 +224,7 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     };
     
     const startDailyChallenge = (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp = false) => {
-        if (challenge && challenge.items && challenge.items.length > 0) {
+        if (challenge && challenge.items.length > 0) {
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');
@@ -241,28 +241,28 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             const existingAttempts = (prev.sessionAttempts || []).filter(a => a.questionId !== attempt.questionId);
             return { ...prev, sessionAttempts: [...existingAttempts, attempt] };
         });
-
+    
         // Update main progress object and persist to Firestore
         setStudentProgress(prevProgress => {
             if (!prevProgress) return null;
-
+    
             const newProgress = { ...prevProgress };
             const challengeKey = `${challengeType}Challenge` as const;
             const challengeData = newProgress[challengeKey];
-
+    
             if (challengeData) {
                 const existingAttempts = (challengeData.sessionAttempts || []).filter(a => a.questionId !== attempt.questionId);
                 const updatedAttempts = [...existingAttempts, attempt];
                 
                 newProgress[challengeKey] = { ...challengeData, sessionAttempts: updatedAttempts };
-
+    
                 if (!isPreview) {
                     FirebaseService.saveStudentProgress(newProgress).catch(err => {
                         console.error("Failed to save daily challenge progress:", err);
                     });
                 }
             }
-
+    
             return newProgress;
         });
     }, [isPreview, setStudentProgress]);

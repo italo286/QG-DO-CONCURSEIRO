@@ -291,11 +291,27 @@ export const handler: Handler = async (event) => {
                 
                 const portugueseChallenge: DailyChallenge<Question> = {
                     date: dateISO,
-                    items: parsedQuestions.map((q, i) => ({ 
-                        ...q, 
-                        options: q.options || [], // Safeguard for missing options
-                        id: `port-challenge-${dateISO}-${i}` 
-                    })),
+                    // FIX: Explicitly construct the Question object to ensure type safety and
+                    // transform `optionJustifications` from an array (returned by AI) to a map (expected by type).
+                    items: parsedQuestions.map((q, i) => {
+                        const optionJustifications: { [key: string]: string } = {};
+                        if (Array.isArray(q.optionJustifications)) {
+                            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                                if (item && item.option && item.justification) {
+                                    optionJustifications[item.option] = item.justification;
+                                }
+                            });
+                        }
+                        return {
+                            id: `port-challenge-${dateISO}-${i}`,
+                            statement: q.statement || '',
+                            options: q.options || [],
+                            correctAnswer: q.correctAnswer || '',
+                            justification: q.justification || '',
+                            optionJustifications: optionJustifications,
+                            errorCategory: q.errorCategory,
+                        };
+                    }),
                     isCompleted: false,
                     attemptsMade: 0,
                 };
