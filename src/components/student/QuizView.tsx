@@ -133,7 +133,6 @@ export const QuizView: React.FC<{
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
     const [timeLeft, setTimeLeft] = useState(durationInSeconds);
-    const quizIdRef = useRef<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
@@ -169,21 +168,20 @@ export const QuizView: React.FC<{
 
 
     useEffect(() => {
-        const quizId = questions.map(q => q.id).join(',');
-        const isNewQuiz = quizIdRef.current !== quizId;
-
-        if (isNewQuiz) {
-            quizIdRef.current = quizId;
-            setSessionAttempts(initialAttempts);
-            setShowResults(false);
-            setSelectedOption(null);
-            setHasCompleted(initialAttempts.length === questions.length);
-            setTimeLeft(durationInSeconds);
-            setCurrentIndex(initialAttempts.length < questions.length ? initialAttempts.length : 0);
-            setReportedQuestions(new Set());
-            setThresholdsMet(new Set());
-            setMotivationalMessage(null);
-        }
+        // The key prop from the parent component (StudentViewRouter) ensures this component
+        // remounts with a fresh state for each new quiz. This effect then initializes
+        // the state based on the initial props provided for that specific quiz instance.
+        setSessionAttempts(initialAttempts);
+        setShowResults(false);
+        setSelectedOption(null);
+        // A quiz is only considered 'completed' from the start if it actually has questions
+        // and all of them have been attempted.
+        setHasCompleted(questions.length > 0 && initialAttempts.length === questions.length);
+        setTimeLeft(durationInSeconds);
+        setCurrentIndex(initialAttempts.length < questions.length ? initialAttempts.length : 0);
+        setReportedQuestions(new Set());
+        setThresholdsMet(new Set());
+        setMotivationalMessage(null);
     }, [questions, initialAttempts, durationInSeconds]);
     
     useEffect(() => {
