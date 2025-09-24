@@ -4,20 +4,29 @@ import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { StudentProgress, Subject, Course, Question, GlossaryTerm } from '../../src/types.server';
 
 // --- Firebase Admin Initialization ---
-if (!admin.apps.length) {
-    try {
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            }),
-        });
-    } catch (e) {
-        console.error('Firebase admin initialization error', e);
-    }
+let db: admin.firestore.Firestore;
+try {
+  const serviceAccount = {
+    projectId: process.env.FIREBASE_PROJECT_ID,
+    privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+  };
+
+  if (!serviceAccount.projectId || !serviceAccount.privateKey || !serviceAccount.clientEmail) {
+    throw new Error('Firebase Admin credentials (FIREBASE_PROJECT_ID, FIREBASE_PRIVATE_KEY, FIREBASE_CLIENT_EMAIL) are not set in environment variables.');
+  }
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+    });
+  }
+  db = admin.firestore();
+} catch (e: any) {
+  console.error('FATAL: Firebase admin initialization failed:', e.message);
+  // db will remain undefined, the handler will catch this and return a 500 error.
 }
-const db = admin.firestore();
+
 
 // --- Gemini API Initialization ---
 const ai = new GoogleGenAI({apiKey: process.env.GEMINI_API_KEY});
@@ -120,6 +129,14 @@ const shuffleArray = <T>(array: T[]): T[] => {
 
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
+    
+    const allAttempts = [
+      ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt || [])),
+      ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || []),
+      ...(studentProgress.reviewChallenge?.sessionAttempts || []),
+      ...(studentProgress.glossaryChallenge?.sessionAttempts || []),
+      ...(studentProgress.portugueseChallenge?.sessionAttempts || [])
+    ];
 
     const questionBank: (Question & {subjectName: string, topicName: string})[] = [];
     subjects.forEach(subject => {
@@ -136,14 +153,14 @@ async function generateReviewChallenge(studentProgress: StudentProgress, subject
     const prompt = `
         Você é um tutor de IA especialista em preparação para concursos. Sua tarefa é criar uma sessão de revisão inteligente e personalizada para um aluno.
         Abaixo estão dois blocos de dados em JSON:
-        1. 'studentProgress': Contém o histórico de desempenho do aluno, incluindo pontuações por tópico. Um score baixo (menor que 0.7) indica dificuldade.
+        1. 'studentProgress': Contém o histórico de desempenho do aluno, incluindo pontuações por tópico e todas as tentativas de resposta. Um score baixo (menor que 0.7) indica dificuldade.
         2. 'questionBank': Uma lista completa de todas as questões disponíveis.
 
         Analise o 'studentProgress' para identificar os tópicos onde o aluno tem maior dificuldade. Com base nessa análise, selecione um conjunto de ${questionCount} questões do 'questionBank' que reforcem esses pontos fracos. Priorize questões dos tópicos com piores scores.
         Retorne um array JSON contendo APENAS os ${questionCount} objetos de questão selecionados, seguindo estritamente o schema fornecido.
 
         ### DADOS ###
-        'studentProgress': ${JSON.stringify(studentProgress)}
+        'studentProgress': ${JSON.stringify({ ...studentProgress, allAttempts })}
         'questionBank': ${JSON.stringify(questionBank)}
     `;
 
@@ -243,6 +260,15 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
 // --- Main Handler ---
 
 export const handler: Handler = async (event: HandlerEvent) => {
+    // Fail fast if Firebase Admin SDK is not initialized
+    if (!db) {
+        console.error("Firestore database is not initialized. Check Firebase Admin credentials in Netlify environment variables.");
+        return { 
+            statusCode: 500, 
+            body: 'Internal Server Error: Could not connect to the database. Check server logs for credential errors.' 
+        };
+    }
+
     const { apiKey, studentId, challengeType } = event.queryStringParameters || {};
 
     if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
