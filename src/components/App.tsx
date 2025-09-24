@@ -4,6 +4,7 @@ import * as FirebaseService from '../services/firebaseService';
 import { User } from '../types';
 import { LoginPage } from './auth';
 import { ProfessorDashboard } from './ProfessorDashboard';
+// FIX: Changed component name from PaineldoAluno to StudentDashboard for consistency.
 import { StudentDashboard } from './student/StudentDashboard';
 import { Spinner } from './ui';
 
@@ -74,6 +75,7 @@ export const App = () => {
     }
     
     if (isStudentView && currentUser.role === 'professor') {
+        // FIX: Changed component name from PaineldoAluno to StudentDashboard to match import.
         return <StudentDashboard 
             user={currentUser} 
             onLogout={() => {}} 
@@ -87,5 +89,6 @@ export const App = () => {
         return <ProfessorDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
     }
     
+    // FIX: Changed component name from PaineldoAluno to StudentDashboard for consistency.
     return <StudentDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
 };

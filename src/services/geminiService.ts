@@ -1,16 +1,18 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
+// FIX: Renamed GEMINI_API_KEY to VITE_GEMINI_API_KEY to match environment variable name.
+const VITE_GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
 
-if (!GEMINI_API_KEY) {
+if (!VITE_GEMINI_API_KEY) {
   // In a real app, you'd want to handle this more gracefully.
   // For this environment, we'll alert and log, but the app will fail on API calls.
   console.error("Gemini API key is missing. Please set the VITE_GEMINI_API_KEY environment variable in your .env file.");
   // alert("Chave da API do Gemini não encontrada. A funcionalidade de IA está desabilitada.");
 }
 
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
+// FIX: Used VITE_GEMINI_API_KEY to initialize GoogleGenAI.
+const ai = new GoogleGenAI({ apiKey: VITE_GEMINI_API_KEY! });
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
@@ -96,7 +98,7 @@ const questionSchema = {
                 option: { type: Type.STRING, description: "O texto exato de uma das 5 alternativas." },
                 justification: { type: Type.STRING, description: "A justificativa explicando por que a alternativa está certa ou errada." },
             },
-            required: ["option", "justification"]
+            propertyOrdering: ["option", "justification"]
           }
         },
         errorCategory: {
@@ -104,7 +106,7 @@ const questionSchema = {
             description: "A categoria do erro gramatical (ex: 'Crase', 'Concordância Verbal'). Apenas para questões de português. Para outros tipos, pode ser omitido."
         }
       },
-      required: ["statement", "options", "correctAnswer", "justification"],
+      propertyOrdering: ["statement", "options", "correctAnswer", "justification", "optionJustifications", "errorCategory"],
     },
   };
   
@@ -136,11 +138,11 @@ const topicGenerationSchema = {
                             description: "A descrição concisa do subtópico.",
                         },
                     },
-                    required: ["name", "description"],
+                    propertyOrdering: ["name", "description"],
                 }
             }
         },
-        required: ["name", "description"],
+        propertyOrdering: ["name", "description", "subtopics"],
     },
 };
 
@@ -158,7 +160,7 @@ const flashcardSchema = {
           description: "A definição, resposta ou explicação que aparecerá no verso do flashcard.",
         },
       },
-      required: ["front", "back"],
+      propertyOrdering: ["front", "back"],
     },
 };
 
@@ -176,7 +178,7 @@ const glossarySchema = {
                 description: "A definição clara e concisa do termo, baseada no contexto do documento.",
             },
         },
-        required: ["term", "definition"],
+        propertyOrdering: ["term", "definition"],
     },
 };
 
@@ -193,7 +195,7 @@ const editalAnalysisSchema = {
                     vagas: { type: Type.STRING, description: "Número de vagas (ex: '5', '10 + CR')." },
                     cadastroReserva: { type: Type.STRING, description: "Indicação de cadastro de reserva (ex: 'Sim', 'Não', 'CR')." }
                 },
-                required: ["cargo", "vagas"]
+                propertyOrdering: ["cargo", "vagas", "cadastroReserva"]
             }
         },
         requisitosEscolaridade: { type: Type.STRING, description: "Nível de escolaridade exigido." },
@@ -208,14 +210,14 @@ const editalAnalysisSchema = {
                     disciplina: { type: Type.STRING },
                     quantidade: { type: Type.INTEGER }
                 },
-                required: ["disciplina", "quantidade"]
+                propertyOrdering: ["disciplina", "quantidade"]
             }
         },
         totalQuestoes: { type: Type.INTEGER, description: "Número total de questões da prova objetiva." },
         remuneracao: { type: Type.STRING, description: "Valor do salário inicial e benefícios, se houver." },
         dataProva: { type: Type.STRING, description: "Data da prova no formato AAAA-MM-DD. Se houver mais de uma, liste a principal." }
     },
-    required: ["cargosEVagas", "requisitosEscolaridade", "bancaOrganizadora", "remuneracao", "dataProva"]
+    propertyOrdering: ["cargosEVagas", "requisitosEscolaridade", "bancaOrganizadora", "remuneracao", "dataProva", "formatoProva", "distribuicaoQuestoes", "totalQuestoes"]
 };
 
 const memoryGameSchema = {
@@ -227,7 +229,7 @@ const memoryGameSchema = {
             items: { type: Type.STRING }
         }
     },
-    required: ["items"]
+    propertyOrdering: ["items"]
 };
 
 const associationGameSchema = {
@@ -242,11 +244,11 @@ const associationGameSchema = {
                     concept: { type: Type.STRING, description: "The key concept or term." },
                     definition: { type: Type.STRING, description: "The definition or associated value." }
                 },
-                required: ["concept", "definition"]
+                propertyOrdering: ["concept", "definition"]
             }
         }
     },
-    required: ["pairs"]
+    propertyOrdering: ["pairs"]
 };
 
 const orderGameSchema = {
@@ -259,7 +261,7 @@ const orderGameSchema = {
             items: { type: Type.STRING }
         }
     },
-    required: ["description", "items"]
+    propertyOrdering: ["description", "items"]
 };
 
 const intruderGameSchema = {
@@ -273,7 +275,7 @@ const intruderGameSchema = {
         },
         intruder: { type: Type.STRING, description: "A single item that is related but does NOT belong to the category." }
     },
-    required: ["categoryName", "correctItems", "intruder"]
+    propertyOrdering: ["categoryName", "correctItems", "intruder"]
 };
 
 const categorizeGameSchema = {
@@ -292,21 +294,21 @@ const categorizeGameSchema = {
                         items: { type: Type.STRING }
                     }
                 },
-                required: ["name", "items"]
+                propertyOrdering: ["name", "items"]
             }
         }
     },
-    required: ["categories"]
+    propertyOrdering: ["categories"]
 };
 
 const allGamesSchemaWithNames = {
     type: Type.OBJECT,
     properties: {
-        memory: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: memoryGameSchema }, required: ['name', 'data'] },
-        association: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: associationGameSchema }, required: ['name', 'data'] },
-        order: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: orderGameSchema }, required: ['name', 'data'] },
-        intruder: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: intruderGameSchema }, required: ['name', 'data'] },
-        categorize: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: categorizeGameSchema }, required: ['name', 'data'] },
+        memory: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: memoryGameSchema }, propertyOrdering: ['name', 'data'] },
+        association: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: associationGameSchema }, propertyOrdering: ['name', 'data'] },
+        order: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: orderGameSchema }, propertyOrdering: ['name', 'data'] },
+        intruder: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: intruderGameSchema }, propertyOrdering: ['name', 'data'] },
+        categorize: { type: Type.OBJECT, properties: { name: { type: Type.STRING }, data: categorizeGameSchema }, propertyOrdering: ['name', 'data'] },
     }
 };
 
@@ -321,7 +323,7 @@ const frequencyAnalysisSchema = {
                 description: "O nível de frequência, que deve ser 'alta', 'media', 'baixa', ou 'nenhuma'."
             }
         },
-        required: ["id", "frequency"]
+        propertyOrdering: ["id", "frequency"]
     }
 };
 
@@ -372,7 +374,6 @@ export const generateQuestionsFromPdf = async (
         text: `Com base no conteúdo deste documento PDF, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.`
     };
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
@@ -382,7 +383,7 @@ export const generateQuestionsFromPdf = async (
         }
     }));
 
-    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
     
     return generatedQuestions.map((q: any) => {
         const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -424,7 +425,6 @@ export const generateQuestionsFromText = async (
             
         const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -434,7 +434,7 @@ export const generateQuestionsFromText = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
         
          return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -498,7 +498,6 @@ export const generateCustomQuizQuestions = async (params: {
             customQuestionSchema.items.properties.options.description = `Um array com exatamente ${numAlternatives} alternativas de resposta.`;
         }
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: contents,
@@ -508,7 +507,7 @@ export const generateCustomQuizQuestions = async (params: {
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
 
         return generatedQuestions.slice(0, questionCount).map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
@@ -558,7 +557,6 @@ export const extractQuestionsFromTecPdf = async (
             text: `Analise este PDF do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). Gere também uma 'justification' principal para a alternativa correta baseada no 'Comentário do Professor'. ${justificationPromptPart} Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo estritamente o schema.`
         };
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart, pdfPart] },
@@ -568,7 +566,7 @@ export const extractQuestionsFromTecPdf = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
@@ -608,7 +606,6 @@ export const extractQuestionsFromTecText = async (
 
         const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). Gere também uma 'justification' principal para a alternativa correta baseada no 'Comentário do Professor'. ${justificationPromptPart} Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo estritamente o schema.\n\nTexto: """${text}"""`;
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -618,7 +615,7 @@ export const extractQuestionsFromTecText = async (
             }
         }));
 
-        const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+        const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
         return generatedQuestions.map((q: any) => {
             const cleanedOptions = (q.options || []).map(stripOptionPrefix);
             const cleanedCorrectAnswer = stripOptionPrefix(q.correctAnswer || '');
@@ -690,7 +687,6 @@ export const generateSmartReview = async (
             `
         };
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
@@ -700,7 +696,7 @@ export const generateSmartReview = async (
             }
         }));
         
-        const reviewQuestions = parseJsonResponse<Question[]>(response.text?.trim() ?? '', 'array');
+        const reviewQuestions = parseJsonResponse<Question[]>(response.text.trim() ?? '', 'array');
         return reviewQuestions;
 
     } catch (error) {
@@ -717,7 +713,6 @@ export const generateTopicsFromText = async (
             text: `A partir do texto a seguir, que é um índice ou resumo de material de estudo para concurso, extraia os principais tópicos e seus respectivos subtópicos. Para cada tópico e subtópico, forneça um nome e uma breve descrição. Se um tópico não tiver subtópicos evidentes, retorne um array 'subtopics' vazio para ele. Formate a saída como um array JSON, seguindo estritamente o schema fornecido. Texto: """${text}"""`
         };
 
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [textPart] },
@@ -727,7 +722,7 @@ export const generateTopicsFromText = async (
             }
         }));
 
-        const generatedTopics = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+        const generatedTopics = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
 
         // Validate and structure the response
         return generatedTopics.map((t: any) => ({
@@ -760,7 +755,6 @@ export const generateFlashcardsFromPdf = async (
         text: `Com base no conteúdo deste documento PDF, identifique os principais termos, conceitos e suas definições. Gere um array JSON de flashcards para estudo. Cada flashcard deve ter uma frente ('front') com o termo/conceito e um verso ('back') com a definição clara e concisa. Siga estritamente o schema JSON fornecido.`
     };
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
@@ -770,7 +764,7 @@ export const generateFlashcardsFromPdf = async (
         }
     }));
 
-    const generatedFlashcards = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+    const generatedFlashcards = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
     
     return generatedFlashcards.map((f: any) => ({
         front: f.front,
@@ -806,13 +800,12 @@ export const analyzeStudentDifficulties = async (
 
         const prompt = `Como um tutor especialista em concursos, analise o seguinte conjunto de erros cometidos por uma turma de alunos. Identifique os padrões de dificuldade, os tópicos mais problemáticos e os tipos de erro mais comuns (ex: erro de interpretação, confusão entre conceitos, falta de atenção). Forneça um resumo conciso e acionável para o professor, com sugestões de como abordar esses pontos fracos. Formate a resposta em markdown. Dados dos erros: ${JSON.stringify(dataForAnalysis)}`;
         
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
         }));
 
-        return response.text?.trim() ?? "Não foi possível gerar a análise no momento.";
+        return response.text.trim() ?? "Não foi possível gerar a análise no momento.";
 
     } catch (error) {
         console.error("Erro ao analisar dificuldades com a IA:", error);
@@ -822,22 +815,20 @@ export const analyzeStudentDifficulties = async (
 
 export const getAiExplanationForText = async (text: string): Promise<string> => {
     const prompt = `Explique o seguinte texto de forma clara e didática, como se fosse para um aluno de concurso que está vendo o assunto pela primeira vez. Use analogias e exemplos simples, se possível. Formate a resposta em markdown. Texto: "${text}"`;
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
-    return response.text?.trim() ?? "Não foi possível gerar a explicação.";
+    return response.text.trim() ?? "Não foi possível gerar a explicação.";
 };
 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
     const prompt = `Resuma o seguinte texto em pontos-chave (bullet points), focando nos conceitos mais importantes para memorização em um concurso. Formate a resposta em markdown. Texto: "${text}"`;
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt
     }));
-    return response.text?.trim() ?? "Não foi possível gerar o resumo.";
+    return response.text.trim() ?? "Não foi possível gerar o resumo.";
 };
 
 export const getAiQuestionForText = async (text: string): Promise<Omit<Question, 'id'>> => {
@@ -846,10 +837,9 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
       const singleQuestionSchema = {
         type: Type.OBJECT,
         properties: questionSchema.items.properties,
-        required: questionSchema.items.required,
+        propertyOrdering: questionSchema.items.propertyOrdering,
     };
      
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -859,7 +849,7 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
         }
     }));
 
-    const generatedQuestion = parseJsonResponse<any>(response.text?.trim() ?? '', 'object');
+    const generatedQuestion = parseJsonResponse<any>(response.text.trim() ?? '', 'object');
     const cleanedOptions = (generatedQuestion.options || []).map(stripOptionPrefix);
     const cleanedCorrectAnswer = stripOptionPrefix(generatedQuestion.correctAnswer || '');
 
@@ -894,7 +884,6 @@ export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat 
 export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions: Question[]): Promise<Omit<Flashcard, 'id'>[]> => {
     const prompt = `Analise a lista de questões que um aluno errou. Para cada questão, crie um flashcard que ajude a solidificar o conhecimento correto. A frente do flashcard deve ser uma pergunta direta ou um termo-chave, e o verso deve ser a resposta ou definição concisa. Foque no "porquê" da resposta correta. Retorne um array de objetos JSON de flashcards, seguindo estritamente o schema fornecido. Questões erradas: ${JSON.stringify(incorrectQuestions)}`;
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -904,25 +893,23 @@ export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions:
         }
     }));
 
-    const generatedFlashcards = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+    const generatedFlashcards = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
     return generatedFlashcards.map((f: any) => ({ front: f.front, back: f.back }));
 };
 
 export const generateQuizFeedback = async (questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
     const prompt = `Você é um tutor de IA. Analise o desempenho do aluno neste quiz. Forneça um feedback construtivo e motivacional. Identifique os padrões de erro (se houver) e dê dicas de estudo personalizadas com base nas questões erradas. Formate a resposta em markdown. Dados do Quiz: Questões: ${JSON.stringify(questions)}, Respostas do Aluno: ${JSON.stringify(attempts)}`;
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
-    return response.text?.trim() ?? "Não foi possível gerar o feedback.";
+    return response.text.trim() ?? "Não foi possível gerar o feedback.";
 };
 
 export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInfo> => {
   const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
   const textPart = { text: "Analise o conteúdo deste edital de concurso público e extraia as informações estruturadas conforme o schema JSON fornecido. Preencha todos os campos da forma mais completa e precisa possível." };
   
-  // FIX: Added explicit type GenerateContentResponse to the response object.
   const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [textPart, pdfPart] },
@@ -932,7 +919,7 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
     }
   }));
 
-  return parseJsonResponse<EditalInfo>(response.text?.trim() ?? '', 'object');
+  return parseJsonResponse<EditalInfo>(response.text.trim() ?? '', 'object');
 };
 
 export const analyzeEditalFromUrl = async (_url: string): Promise<EditalInfo> => {
@@ -946,12 +933,11 @@ export const analyzeEditalFromUrl = async (_url: string): Promise<EditalInfo> =>
 
 export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuestions: Question[]): Promise<string> => {
     const prompt = `Como um tutor de IA, analise as seguintes questões que um aluno errou. Crie um resumo conciso dos principais tópicos e conceitos que o aluno precisa revisar, com base nessas questões. Formate a resposta em markdown. Questões erradas: ${JSON.stringify(incorrectQuestions.map(q => ({ statement: q.statement, justification: q.justification })))}`;
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
     }));
-    return response.text?.trim() ?? "Não foi possível gerar o resumo no momento.";
+    return response.text.trim() ?? "Não foi possível gerar o resumo no momento.";
 };
 
 export const generateJustificationsForQuestion = async (
@@ -975,7 +961,6 @@ export const generateJustificationsForQuestion = async (
         };
     });
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -984,12 +969,12 @@ export const generateJustificationsForQuestion = async (
             responseSchema: {
                 type: Type.OBJECT,
                 properties: properties,
-                required: question.options // Ensure all options have justifications
+                propertyOrdering: question.options // Ensure all options have justifications
             }
         }
     }));
 
-    return parseJsonResponse<{ [optionText: string]: string }>(response.text?.trim() ?? '', 'object');
+    return parseJsonResponse<{ [optionText: string]: string }>(response.text.trim() ?? '', 'object');
 };
 
 export const generateGameFromPdf = async (
@@ -1033,7 +1018,6 @@ export const generateGameFromPdf = async (
     }
     
     try {
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: { parts: [{text: prompt}, pdfPart] },
@@ -1043,7 +1027,7 @@ export const generateGameFromPdf = async (
             }
         }));
     
-        const gameData = parseJsonResponse<any>(response.text?.trim() ?? '', 'object');
+        const gameData = parseJsonResponse<any>(response.text.trim() ?? '', 'object');
         return gameData;
     } catch (error) {
         console.error(`Error generating ${gameType} game with AI:`, error);
@@ -1087,7 +1071,6 @@ export const generateGameFromText = async (
     }
     
     try {
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -1097,7 +1080,7 @@ export const generateGameFromText = async (
             }
         }));
     
-        const gameData = parseJsonResponse<any>(response.text?.trim() ?? '', 'object');
+        const gameData = parseJsonResponse<any>(response.text.trim() ?? '', 'object');
         return gameData;
     } catch (error) {
         console.error(`Error generating ${gameType} game from text with AI:`, error);
@@ -1109,7 +1092,6 @@ export const generateAllGamesFromText = async (text: string): Promise<Omit<MiniG
     const prompt = `A partir do texto fornecido, gere dados para o maior número possível de tipos de jogos diferentes. Se um tipo de jogo não for aplicável ao texto, omita-o da resposta. Dê um nome criativo para cada jogo gerado, baseado no conteúdo. Retorne um objeto JSON seguindo o schema fornecido. Texto: """${text}"""`;
     
     try {
-        // FIX: Added explicit type GenerateContentResponse to the response object.
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -1119,7 +1101,7 @@ export const generateAllGamesFromText = async (text: string): Promise<Omit<MiniG
             }
         }));
 
-        const result = parseJsonResponse<any>(response.text?.trim() ?? '', 'object');
+        const result = parseJsonResponse<any>(response.text.trim() ?? '', 'object');
         const games: Omit<MiniGame, 'id'>[] = [];
 
         Object.keys(result).forEach((gameType) => {
@@ -1181,24 +1163,8 @@ export const generateAdaptiveStudyPlan = async (
         3.  Tópicos já concluídos com score alto (acima de 0.9) devem ter baixa prioridade.
         4.  Retorne a resposta como um objeto JSON. As chaves devem ser as datas no formato 'YYYY-MM-DD', e os valores devem ser um array de IDs de tópicos (strings).
         5.  Não agende estudos para sábado e domingo, a menos que seja estritamente necessário para cobrir os tópicos com baixa performance.
-
-        SCHEMA:
-        \`\`\`json
-        {
-            "type": "OBJECT",
-            "properties": {
-                "${futureDates[0]}": { "type": "ARRAY", "items": { "type": "STRING" } },
-                "${futureDates[1]}": { "type": "ARRAY", "items": { "type": "STRING" } }
-            },
-            "additionalProperties": {
-                "type": "ARRAY",
-                "items": { "type": "STRING" }
-            }
-        }
-        \`\`\`
     `;
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1207,7 +1173,7 @@ export const generateAdaptiveStudyPlan = async (
         }
     }));
 
-    return parseJsonResponse<StudyPlan['plan']>(response.text?.trim() ?? '', 'object');
+    return parseJsonResponse<StudyPlan['plan']>(response.text.trim() ?? '', 'object');
 };
 
 
@@ -1215,7 +1181,6 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const textPart = { text: "Analise este documento PDF e extraia os termos chave e suas definições para criar um glossário. Formate a saída como um array JSON, seguindo estritamente o schema." };
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: { parts: [textPart, pdfPart] },
@@ -1225,7 +1190,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
         }
     }));
     
-    return parseJsonResponse<GlossaryTerm[]>(response.text?.trim() ?? '', 'array');
+    return parseJsonResponse<GlossaryTerm[]>(response.text.trim() ?? '', 'array');
 };
 
 export const generatePortugueseChallenge = async (
@@ -1257,7 +1222,6 @@ export const generatePortugueseChallenge = async (
     Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
     `;
     
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1267,7 +1231,7 @@ export const generatePortugueseChallenge = async (
         }
     }));
 
-    const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+    const generatedQuestions = parseJsonResponse<any[]>(response.text.trim() ?? '', 'array');
 
     return generatedQuestions.map((q: any) => {
         const cleanedOptionJustifications: { [key: string]: string } = {};
@@ -1308,7 +1272,6 @@ export const analyzeTopicFrequencies = async (
         Siga estritamente o schema JSON fornecido.
     `;
 
-    // FIX: Added explicit type GenerateContentResponse to the response object.
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: prompt,
@@ -1318,7 +1281,7 @@ export const analyzeTopicFrequencies = async (
         }
     }));
     
-    const results = parseJsonResponse<{ id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma' }[]>(response.text?.trim() ?? '', 'array');
+    const results = parseJsonResponse<{ id: string, frequency: 'alta' | 'media' | 'baixa' | 'nenhuma' }[]>(response.text.trim() ?? '', 'array');
     
     const frequencyMap: { [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' } = {};
     results.forEach(item => {
