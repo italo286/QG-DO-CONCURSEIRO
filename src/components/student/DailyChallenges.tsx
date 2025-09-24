@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StudentProgress, DailyChallenge, Question } from '../../types';
 import { Card, Button, Spinner } from '../ui';
 import { CycleIcon, TagIcon, TranslateIcon, CheckCircleIcon, CheckIcon, FireIcon, XCircleIcon } from '../Icons';
@@ -12,6 +12,48 @@ interface DailyChallengesProps {
 }
 
 const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+
+const CountdownTimer: React.FC = () => {
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        const calculateTimeLeft = () => {
+            const now = getBrasiliaDate();
+            const tomorrow = new Date(now);
+            tomorrow.setUTCDate(now.getUTCDate() + 1);
+            tomorrow.setUTCHours(0, 0, 0, 0); // Midnight in Brasília
+
+            const diff = tomorrow.getTime() - now.getTime();
+            
+            if (diff <= 0) {
+                return '00:00:00';
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+            
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        };
+
+        const timer = setInterval(() => {
+            setTimeLeft(calculateTimeLeft());
+        }, 1000);
+
+        // Initial calculation
+        setTimeLeft(calculateTimeLeft());
+
+        return () => clearInterval(timer);
+    }, []);
+
+    return (
+        <div className="text-center my-6">
+            <p className="text-gray-300 mb-2">Você já gerou os desafios de hoje. Volte amanhã!</p>
+            <div className="text-2xl font-bold text-cyan-400 font-mono" aria-live="polite">{timeLeft}</div>
+            <p className="text-xs text-gray-500">para novos desafios</p>
+        </div>
+    );
+};
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
     const today = getBrasiliaDate();
@@ -107,16 +149,16 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     isGeneratingAll,
 }) => {
     const todayISO = getLocalDateISOString(getBrasiliaDate());
-    const needsGeneration = !studentProgress.reviewChallenge || studentProgress.reviewChallenge.date !== todayISO;
+    const challengesGeneratedToday = studentProgress.reviewChallenge?.date === todayISO;
     const streak = studentProgress.dailyChallengeStreak?.current || 0;
     
-    const hasPendingChallenges = !needsGeneration && (
+    const hasPendingChallenges = !challengesGeneratedToday || (
         !studentProgress.reviewChallenge?.isCompleted ||
         !studentProgress.glossaryChallenge?.isCompleted ||
         !studentProgress.portugueseChallenge?.isCompleted
     );
 
-    const shouldHighlight = needsGeneration || hasPendingChallenges;
+    const shouldHighlight = !challengesGeneratedToday || hasPendingChallenges;
 
     return (
         <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-yellow-400/70 to-orange-500/70 backdrop-blur-sm border border-yellow-500/20' : ''}`}>
@@ -134,13 +176,17 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
             
             <WeeklyProgressTracker studentProgress={studentProgress} />
             
-            <div className="text-center my-6">
-                 <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
-                    {isGeneratingAll ? <Spinner /> : (needsGeneration ? 'Gerar Desafios de Hoje' : 'Refazer Desafios Diários')}
-                </Button>
-            </div>
+            {challengesGeneratedToday ? (
+                <CountdownTimer />
+            ) : (
+                <div className="text-center my-6">
+                    <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
+                        {isGeneratingAll ? <Spinner /> : 'Gerar Desafios de Hoje'}
+                    </Button>
+                </div>
+            )}
             
-            {!needsGeneration && (
+            {challengesGeneratedToday && (
                  <div className="space-y-4 animate-fade-in">
                     <ChallengeItem
                         title="Desafio da Revisão"
