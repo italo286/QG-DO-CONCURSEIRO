@@ -67,7 +67,7 @@ const questionSchema = {
     },
 };
 
-const generateReviewChallenge = async (progress: StudentProgress, allQuestionsWithContext: (Question & { subjectId: string, topicId: string })[]): Promise<Question[]> => {
+const generateReviewChallenge = async (progress: StudentProgress, allQuestionsWithContext: (Question & { subjectId: string, topicId: string, subjectName: string, topicName: string })[]): Promise<Question[]> => {
     const reviewMode = progress.dailyReviewMode || 'standard';
     const reviewQuestionCount = progress.advancedReviewQuestionCount || 5;
 
@@ -154,7 +154,7 @@ const generatePortugueseChallenge = async (progress: StudentProgress, ai: Google
 3. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
 4. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal').
 5. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-6. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa.
+6. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
 
 Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.`;
 
@@ -168,7 +168,7 @@ Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente
         }
     });
 
-    let parsedQuestions: Question[] = [];
+    let parsedQuestions: any[] = [];
     if (ptResponse.text) {
         try {
             const parsedData = JSON.parse(ptResponse.text.trim());
@@ -176,7 +176,26 @@ Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente
             else if (typeof parsedData === 'object' && parsedData !== null) parsedQuestions = [parsedData];
         } catch (e) { console.error(`[PARSE_ERROR] PT Generation:`, e); }
     }
-    return parsedQuestions.map((q, i) => ({ ...q, id: `port-challenge-${dateISO}-${i}` }));
+    
+    return parsedQuestions.map((q, i) => {
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (Array.isArray(q.optionJustifications)) {
+            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                if (item.option && item.justification) {
+                    cleanedOptionJustifications[item.option] = item.justification;
+                }
+            });
+        }
+        return { 
+            id: `port-challenge-${dateISO}-${i}`,
+            statement: q.statement,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            justification: q.justification,
+            errorCategory: q.errorCategory,
+            optionJustifications: cleanedOptionJustifications,
+        };
+    });
 };
 
 export const handler: Handler = async (event) => {
@@ -210,11 +229,11 @@ export const handler: Handler = async (event) => {
                 const allSubjects = subjectsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
                 const allQuestionsWithContext = allSubjects.flatMap(subject =>
                     subject.topics.flatMap(topic => [
-                        ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
-                        ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id })),
+                        ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, subjectName: subject.name, topicName: topic.name })),
+                        ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, subjectName: subject.name, topicName: topic.name })),
                         ...topic.subtopics.flatMap(st => [
-                            ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
-                            ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id })),
+                            ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id, subjectName: subject.name, topicName: `${topic.name} / ${st.name}` })),
+                            ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id, subjectName: subject.name, topicName: `${topic.name} / ${st.name}` })),
                         ])
                     ])
                 );

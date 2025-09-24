@@ -2,6 +2,7 @@ import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button, Spinner } from '../ui';
 import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon } from '../Icons';
+import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
@@ -77,8 +78,14 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
     const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak } = studentProgress;
     const streak = dailyChallengeStreak?.current || 0;
 
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+    const isGenerationNeeded = !reviewChallenge || reviewChallenge.date !== todayISO ||
+                               !glossaryChallenge || glossaryChallenge.date !== todayISO ||
+                               !portugueseChallenge || portugueseChallenge.date !== todayISO;
+    const cardHighlightClass = isGenerationNeeded ? 'animate-pulse-border border-yellow-400/50' : '';
+
     return (
-        <Card className="p-6">
+        <Card className={`p-6 transition-colors duration-500 ${cardHighlightClass}`}>
             <div className="flex justify-between items-start mb-4">
                 <div>
                     <h3 className="text-xl font-bold text-white">Desafios Diários</h3>
