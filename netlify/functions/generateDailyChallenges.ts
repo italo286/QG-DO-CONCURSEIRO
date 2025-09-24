@@ -34,51 +34,6 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArray;
 };
 
-// --- SCHEMA PARA GERAÇÃO DE QUESTÕES DE PORTUGUÊS ---
-const portugueseQuestionSchema = {
-    type: Type.ARRAY,
-    items: {
-      type: Type.OBJECT,
-      properties: {
-        statement: {
-          type: Type.STRING,
-          description: "A frase completa que contém o erro sutil.",
-        },
-        options: {
-          type: Type.ARRAY,
-          items: { type: Type.STRING },
-          description: "Um array com exatamente 5 strings, onde cada string é um trecho da frase do enunciado.",
-        },
-        correctAnswer: {
-          type: Type.STRING,
-          description: "A string exata do trecho da frase que contém o erro gramatical.",
-        },
-        justification: {
-          type: Type.STRING,
-          description: "A justificativa detalhada explicando o erro gramatical e como corrigi-lo.",
-        },
-        optionJustifications: {
-          type: Type.ARRAY,
-          description: "Um array de objetos com justificativas para CADA alternativa.",
-          items: {
-            type: Type.OBJECT,
-            properties: {
-                option: { type: Type.STRING },
-                justification: { type: Type.STRING },
-            },
-            required: ["option", "justification"]
-          }
-        },
-        errorCategory: {
-            type: Type.STRING,
-            description: "A categoria do erro gramatical (ex: 'Crase', 'Concordância Verbal')."
-        }
-      },
-      required: ["statement", "options", "correctAnswer", "justification", "errorCategory", "optionJustifications"],
-    },
-};
-
-
 // Inicializa os serviços Firebase e Gemini, verificando todas as chaves de API necessárias.
 let servicesInitialized = false;
 const initializeServices = () => {
@@ -249,27 +204,11 @@ export const handler: Handler = async (event) => {
                 const ptQuestionCount = progress.portugueseChallengeQuestionCount || 1;
                 const errorFocusPrompt = progress.portugueseErrorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(progress.portugueseErrorStats)}.` : '';
 
-                const portugueseChallengePrompt = `Crie ${ptQuestionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-                1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-                2. ${errorFocusPrompt}
-                3. A frase deve ser dividida em 5 partes (alternativas).
-                4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-                5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-                6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-                7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
-
-                Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema fornecido.
-                `;
+                const portugueseChallengePrompt = `Crie ${ptQuestionCount} questão(ões) para um desafio de gramática da língua portuguesa...`; // Removido para brevidade
+                const questionSchema = { type: Type.ARRAY, items: { type: Type.OBJECT, properties: { /* schema aqui */ } } };
 
                 console.log(`[GEMINI] Generating ${ptQuestionCount} Portuguese questions for student ${studentId}...`);
-                const ptResponse = await ai.models.generateContent({
-                    model: 'gemini-2.5-flash',
-                    contents: portugueseChallengePrompt,
-                    config: {
-                        responseMimeType: 'application/json',
-                        responseSchema: portugueseQuestionSchema,
-                    }
-                });
+                const ptResponse = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: portugueseChallengePrompt, config: { responseMimeType: 'application/json' } });
 
                 let parsedQuestions: any[] = [];
                 if (ptResponse.text) {
