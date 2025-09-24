@@ -98,9 +98,17 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     const todayISO = getLocalDateISOString(getBrasiliaDate());
     const needsGeneration = !studentProgress.reviewChallenge || studentProgress.reviewChallenge.date !== todayISO;
     const streak = studentProgress.dailyChallengeStreak?.current || 0;
+    
+    const hasPendingChallenges = !needsGeneration && (
+        !studentProgress.reviewChallenge?.isCompleted ||
+        !studentProgress.glossaryChallenge?.isCompleted ||
+        !studentProgress.portugueseChallenge?.isCompleted
+    );
+
+    const shouldHighlight = needsGeneration || hasPendingChallenges;
 
     return (
-        <Card className={`p-6 transition-shadow ${needsGeneration ? 'animate-pulse-border' : ''}`}>
+        <Card className={`p-6 transition-shadow ${shouldHighlight ? 'animate-pulse-border' : ''}`}>
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-bold text-white">Sua Trilha Diária</h3>
                 {streak > 0 && (
