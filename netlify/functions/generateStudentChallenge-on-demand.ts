@@ -129,38 +129,77 @@ const shuffleArray = <T>(array: T[]): T[] => {
 
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
-    
-    const allAttempts = [
-      ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt || [])),
-      ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || []),
-      ...(studentProgress.reviewChallenge?.sessionAttempts || []),
-      ...(studentProgress.glossaryChallenge?.sessionAttempts || []),
-      ...(studentProgress.portugueseChallenge?.sessionAttempts || [])
-    ];
 
-    const questionBank: (Question & {subjectName: string, topicName: string})[] = [];
+    // 1. Get all topic progress data with scores
+    const topicScores: { topicId: string; subjectId: string; score: number }[] = [];
+    for (const subjectId in studentProgress.progressByTopic) {
+        for (const topicId in studentProgress.progressByTopic[subjectId]) {
+            const topicProgress = studentProgress.progressByTopic[subjectId][topicId];
+            if (topicProgress && typeof topicProgress.score === 'number') {
+                topicScores.push({ topicId, subjectId, score: topicProgress.score });
+            }
+        }
+    }
+
+    // 2. Identify weak topics (lowest scores)
+    topicScores.sort((a, b) => a.score - b.score);
+    const weakTopics = topicScores.slice(0, 10); // Take the 10 weakest topics
+    const weakTopicIds = new Set(weakTopics.map(t => t.topicId));
+
+    const allQuestionsFromSubjects: (Question & { subjectName: string, topicName: string })[] = [];
     subjects.forEach(subject => {
         subject.topics.forEach(topic => {
-            topic.questions.forEach(question => questionBank.push({ ...question, subjectName: subject.name, topicName: topic.name }));
+            const baseTopicName = topic.name;
+            topic.questions.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: baseTopicName }));
+            topic.tecQuestions?.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: baseTopicName }));
             topic.subtopics.forEach(subtopic => {
-                subtopic.questions.forEach(question => questionBank.push({ ...question, subjectName: subject.name, topicName: subtopic.name }));
-            })
+                const fullTopicName = `${baseTopicName} / ${subtopic.name}`;
+                subtopic.questions.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: fullTopicName }));
+                subtopic.tecQuestions?.forEach(q => allQuestionsFromSubjects.push({ ...q, subjectName: subject.name, topicName: fullTopicName }));
+            });
         });
     });
+
+    if (allQuestionsFromSubjects.length === 0) return [];
+    
+    // 3. Filter question bank to only include questions from weak topics, or fallback
+    let questionBank = allQuestionsFromSubjects.filter(q => weakTopicIds.has(q.id));
+    
+    // Fallback if no progress or if weak topics have no questions
+    if (questionBank.length < questionCount) {
+        const randomQuestions = shuffleArray(allQuestionsFromSubjects.filter(q => !questionBank.some(qb => qb.id === q.id)));
+        const needed = questionCount - questionBank.length;
+        questionBank.push(...randomQuestions.slice(0, needed));
+    }
     
     if (questionBank.length === 0) return [];
 
+    // 4. Create a summarized version of student progress
+    const summarizedProgress: any = {
+        weakTopics: {},
+        recentIncorrectAttempts: []
+    };
+    weakTopics.forEach(t => {
+        summarizedProgress.weakTopics[t.topicId] = studentProgress.progressByTopic[t.subjectId][t.topicId];
+    });
+
+    const allAttempts = [
+        ...Object.values(studentProgress.progressByTopic).flatMap(s => Object.values(s).flatMap(t => t.lastAttempt || [])),
+        ...(studentProgress.reviewSessions || []).flatMap(r => r.attempts || [])
+    ];
+    summarizedProgress.recentIncorrectAttempts = allAttempts.filter(a => !a.isCorrect).slice(-20); // Last 20 incorrect
+
     const prompt = `
         Você é um tutor de IA especialista em preparação para concursos. Sua tarefa é criar uma sessão de revisão inteligente e personalizada para um aluno.
-        Abaixo estão dois blocos de dados em JSON:
-        1. 'studentProgress': Contém o histórico de desempenho do aluno, incluindo pontuações por tópico e todas as tentativas de resposta. Um score baixo (menor que 0.7) indica dificuldade.
-        2. 'questionBank': Uma lista completa de todas as questões disponíveis.
+        Abaixo estão os dados:
+        1. 'summarizedProgress': Contém o desempenho do aluno nos seus tópicos mais fracos e seus erros recentes.
+        2. 'questionBank': Uma lista de questões focada APENAS nesses tópicos fracos (ou uma seleção geral se não houver dados de progresso).
 
-        Analise o 'studentProgress' para identificar os tópicos onde o aluno tem maior dificuldade. Com base nessa análise, selecione um conjunto de ${questionCount} questões do 'questionBank' que reforcem esses pontos fracos. Priorize questões dos tópicos com piores scores.
+        Selecione um conjunto de ${questionCount} questões do 'questionBank' que reforcem os pontos fracos do aluno. Varie os tópicos se possível.
         Retorne um array JSON contendo APENAS os ${questionCount} objetos de questão selecionados, seguindo estritamente o schema fornecido.
 
         ### DADOS ###
-        'studentProgress': ${JSON.stringify({ ...studentProgress, allAttempts })}
+        'summarizedProgress': ${JSON.stringify(summarizedProgress)}
         'questionBank': ${JSON.stringify(questionBank)}
     `;
 
@@ -174,8 +213,9 @@ async function generateReviewChallenge(studentProgress: StudentProgress, subject
     });
     
     const reviewQuestions = JSON.parse(response.text.trim());
-    return reviewQuestions as Question[];
+    return shuffleArray(reviewQuestions as Question[]);
 }
+
 
 const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: Subject[]): Question[] => {
     const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
