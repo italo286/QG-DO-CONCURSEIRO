@@ -43,7 +43,7 @@ interface StudentViewRouterProps {
     isSidebarCollapsed: boolean;
     quizInstanceKey: number;
     activeCustomQuiz: CustomQuiz | null;
-    isGeneratingChallenge: { review: boolean; glossary: boolean; portuguese: boolean; };
+    isGeneratingAllChallenges: boolean;
 
     // Callbacks
     onAcknowledgeMessage: (messageId: string) => void;
@@ -51,7 +51,7 @@ interface StudentViewRouterProps {
     onSubjectSelect: (subject: Subject) => void;
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
     onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
-    onGenerateChallenge: (type: 'review' | 'glossary' | 'portuguese') => void;
+    onGenerateAllChallenges: () => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
@@ -148,6 +148,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
 
     switch (props.view) {
         case 'dashboard':
+            // FIX: Removed incorrect props 'onGenerateChallenge' and 'isGeneratingChallenge' that are not expected by DashboardHome.
             return <DashboardHome {...props} />;
         case 'course':
             if (!props.selectedCourse) return null;
@@ -218,6 +219,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onAddBonusXp={props.onAddBonusXp}
             />;
         default:
+            // FIX: Removed incorrect props 'onGenerateChallenge' and 'isGeneratingChallenge' that are not expected by DashboardHome.
             return <DashboardHome {...props} />;
     }
 };

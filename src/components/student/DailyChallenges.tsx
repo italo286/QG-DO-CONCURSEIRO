@@ -1,17 +1,13 @@
 import React from 'react';
 import { StudentProgress, DailyChallenge } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { TranslateIcon, FireIcon, CycleIcon, TagIcon } from '../Icons';
+import { TranslateIcon, FireIcon, CycleIcon, TagIcon, SparklesIcon } from '../Icons';
 
 interface DailyChallengesProps {
     studentProgress: StudentProgress | null;
     onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese') => void;
-    onGenerateChallenge: (type: 'review' | 'glossary' | 'portuguese') => void;
-    isGenerating: {
-        review: boolean;
-        glossary: boolean;
-        portuguese: boolean;
-    };
+    onGenerateAllChallenges: () => void;
+    isGeneratingAll: boolean;
 }
 
 const ChallengeCard: React.FC<{
@@ -19,11 +15,9 @@ const ChallengeCard: React.FC<{
     icon: React.FC<{className?: string}>;
     challenge: DailyChallenge<any> | undefined;
     onStart: () => void;
-    onGenerate: () => void;
-    isGenerating: boolean;
     type: 'review' | 'glossary' | 'portuguese';
     studentProgress: StudentProgress | null;
-}> = ({ title, icon: Icon, challenge, onStart, onGenerate, isGenerating, type, studentProgress }) => {
+}> = ({ title, icon: Icon, challenge, onStart, type, studentProgress }) => {
     
     const maxAttemptsKey = `${type}ChallengeMaxAttempts` as keyof StudentProgress;
     const maxAttempts = studentProgress?.[maxAttemptsKey] as number | 'unlimited' | undefined ?? 1;
@@ -44,23 +38,24 @@ const ChallengeCard: React.FC<{
         iconColor = 'text-green-400';
     } else {
         switch(type) {
-            case 'review': cardClasses += 'from-rose-900 to-red-900 border-rose-700/50 hover:border-rose-400'; break;
-            case 'glossary': cardClasses += 'from-indigo-900 to-blue-900 border-indigo-700/50 hover:border-indigo-400'; break;
-            case 'portuguese': cardClasses += 'from-teal-900 to-green-900 border-teal-700/50 hover:border-teal-400'; break;
+            case 'review': cardClasses += 'from-rose-900 to-red-900 border-rose-700/50'; break;
+            case 'glossary': cardClasses += 'from-indigo-900 to-blue-900 border-indigo-700/50'; break;
+            case 'portuguese': cardClasses += 'from-teal-900 to-green-900 border-teal-700/50'; break;
         }
     }
 
-    const renderButton = () => {
-        if (isGenerating) {
-            return <Button disabled className="mt-3 text-sm py-2 px-3 w-full bg-black/20"><Spinner /> Gerando...</Button>;
-        }
+    const renderButtonOrStatus = () => {
         if (isEffectivelyCompleted) {
             return <p className="text-sm mt-3 text-green-300 font-semibold">Concluído hoje!</p>;
         }
-        if (challenge && itemsCount > 0) {
-            return <Button onClick={onStart} className="mt-3 text-sm py-2 px-3 w-full bg-black/20 hover:bg-black/40 border border-white/20">{hasStarted ? 'Continuar Desafio' : 'Começar Desafio'}</Button>;
+        if (challenge) {
+             if (itemsCount > 0) {
+                return <Button onClick={onStart} className="mt-3 text-sm py-2 px-3 w-full bg-black/20 hover:bg-black/40 border border-white/20">{hasStarted ? 'Continuar Desafio' : 'Começar Desafio'}</Button>;
+            } else {
+                return <p className="text-sm mt-3 text-gray-400">Nenhum item disponível hoje.</p>;
+            }
         }
-        return <Button onClick={onGenerate} className="mt-3 text-sm py-2 px-3 w-full bg-black/20 hover:bg-black/40 border border-white/20">Gerar Desafio</Button>;
+        return <p className="text-sm mt-3 text-gray-500">Aguardando geração...</p>;
     };
 
     return (
@@ -70,13 +65,13 @@ const ChallengeCard: React.FC<{
                 <h4 className="font-bold text-white">{title}</h4>
                 <p className="text-xs text-gray-400 mt-1">{challenge ? `${itemsCount} itens` : 'Pronto para gerar'}</p>
             </div>
-            {renderButton()}
+            {renderButtonOrStatus()}
         </div>
     );
 };
 
 
-export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge, onGenerateChallenge, isGenerating }) => {
+export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgress, onStartDailyChallenge, onGenerateAllChallenges, isGeneratingAll }) => {
     if (!studentProgress) return null;
 
     const { reviewChallenge, glossaryChallenge, portugueseChallenge, dailyChallengeStreak } = studentProgress;
@@ -84,14 +79,23 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
 
     return (
         <Card className="p-6">
-            <div className="flex justify-between items-center mb-4">
-                <h3 className="text-xl font-bold text-white">Desafios Diários</h3>
+            <div className="flex justify-between items-start mb-4">
+                <div>
+                    <h3 className="text-xl font-bold text-white">Desafios Diários</h3>
+                    <p className="text-sm text-gray-400">Clique no botão para gerar ou refazer seus desafios do dia.</p>
+                </div>
                 {streak > 0 && (
-                    <div className="flex items-center gap-2 px-3 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-300">
+                    <div className="flex-shrink-0 flex items-center gap-2 px-3 py-1 bg-orange-500/20 border border-orange-500/50 rounded-full text-orange-300">
                         <FireIcon className="h-5 w-5" />
                         <span className="font-bold text-sm">{streak} dia(s) de ofensiva</span>
                     </div>
                 )}
+            </div>
+            <div className="mb-6 text-center border-t border-b border-gray-700/50 py-4">
+                <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
+                    {isGeneratingAll ? <Spinner /> : <SparklesIcon className="h-5 w-5 mr-2" />}
+                    {isGeneratingAll ? 'Gerando...' : 'Gerar / Refazer Desafios Diários'}
+                </Button>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <ChallengeCard 
@@ -99,8 +103,6 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     icon={CycleIcon}
                     challenge={reviewChallenge}
                     onStart={() => onStartDailyChallenge(reviewChallenge!, 'review')}
-                    onGenerate={() => onGenerateChallenge('review')}
-                    isGenerating={isGenerating.review}
                     type="review"
                     studentProgress={studentProgress}
                 />
@@ -109,8 +111,6 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     icon={TagIcon}
                     challenge={glossaryChallenge}
                     onStart={() => onStartDailyChallenge(glossaryChallenge!, 'glossary')}
-                    onGenerate={() => onGenerateChallenge('glossary')}
-                    isGenerating={isGenerating.glossary}
                     type="glossary"
                     studentProgress={studentProgress}
                 />
@@ -119,8 +119,6 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({ studentProgres
                     icon={TranslateIcon}
                     challenge={portugueseChallenge}
                     onStart={() => onStartDailyChallenge(portugueseChallenge!, 'portuguese')}
-                    onGenerate={() => onGenerateChallenge('portuguese')}
-                    isGenerating={isGenerating.portuguese}
                     type="portuguese"
                     studentProgress={studentProgress}
                 />

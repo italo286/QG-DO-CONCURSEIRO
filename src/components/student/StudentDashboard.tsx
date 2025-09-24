@@ -58,8 +58,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
-    // FIX: Added isGeneratingChallenge state to track the loading state for generating daily challenges.
-    const [isGeneratingChallenge, setIsGeneratingChallenge] = useState({ review: false, glossary: false, portuguese: false });
+    const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
     const {
         isLoading,
@@ -233,43 +232,47 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         }
     };
 
-    // FIX: Added function to generate daily challenges on demand.
-    const handleGenerateDailyChallenge = async (type: 'review' | 'glossary' | 'portuguese') => {
+    const handleGenerateAllDailyChallenges = async () => {
         if (isPreview || !studentProgress) return;
-
-        setIsGeneratingChallenge(prev => ({ ...prev, [type]: true }));
+    
+        setIsGeneratingAllChallenges(true);
         try {
             const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
-            const response = await fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`O servidor respondeu com o status: ${response.status}. Detalhes: ${errorBody}`);
-            }
+            const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
             
-            const items: Question[] = await response.json();
+            const challengePromises = types.map(type => 
+                fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
+                    .then(async res => {
+                        if (!res.ok) {
+                             const errorBody = await res.text();
+                             throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
+                        }
+                        return res.json();
+                    })
+            );
+            
+            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
+            
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-
-            const newChallenge: DailyChallenge<Question> = {
-                date: todayISO,
-                items,
-                isCompleted: false,
-                attemptsMade: 0
-            };
+    
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
             
-            const challengeKey = `${type}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
             const newProgress = {
                 ...studentProgress,
-                [challengeKey]: newChallenge
+                reviewChallenge: newReviewChallenge,
+                glossaryChallenge: newGlossaryChallenge,
+                portugueseChallenge: newPortugueseChallenge,
             };
-
+            
             handleUpdateStudentProgress(newProgress, studentProgress);
-
+    
         } catch (error) {
-            console.error(`Error generating ${type} challenge:`, error);
-            alert(`Não foi possível gerar o desafio de ${type}. Tente novamente.`);
+            console.error("Erro ao gerar todos os desafios diários:", error);
+            alert("Não foi possível gerar todos os desafios. Por favor, tente novamente.");
         } finally {
-            setIsGeneratingChallenge(prev => ({ ...prev, [type]: false }));
+            setIsGeneratingAllChallenges(false);
         }
     };
 
@@ -292,8 +295,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
-                    onGenerateChallenge={handleGenerateDailyChallenge}
-                    isGeneratingChallenge={isGeneratingChallenge}
+                    onGenerateAllChallenges={handleGenerateAllDailyChallenges}
+                    isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
