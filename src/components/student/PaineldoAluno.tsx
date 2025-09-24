@@ -224,48 +224,12 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
     };
     
     const startDailyChallenge = (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp = false) => {
-        if (challenge && challenge.items && challenge.items.length > 0) {
+        if (challenge && challenge.items.length > 0) {
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');
         }
     };
-
-    const handleSaveDailyChallengeAttempt = useCallback((
-        challengeType: 'review' | 'glossary' | 'portuguese',
-        attempt: QuestionAttempt
-    ) => {
-        // Update local state for immediate feedback in QuizView
-        setActiveChallenge(prev => {
-            if (!prev) return null;
-            const existingAttempts = (prev.sessionAttempts || []).filter(a => a.questionId !== attempt.questionId);
-            return { ...prev, sessionAttempts: [...existingAttempts, attempt] };
-        });
-    
-        // Update main progress object and persist to Firestore
-        setStudentProgress(prevProgress => {
-            if (!prevProgress) return null;
-    
-            const newProgress = { ...prevProgress };
-            const challengeKey = `${challengeType}Challenge` as const;
-            const challengeData = newProgress[challengeKey];
-    
-            if (challengeData) {
-                const existingAttempts = (challengeData.sessionAttempts || []).filter(a => a.questionId !== attempt.questionId);
-                const updatedAttempts = [...existingAttempts, attempt];
-                
-                newProgress[challengeKey] = { ...challengeData, sessionAttempts: updatedAttempts };
-    
-                if (!isPreview) {
-                    FirebaseService.saveStudentProgress(newProgress).catch(err => {
-                        console.error("Failed to save daily challenge progress:", err);
-                    });
-                }
-            }
-    
-            return newProgress;
-        });
-    }, [isPreview, setStudentProgress]);
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
@@ -366,7 +330,15 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={handleSaveDailyChallengeAttempt}
+                    onSaveDailyChallengeAttempt={(_, attempt) => {
+                        setActiveChallenge(prev => {
+                            if(!prev) return null;
+                            const updatedChallenge = {...prev};
+                            if (!updatedChallenge.sessionAttempts) updatedChallenge.sessionAttempts = [];
+                            updatedChallenge.sessionAttempts.push(attempt);
+                            return updatedChallenge;
+                        });
+                    }}
                     handleGameComplete={(gameId) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
