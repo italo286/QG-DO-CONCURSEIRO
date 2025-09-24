@@ -270,11 +270,14 @@ export const handler: Handler = async (event) => {
                         responseSchema: portugueseQuestionSchema,
                     }
                 });
+                
+                console.log(`[GEMINI_RAW_RESPONSE] Student ${studentId}: ${ptResponse.text}`);
 
                 let parsedQuestions: any[] = [];
                 if (ptResponse.text) {
                     try {
-                        const parsedData = JSON.parse(ptResponse.text.trim());
+                        const responseText = ptResponse.text.trim();
+                        const parsedData = JSON.parse(responseText);
                         if (Array.isArray(parsedData)) {
                             parsedQuestions = parsedData;
                         } else if (typeof parsedData === 'object' && parsedData !== null) {
@@ -282,8 +285,8 @@ export const handler: Handler = async (event) => {
                         } else {
                             console.warn(`[GEMINI_WARN] Unexpected JSON type for student ${studentId}. Type: ${typeof parsedData}`);
                         }
-                    } catch (e) {
-                        console.error(`[PARSE_ERROR] PT Student ${studentId}:`, e);
+                    } catch (e: any) {
+                        console.error(`[PARSE_ERROR] PT Student ${studentId}. Failed to parse JSON. Error: ${e.message}. Raw Text: "${ptResponse.text}"`);
                     }
                 } else {
                     console.warn(`[GEMINI_WARN] Empty response from Gemini for student ${studentId}. Might be due to safety filters.`);
@@ -291,8 +294,6 @@ export const handler: Handler = async (event) => {
                 
                 const portugueseChallenge: DailyChallenge<Question> = {
                     date: dateISO,
-                    // FIX: Explicitly construct the Question object to ensure type safety and
-                    // transform `optionJustifications` from an array (returned by AI) to a map (expected by type).
                     items: parsedQuestions.map((q, i) => {
                         const optionJustifications: { [key: string]: string } = {};
                         if (Array.isArray(q.optionJustifications)) {
@@ -316,6 +317,7 @@ export const handler: Handler = async (event) => {
                     attemptsMade: 0,
                 };
                 
+                console.log(`[FIRESTORE_PAYLOAD] Portuguese challenge for student ${studentId}: ${JSON.stringify(portugueseChallenge)}`);
                 return { studentId, updatePayload: { reviewChallenge, glossaryChallenge, portugueseChallenge } };
 
             } catch (studentError: any) {

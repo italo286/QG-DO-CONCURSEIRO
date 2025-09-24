@@ -95,7 +95,7 @@ const ChallengeCard: React.FC<{
             <div>
                 <Icon className={`h-10 w-10 mx-auto mb-2 ${iconColor}`} />
                 <h4 className="font-bold text-white">{title}</h4>
-                <p className="text-xs text-gray-400 mt-1">{itemsCount} {type === 'portuguese' ? 'frases' : (type === 'glossary' ? 'termos' : 'questões')}</p>
+                <p className="text-xs text-gray-400 mt-1">{itemsCount > 0 ? `${itemsCount} ${type === 'portuguese' ? 'frases' : (type === 'glossary' ? 'termos' : 'questões')}` : "Indisponível hoje"}</p>
             </div>
             
             {isEffectivelyCompleted ? (
@@ -103,10 +103,10 @@ const ChallengeCard: React.FC<{
             ) : (
                 <Button 
                     onClick={onStart} 
-                    disabled={itemsCount === 0} 
+                    disabled={!challenge || itemsCount === 0} 
                     className="mt-3 text-sm py-2 px-3 w-full bg-black/20 hover:bg-black/40 border border-white/20"
                 >
-                    {itemsCount > 0 ? (hasStarted ? 'Continuar Desafio' : 'Começar') : 'N/A para hoje'}
+                    {challenge && itemsCount > 0 ? (hasStarted ? 'Continuar Desafio' : 'Começar') : 'N/A para hoje'}
                 </Button>
             )}
         </div>
