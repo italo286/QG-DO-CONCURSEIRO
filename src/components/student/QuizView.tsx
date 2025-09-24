@@ -533,6 +533,9 @@ export const QuizView: React.FC<{
     const isCorrect = isCurrentQuestionAnswered && attemptForCurrentQuestion.isCorrect;
     const currentJustifications = fetchedJustifications[questionId] || optionJustifications;
     
+    // FIX: If statement is missing (sometimes happens with AI), construct it from options.
+    const displaySentence = statement || (options || []).join(' ');
+
     return (
         <>
             <Card className="p-6">
@@ -585,7 +588,7 @@ export const QuizView: React.FC<{
                 )}
 
                 {dailyChallengeType === 'portuguese' ? (
-                     <div className="prose prose-invert max-w-none mb-4 text-center italic p-4 bg-gray-800/50 rounded-lg" dangerouslySetInnerHTML={{ __html: markdownToHtml(statement) }}></div>
+                     <div className="prose prose-invert max-w-none mb-4 text-center italic p-4 bg-gray-800/50 rounded-lg" dangerouslySetInnerHTML={{ __html: markdownToHtml(displaySentence) }}></div>
                 ) : (
                     <div className="prose prose-invert max-w-none mb-4" dangerouslySetInnerHTML={{ __html: markdownToHtml(statement) }}></div>
                 )}
