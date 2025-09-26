@@ -57,27 +57,32 @@ const CountdownTimer: React.FC = () => {
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
     const todayBrasilia = getBrasiliaDate();
-    const todayISO = getLocalDateISOString(todayBrasilia);
+    const todayClean = new Date(todayBrasilia);
+    todayClean.setUTCHours(0, 0, 0, 0);
+
     const todayDayOfWeek = todayBrasilia.getUTCDay(); // 0 for Sunday, 1 for Monday, etc.
 
     // Calculate the start of the week (Sunday)
-    const weekStart = getBrasiliaDate();
+    const weekStart = new Date(todayBrasilia);
     weekStart.setUTCDate(todayBrasilia.getUTCDate() - todayDayOfWeek);
+    weekStart.setUTCHours(0, 0, 0, 0);
 
-    const weekDates = Array.from({ length: 7 }).map((_, i) => {
+    const weekDateObjects = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(weekStart.getTime());
         date.setUTCDate(weekStart.getUTCDate() + i);
-        return getLocalDateISOString(date);
+        return date;
     });
 
     return (
         <div className="flex justify-center items-center gap-3 md:gap-4 my-4">
-            {weekDates.map((dateISO, index) => {
+            {weekDateObjects.map((date, index) => {
+                const dateISO = getLocalDateISOString(date);
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
                 const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
                 const isPartiallyCompleted = completions && (completions.review || completions.glossary || completions.portuguese);
-                const isPastDay = dateISO < todayISO;
-                const isCurrentDay = dateISO === todayISO;
+                
+                const isPastDay = date.getTime() < todayClean.getTime();
+                const isCurrentDay = date.getTime() === todayClean.getTime();
 
                 let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ';
                 let content: React.ReactNode = WEEK_DAYS[index];
@@ -94,9 +99,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
                     styles += 'bg-gray-700 text-gray-400';
                 }
 
-                // Add a title for accessibility and hover info
-                const dateForTitle = new Date(`${dateISO}T12:00:00Z`);
-                const title = dateForTitle.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+                const title = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
 
                 return (
                     <div key={dateISO} className={styles} title={title}>
