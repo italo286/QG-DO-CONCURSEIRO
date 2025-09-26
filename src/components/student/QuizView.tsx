@@ -171,42 +171,34 @@ export const QuizView: React.FC<{
     const quizId = useMemo(() => questions.length > 0 ? questions.map(q => q.id).join(',') : null, [questions]);
 
     useEffect(() => {
+        const isCompletedFromProps = questions.length > 0 && initialAttempts.length === questions.length;
         const isNewQuiz = prevQuizIdRef.current !== quizId;
 
-        // Only perform a full state reset if it's a new quiz.
-        // This prevents the component from jumping to the next question automatically
-        // when a re-render is caused by saving an attempt.
         if (isNewQuiz) {
             prevQuizIdRef.current = quizId;
 
-            const isCompletedFromProps = questions.length > 0 && initialAttempts.length === questions.length;
-
-            // Reset Core State for a new quiz
-            setSessionAttempts(initialAttempts);
+            // Full reset for a new quiz
             setShowResults(isDailyChallenge ? false : isCompletedFromProps);
-            setHasCompleted(isCompletedFromProps);
             setCurrentIndex(isCompletedFromProps ? 0 : initialAttempts.length);
+            
+            // Reset UI and other secondary state
             setSelectedOption(null);
             setTimeLeft(durationInSeconds);
-
-            // Reset Gamification/UI State
             setComboStreak(0);
             setMotivationalMessage(null);
             setThresholdsMet(new Set());
             setShowComboToast(false);
-            
-            // Reset Question-specific State
             setEliminatedOptions(new Set());
             setFetchedJustifications({});
             setIsFetchingJustifications(null);
             setReportedQuestions(new Set());
             setQuestionToReport(null);
-        } else {
-            // This is a re-render for the same quiz. We only sync the session attempts
-            // from the parent, as that's the only prop that should change during a quiz.
-            // Crucially, we do NOT reset currentIndex or other UI states.
-            setSessionAttempts(initialAttempts);
         }
+
+        // Always sync these states with props
+        setSessionAttempts(initialAttempts);
+        setHasCompleted(isCompletedFromProps);
+
     }, [questions, initialAttempts, durationInSeconds, isDailyChallenge, quizId]);
     
     useEffect(() => {
