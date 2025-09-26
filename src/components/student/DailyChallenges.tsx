@@ -79,24 +79,31 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
                 const dateISO = getLocalDateISOString(date);
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
                 const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
-                const isPartiallyCompleted = completions && (completions.review || completions.glossary || completions.portuguese);
-                
+
                 const isPastDay = date.getTime() < todayClean.getTime();
                 const isCurrentDay = date.getTime() === todayClean.getTime();
 
                 let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ';
                 let content: React.ReactNode = WEEK_DAYS[index];
-
-                if (isFullyCompleted) {
-                    styles += 'bg-green-500 text-white';
-                    content = <CheckIcon className="h-6 w-6" />;
-                } else if (isPastDay && isPartiallyCompleted) {
-                    styles += 'bg-red-800 text-red-300';
-                    content = <XCircleIcon className="h-8 w-8" />;
-                } else if (isCurrentDay) {
+                
+                if (isCurrentDay) {
                     styles += 'bg-cyan-500 text-white ring-2 ring-offset-2 ring-offset-gray-800 ring-cyan-400';
-                } else {
+                    if (isFullyCompleted) {
+                        content = <CheckIcon className="h-6 w-6" />;
+                    } else {
+                        content = WEEK_DAYS[index];
+                    }
+                } else if (isPastDay) {
+                    if (isFullyCompleted) {
+                        styles += 'bg-green-500 text-white';
+                        content = <CheckIcon className="h-6 w-6" />;
+                    } else { // Not fully completed (partial or zero)
+                        styles += 'bg-red-800 text-red-300';
+                        content = <XCircleIcon className="h-8 w-8" />;
+                    }
+                } else { // isFutureDay
                     styles += 'bg-gray-700 text-gray-400';
+                    content = WEEK_DAYS[index];
                 }
 
                 const title = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
