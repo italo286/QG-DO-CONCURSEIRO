@@ -276,6 +276,7 @@ const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: S
     const uniqueTerms = Array.from(new Map(allTerms.map(item => [item.term, item])).values());
     if (uniqueTerms.length < 5) return [];
 
+    const definitionToTermMap = new Map(uniqueTerms.map(t => [t.definition, t.term]));
     const challengeQuestions: Question[] = [];
     const usedTerms = new Set<string>();
 
@@ -296,12 +297,29 @@ const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: S
             options.push(shuffledOther[j]);
         }
         
+        const shuffledOptions = shuffleArray(options);
+
+        const optionJustifications: { [optionText: string]: string } = {};
+        shuffledOptions.forEach(option => {
+            if (option === correctAnswer) {
+                optionJustifications[option] = `Esta é a definição correta para o termo "${term.term}".`;
+            } else {
+                const correspondingTerm = definitionToTermMap.get(option);
+                if (correspondingTerm) {
+                    optionJustifications[option] = `Esta definição se refere ao termo "${correspondingTerm}", e não a "${term.term}".`;
+                } else {
+                    optionJustifications[option] = `Esta definição está incorreta para o termo "${term.term}".`;
+                }
+            }
+        });
+
         challengeQuestions.push({
             id: `glossary-${Date.now()}-${i}`,
             statement: `Qual é a definição de "${term.term}"?`,
-            options: shuffleArray(options),
+            options: shuffledOptions,
             correctAnswer: correctAnswer,
-            justification: `"${term.term}" significa: ${term.definition}.`
+            justification: `"${term.term}" significa: ${term.definition}.`,
+            optionJustifications: optionJustifications,
         });
     }
 
@@ -334,8 +352,30 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         }
     });
 
-    const generatedQuestions = JSON.parse(response.text.trim());
-    return generatedQuestions as Question[];
+    const rawQuestions = JSON.parse(response.text.trim());
+    
+    // Process questions to match the Question type, especially the optionJustifications
+    return rawQuestions.map((q: any, index: number) => {
+        const cleanedOptionJustifications: { [key: string]: string } = {};
+        if (Array.isArray(q.optionJustifications)) {
+            q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                // Ensure the option from justification exists in the main options array
+                if (item.option && item.justification && q.options.includes(item.option)) {
+                    cleanedOptionJustifications[item.option] = item.justification;
+                }
+            });
+        }
+
+        return {
+            id: `port-challenge-${Date.now()}-${index}`,
+            statement: q.statement,
+            options: q.options,
+            correctAnswer: q.correctAnswer,
+            justification: q.justification,
+            optionJustifications: cleanedOptionJustifications,
+            errorCategory: q.errorCategory,
+        };
+    });
 }
 
 
