@@ -176,7 +176,7 @@ export const QuizView: React.FC<{
 
         // Reset Core State
         setSessionAttempts(initialAttempts);
-        setShowResults(isCompletedFromProps);
+        setShowResults(isDailyChallenge ? false : isCompletedFromProps);
         setHasCompleted(isCompletedFromProps);
         setCurrentIndex(isCompletedFromProps ? 0 : initialAttempts.length);
         setSelectedOption(null);
@@ -194,7 +194,7 @@ export const QuizView: React.FC<{
         setIsFetchingJustifications(null);
         setReportedQuestions(new Set());
         setQuestionToReport(null);
-    }, [questions, initialAttempts, durationInSeconds]);
+    }, [questions, initialAttempts, durationInSeconds, isDailyChallenge]);
     
     useEffect(() => {
         if (motivationalMessage) {
@@ -439,7 +439,7 @@ export const QuizView: React.FC<{
         }
     };
 
-    if (showResults || hasCompleted) {
+    if (showResults) {
         const score = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
         const passedChallenge = score >= 60; // 60% to pass daily challenge
         
@@ -523,7 +523,6 @@ export const QuizView: React.FC<{
 
                 <div className="text-center mt-6 flex justify-center flex-wrap gap-2">
                     {!hideBackButtonOnResults && <Button onClick={onBack} className="bg-gray-600 hover:bg-gray-500"><ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180"/> Voltar</Button>}
-                    {isDailyChallenge && onNavigateToDailyChallengeResults && <Button onClick={onNavigateToDailyChallengeResults}>Ver Resumo Final</Button>}
                     <Button onClick={handleGenerateFeedback} disabled={isFeedbackLoading}>
                         {isFeedbackLoading ? <Spinner/> : <><GeminiIcon className="h-5 w-5 mr-2" /> Gerar Feedback</>}
                     </Button>

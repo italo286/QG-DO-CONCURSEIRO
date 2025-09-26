@@ -56,13 +56,13 @@ const CountdownTimer: React.FC = () => {
 };
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
-    const today = getBrasiliaDate();
-    today.setUTCHours(0, 0, 0, 0); // Normalize to start of day for comparison
-    const todayIndex = today.getUTCDay();
+    const todayBrasilia = getBrasiliaDate();
+    const todayISO = getLocalDateISOString(todayBrasilia);
+    const todayDayOfWeek = todayBrasilia.getUTCDay(); // 0 for Sunday, 1 for Monday, etc.
 
+    // Calculate the start of the week (Sunday)
     const weekStart = getBrasiliaDate();
-    weekStart.setUTCDate(today.getUTCDate() - todayIndex);
-    weekStart.setUTCHours(0, 0, 0, 0);
+    weekStart.setUTCDate(todayBrasilia.getUTCDate() - todayDayOfWeek);
 
     const weekDates = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(weekStart.getTime());
@@ -73,11 +73,11 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
     return (
         <div className="flex justify-center items-center gap-3 md:gap-4 my-4">
             {weekDates.map((dateISO, index) => {
-                const dateObj = new Date(dateISO + 'T00:00:00Z');
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
                 const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
-                const isPastDay = dateObj < today;
-                const isCurrentDay = dateObj.getTime() === today.getTime();
+                const isPartiallyCompleted = completions && (completions.review || completions.glossary || completions.portuguese);
+                const isPastDay = dateISO < todayISO;
+                const isCurrentDay = dateISO === todayISO;
 
                 let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ';
                 let content: React.ReactNode = WEEK_DAYS[index];
@@ -85,7 +85,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
                 if (isFullyCompleted) {
                     styles += 'bg-green-500 text-white';
                     content = <CheckIcon className="h-6 w-6" />;
-                } else if (isPastDay && completions) { // A past day with partial (but not full) completion
+                } else if (isPastDay && isPartiallyCompleted) {
                     styles += 'bg-red-800 text-red-300';
                     content = <XCircleIcon className="h-8 w-8" />;
                 } else if (isCurrentDay) {
@@ -94,8 +94,12 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
                     styles += 'bg-gray-700 text-gray-400';
                 }
 
+                // Add a title for accessibility and hover info
+                const dateForTitle = new Date(`${dateISO}T12:00:00Z`);
+                const title = dateForTitle.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+
                 return (
-                    <div key={dateISO} className={styles} title={new Date(dateISO + 'T12:00:00Z').toLocaleDateString('pt-BR')}>
+                    <div key={dateISO} className={styles} title={title}>
                         {content}
                     </div>
                 );

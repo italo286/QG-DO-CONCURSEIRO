@@ -215,8 +215,8 @@ export const ProfessorReviewsDashboard: React.FC<{
                     </div>
                 </Card>
             </div>
-            <div className="lg:col-span-1 space-y-8">
-                <Card className="p-6 sticky top-8">
+            <div className="lg:col-span-1 space-y-8 self-start sticky top-8">
+                <Card className="p-6">
                     {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
                     <h3 className="font-bold text-lg text-cyan-400 mb-4">Criar Nova Revisão</h3>
                     <div className="space-y-4">
