@@ -175,7 +175,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     const shouldHighlight = !challengesGeneratedToday || hasPendingChallenges;
 
     return (
-        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border border-yellow-500/30 shadow-lg shadow-orange-500/20' : ''}`}>
+        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-yellow-500/70 to-orange-500/70 backdrop-blur-lg border border-yellow-500/30 shadow-lg shadow-orange-500/20' : ''}`}>
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-bold text-white">Sua Trilha Diária</h3>
                 {streak > 0 && (
