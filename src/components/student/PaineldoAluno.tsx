@@ -320,14 +320,16 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
             
             const { reviewChallenge, glossaryChallenge, portugueseChallenge } = await response.json();
             
-            const newProgress = {
-                ...studentProgress,
-                reviewChallenge,
-                glossaryChallenge,
-                portugueseChallenge,
-            };
-            
-            handleUpdateStudentProgress(newProgress, studentProgress);
+            // The server now handles the database write. We only need to update the local state for a fast UI response.
+            setStudentProgress(prev => {
+                if (!prev) return null;
+                return {
+                    ...prev,
+                    reviewChallenge,
+                    glossaryChallenge,
+                    portugueseChallenge,
+                };
+            });
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);

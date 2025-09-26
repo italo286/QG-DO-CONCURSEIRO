@@ -1,6 +1,7 @@
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
+import { FieldValue } from 'firebase-admin/firestore';
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 import { StudentProgress, Subject, Course, Question, GlossaryTerm, Topic, SubTopic, DailyChallenge } from '../../src/types.server';
 
 // --- Firebase Admin Initialization ---
@@ -177,7 +178,10 @@ const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: S
 async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
     
-    // Optimized: Added thinkingConfig to drastically reduce latency and avoid timeouts.
+    // OTIMIZAÇÃO DE PERFORMANCE:
+    // A configuração `thinkingConfig: { thinkingBudget: 0 }` desativa o "tempo de reflexão" da IA.
+    // Para uma tarefa estruturada como esta, a qualidade da resposta é mantida, mas a velocidade
+    // da resposta é drasticamente maior, evitando timeouts (erro 504) na função serverless.
     const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Crie ${questionCount} questão(ões) de português no formato de 'encontre o erro'. A frase completa é o 'statement'. As 'options' são 5 trechos da frase. 'correctAnswer' é o trecho com o erro. 'justification' explica o erro. 'errorCategory' classifica o erro (ex: 'Crase'). Retorne um array JSON.`,
@@ -228,10 +232,31 @@ export const handler: Handler = async (event: HandlerEvent) => {
         
         const todayISO = getLocalDateISOString(getBrasiliaDate());
 
+        // CRIAÇÃO DOS OBJETOS DE DESAFIO COMPLETOS E ZERADOS
+        // É crucial incluir `sessionAttempts: []` para garantir que tentativas anteriores sejam limpas.
+        const reviewChallenge = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+        const glossaryChallenge = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+        const portugueseChallenge = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+
+        // ATUALIZAÇÃO ATÔMICA NO FIRESTORE
+        // Para garantir que os desafios sempre apareçam como novos, esta função primeiro deleta
+        // qualquer estado de desafio antigo do dia e depois insere os novos desafios.
+        // Isso replica a funcionalidade de "reset" do professor e previne o bug de desafios
+        // aparecerem como já concluídos.
+        const progressRef = db.collection('studentProgress').doc(studentId);
+        await progressRef.update({
+            // Substitui completamente os objetos de desafio antigos pelos novos
+            reviewChallenge: reviewChallenge,
+            glossaryChallenge: glossaryChallenge,
+            portugueseChallenge: portugueseChallenge,
+            // Deleta o registro de conclusão do dia para garantir que a UI de acompanhamento semanal seja resetada.
+            [`dailyChallengeCompletions.${todayISO}`]: FieldValue.delete()
+        });
+
         const responsePayload = {
-            reviewChallenge: { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 } as DailyChallenge<Question>,
-            glossaryChallenge: { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 } as DailyChallenge<Question>,
-            portugueseChallenge: { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 } as DailyChallenge<Question>
+            reviewChallenge,
+            glossaryChallenge,
+            portugueseChallenge,
         };
         
         return {
