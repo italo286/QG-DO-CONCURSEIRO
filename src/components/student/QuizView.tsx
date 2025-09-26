@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import * as GeminiService from '../../services/geminiService';
 import { Question, QuestionAttempt } from '../../types';
 import { markdownToHtml, generateQuestionsPdf } from '../../utils';
@@ -167,34 +167,47 @@ export const QuizView: React.FC<{
     }, [sessionAttempts, questions]);
 
 
+    const prevQuizIdRef = useRef<string | null>(null);
+    const quizId = useMemo(() => questions.length > 0 ? questions.map(q => q.id).join(',') : null, [questions]);
+
     useEffect(() => {
-        // This effect unconditionally resets the entire component's state whenever the
-        // questions prop changes. This is the most robust way to ensure that a new quiz
-        // session (like a new daily challenge) starts fresh, fixing a bug where old
-        // state (like completion status and answers) could persist between challenges.
-        const isCompletedFromProps = questions.length > 0 && initialAttempts.length === questions.length;
+        const isNewQuiz = prevQuizIdRef.current !== quizId;
 
-        // Reset Core State
-        setSessionAttempts(initialAttempts);
-        setShowResults(isDailyChallenge ? false : isCompletedFromProps);
-        setHasCompleted(isCompletedFromProps);
-        setCurrentIndex(isCompletedFromProps ? 0 : initialAttempts.length);
-        setSelectedOption(null);
-        setTimeLeft(durationInSeconds);
+        // Only perform a full state reset if it's a new quiz.
+        // This prevents the component from jumping to the next question automatically
+        // when a re-render is caused by saving an attempt.
+        if (isNewQuiz) {
+            prevQuizIdRef.current = quizId;
 
-        // Reset Gamification/UI State
-        setComboStreak(0);
-        setMotivationalMessage(null);
-        setThresholdsMet(new Set());
-        setShowComboToast(false);
-        
-        // Reset Question-specific State
-        setEliminatedOptions(new Set());
-        setFetchedJustifications({});
-        setIsFetchingJustifications(null);
-        setReportedQuestions(new Set());
-        setQuestionToReport(null);
-    }, [questions, initialAttempts, durationInSeconds, isDailyChallenge]);
+            const isCompletedFromProps = questions.length > 0 && initialAttempts.length === questions.length;
+
+            // Reset Core State for a new quiz
+            setSessionAttempts(initialAttempts);
+            setShowResults(isDailyChallenge ? false : isCompletedFromProps);
+            setHasCompleted(isCompletedFromProps);
+            setCurrentIndex(isCompletedFromProps ? 0 : initialAttempts.length);
+            setSelectedOption(null);
+            setTimeLeft(durationInSeconds);
+
+            // Reset Gamification/UI State
+            setComboStreak(0);
+            setMotivationalMessage(null);
+            setThresholdsMet(new Set());
+            setShowComboToast(false);
+            
+            // Reset Question-specific State
+            setEliminatedOptions(new Set());
+            setFetchedJustifications({});
+            setIsFetchingJustifications(null);
+            setReportedQuestions(new Set());
+            setQuestionToReport(null);
+        } else {
+            // This is a re-render for the same quiz. We only sync the session attempts
+            // from the parent, as that's the only prop that should change during a quiz.
+            // Crucially, we do NOT reset currentIndex or other UI states.
+            setSessionAttempts(initialAttempts);
+        }
+    }, [questions, initialAttempts, durationInSeconds, isDailyChallenge, quizId]);
     
     useEffect(() => {
         if (motivationalMessage) {
@@ -700,7 +713,7 @@ export const QuizView: React.FC<{
                                 <ArrowRightIcon className="h-5 w-5 transform rotate-180"/>
                             </Button>
                             {!isCurrentQuestionAnswered ? (
-                                <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
+                                <Button onClick={handleRespond}>Responder</Button>
                             ) : (
                                 <Button onClick={handleNext}>
                                     {isLastQuestion ? 'Ver Resultados' : 'Próxima'}
