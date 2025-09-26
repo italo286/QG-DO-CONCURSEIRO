@@ -1,6 +1,7 @@
 import { db, storage, firebase } from '../firebaseConfig';
 // FIX: Imported Question type to resolve reference error.
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic, Question } from '../types';
+import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 
 type Unsubscribe = () => void;
 // type Timestamp = firebase.firestore.Timestamp; // This was being used incorrectly as timestamps are stored as numbers
@@ -406,6 +407,20 @@ export const listenToStudentProgressForTeacher = (studentIds: string[], callback
     });
     
     return () => unsubs.forEach(unsub => unsub());
+};
+
+export const resetDailyChallengesForStudent = async (studentId: string): Promise<void> => {
+    const progressRef = db.collection('studentProgress').doc(studentId);
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+
+    // Use FieldValue.delete() to completely remove the fields for the current day.
+    // This will make the student's app behave as if challenges were never generated.
+    await progressRef.update({
+        reviewChallenge: firebase.firestore.FieldValue.delete(),
+        glossaryChallenge: firebase.firestore.FieldValue.delete(),
+        portugueseChallenge: firebase.firestore.FieldValue.delete(),
+        [`dailyChallengeCompletions.${todayISO}`]: firebase.firestore.FieldValue.delete()
+    });
 };
 
 

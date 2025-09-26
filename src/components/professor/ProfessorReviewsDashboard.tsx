@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { User, Subject, ReviewSession, StudentProgress, Question } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { UserCircleIcon, ChevronDownIcon } from '../Icons';
+import { UserCircleIcon, ChevronDownIcon, RefreshIcon } from '../Icons';
 
 export const ProfessorReviewsDashboard: React.FC<{
     students: User[];
@@ -16,6 +16,8 @@ export const ProfessorReviewsDashboard: React.FC<{
     
     const [allProgress, setAllProgress] = useState<{ [studentId: string]: StudentProgress }>({});
     const [isLoadingProgress, setIsLoadingProgress] = useState(true);
+    const [selectedStudentForReset, setSelectedStudentForReset] = useState<string>('');
+    const [isResetting, setIsResetting] = useState(false);
 
     useEffect(() => {
         setIsLoadingProgress(true);
@@ -140,6 +142,27 @@ export const ProfessorReviewsDashboard: React.FC<{
     const toggleStudent = (id: string) => setSelectedStudentIds(prev => prev.includes(id) ? prev.filter(sid => sid !== id) : [...prev, id]);
     const toggleQuestion = (id: string) => setSelectedQuestionIds(prev => prev.includes(id) ? prev.filter(qid => qid !== id) : [...prev, id]);
 
+    const handleResetChallenges = async () => {
+        if (!selectedStudentForReset) {
+            setToastMessage("Por favor, selecione um aluno.");
+            return;
+        }
+    
+        const studentName = students.find(s => s.id === selectedStudentForReset)?.name || 'o aluno';
+        if (window.confirm(`Tem certeza que deseja resetar os desafios diários de hoje para ${studentName}? Isso permitirá que ele(a) gere os desafios novamente.`)) {
+            setIsResetting(true);
+            try {
+                await FirebaseService.resetDailyChallengesForStudent(selectedStudentForReset);
+                setToastMessage(`Desafios para ${studentName} resetados com sucesso!`);
+            } catch (error) {
+                console.error("Failed to reset daily challenges:", error);
+                setToastMessage("Ocorreu um erro ao resetar os desafios.");
+            } finally {
+                setIsResetting(false);
+            }
+        }
+    };
+
     return (
          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
@@ -192,7 +215,7 @@ export const ProfessorReviewsDashboard: React.FC<{
                     </div>
                 </Card>
             </div>
-             <div className="lg:col-span-1">
+            <div className="lg:col-span-1 space-y-8">
                 <Card className="p-6 sticky top-8">
                     {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
                     <h3 className="font-bold text-lg text-cyan-400 mb-4">Criar Nova Revisão</h3>
@@ -243,6 +266,38 @@ export const ProfessorReviewsDashboard: React.FC<{
                                 Enviar Revisão
                             </Button>
                          </div>
+                    </div>
+                </Card>
+
+                <Card className="p-6">
+                    <h3 className="font-bold text-lg text-yellow-400 mb-4 flex items-center gap-2">
+                        <RefreshIcon className="h-5 w-5" /> Ferramenta de Teste
+                    </h3>
+                    <div className="space-y-4">
+                        <div>
+                            <label htmlFor="student-reset-select" className="block text-sm font-medium text-gray-300">Resetar Desafios Diários</label>
+                            <p className="text-xs text-gray-400 mb-2">Selecione um aluno para limpar os desafios gerados hoje, permitindo um novo teste.</p>
+                            <select
+                                id="student-reset-select"
+                                value={selectedStudentForReset}
+                                onChange={e => setSelectedStudentForReset(e.target.value)}
+                                className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"
+                            >
+                                <option value="" disabled>Selecione um aluno...</option>
+                                {students.map(student => (
+                                    <option key={student.id} value={student.id}>
+                                        {student.name || student.username}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                        <Button
+                            onClick={handleResetChallenges}
+                            disabled={isResetting || !selectedStudentForReset}
+                            className="w-full bg-yellow-600 hover:bg-yellow-700"
+                        >
+                            {isResetting ? <Spinner /> : 'Resetar Desafios de Hoje'}
+                        </Button>
                     </div>
                 </Card>
             </div>
