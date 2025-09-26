@@ -176,13 +176,15 @@ const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: S
 
 async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
-    const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa...`; // Abridged for brevity
-
-    // Optimized: Removed responseSchema to prevent timeouts on complex requests.
+    
+    // Optimized: Added thinkingConfig to drastically reduce latency and avoid timeouts.
     const response: GenerateContentResponse = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
         contents: `Crie ${questionCount} questão(ões) de português no formato de 'encontre o erro'. A frase completa é o 'statement'. As 'options' são 5 trechos da frase. 'correctAnswer' é o trecho com o erro. 'justification' explica o erro. 'errorCategory' classifica o erro (ex: 'Crase'). Retorne um array JSON.`,
-        config: { responseMimeType: 'application/json' }
+        config: {
+            responseMimeType: 'application/json',
+            thinkingConfig: { thinkingBudget: 0 }
+        }
     });
 
     const rawQuestions = JSON.parse(response.text.trim());
