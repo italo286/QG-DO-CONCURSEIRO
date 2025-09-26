@@ -310,39 +310,28 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setIsGeneratingAllChallenges(true);
         try {
             const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
-            const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
             
-            const challengePromises = types.map(type => 
-                fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
-                    .then(async res => {
-                        if (!res.ok) {
-                             const errorBody = await res.text();
-                             throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
-                        }
-                        return res.json();
-                    })
-            );
+            const response = await fetch(`/.netlify/functions/generateDailyChallenges?apiKey=${apiKey}&studentId=${user.id}`);
             
-            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
+            if (!response.ok) {
+                const errorBody = await response.text();
+                throw new Error(`Falha ao gerar desafios: ${response.status} ${errorBody}`);
+            }
             
-            const todayISO = getLocalDateISOString(getBrasiliaDate());
-    
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
+            const { reviewChallenge, glossaryChallenge, portugueseChallenge } = await response.json();
             
             const newProgress = {
                 ...studentProgress,
-                reviewChallenge: newReviewChallenge,
-                glossaryChallenge: newGlossaryChallenge,
-                portugueseChallenge: newPortugueseChallenge,
+                reviewChallenge,
+                glossaryChallenge,
+                portugueseChallenge,
             };
             
             handleUpdateStudentProgress(newProgress, studentProgress);
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert("Não foi possível gerar todos os desafios. Por favor, tente novamente.");
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
