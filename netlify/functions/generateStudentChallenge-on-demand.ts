@@ -348,7 +348,6 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
-            responseSchema: questionSchema
         }
     });
 

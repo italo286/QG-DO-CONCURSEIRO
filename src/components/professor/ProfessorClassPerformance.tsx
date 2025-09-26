@@ -37,8 +37,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
-        // FIX: The original chained `flatMap` was not robust against malformed progress data, causing a TypeScript error where a parameter was inferred as `unknown`. The logic is updated to safely filter and map the attempts.
-        // FIX: Added a filter with a type guard to safely handle potentially malformed progress data and resolve the TypeScript error where 'p' was inferred as 'unknown'.
+        // FIX: The original chained flatMap was not robust against malformed progress data, causing a TypeScript error where a parameter was inferred as 'unknown'. The logic is updated to safely filter and map the attempts.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
             .filter((p): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
