@@ -83,6 +83,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
         portugueseChallengeMaxAttempts: 1,
         portugueseErrorStats: {},
         gamesCompletedCount: 0,
+        dailyChallengeTime: '06:00',
         dailyChallengeStreak: {
             current: 0,
             longest: 0,
@@ -353,6 +354,7 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                 portugueseChallengeMaxAttempts: 1,
                 portugueseErrorStats: {},
                 gamesCompletedCount: 0,
+                dailyChallengeTime: '06:00',
                 dailyChallengeStreak: {
                     current: 0,
                     longest: 0,

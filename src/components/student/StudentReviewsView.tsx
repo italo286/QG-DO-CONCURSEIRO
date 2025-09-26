@@ -413,7 +413,7 @@ export const StudentReviewsView: React.FC<{
     const [filterSubject, setFilterSubject] = useState('');
     const [filterTopic, setFilterTopic] = useState('');
     const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-    const [settingsTab, setSettingsTab] = useState<'review' | 'glossary' | 'portuguese'>('review');
+    const [settingsTab, setSettingsTab] = useState<'geral' | 'review' | 'glossary' | 'portuguese'>('geral');
     const [localSettings, setLocalSettings] = useState<Partial<StudentProgress>>({});
     const [isSavingSettings, setIsSavingSettings] = useState(false);
 
@@ -454,6 +454,7 @@ export const StudentReviewsView: React.FC<{
                 portugueseChallengeQuestionCount: studentProgress.portugueseChallengeQuestionCount ?? 1,
                 portugueseChallengeTimerDuration: studentProgress.portugueseChallengeTimerDuration ?? 300,
                 portugueseChallengeMaxAttempts: studentProgress.portugueseChallengeMaxAttempts ?? 1,
+                dailyChallengeTime: studentProgress.dailyChallengeTime ?? '06:00',
             });
         }
     }, [isSettingsModalOpen, studentProgress]);
@@ -690,10 +691,27 @@ export const StudentReviewsView: React.FC<{
 
         <Modal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} title="Configurações dos Desafios" size="3xl">
             <div className="flex border-b border-gray-700 mb-4" role="tablist">
+                <button onClick={() => setSettingsTab('geral')} className={`flex-1 py-2 text-sm font-medium ${settingsTab === 'geral' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>Geral</button>
                 <button onClick={() => setSettingsTab('review')} className={`flex-1 py-2 text-sm font-medium ${settingsTab === 'review' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>Desafio da Revisão</button>
                 <button onClick={() => setSettingsTab('glossary')} className={`flex-1 py-2 text-sm font-medium ${settingsTab === 'glossary' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>Desafio do Glossário</button>
                 <button onClick={() => setSettingsTab('portuguese')} className={`flex-1 py-2 text-sm font-medium ${settingsTab === 'portuguese' ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}>Desafio de Português</button>
             </div>
+            {settingsTab === 'geral' && (
+                 <div className="space-y-6 animate-fade-in">
+                    <h3 className="text-lg font-semibold text-white">Configurações Gerais dos Desafios</h3>
+                    <div>
+                        <label htmlFor="daily-challenge-time" className="block text-sm font-medium text-gray-300">Horário para gerar novos desafios</label>
+                        <input
+                            type="time"
+                            id="daily-challenge-time"
+                            value={localSettings.dailyChallengeTime || '06:00'}
+                            onChange={(e) => handleLocalSettingsChange('dailyChallengeTime', e.target.value)}
+                            className="mt-1 block bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white"
+                        />
+                        <p className="text-xs text-gray-400 mt-1">Os desafios do dia aparecerão após este horário (Horário de Brasília).</p>
+                    </div>
+                </div>
+            )}
             {settingsTab === 'review' && <SettingsContent challengeType="review" localSettings={localSettings} enrolledSubjects={enrolledSubjects} handleLocalSettingsChange={handleLocalSettingsChange} handleLocalTopicSelectionChange={handleLocalTopicSelectionChange} handleLocalSubjectSelectionChange={handleLocalSubjectSelectionChange} studentProgress={studentProgress} allQuestionsWithContext={allQuestionsWithContext} />}
             {settingsTab === 'glossary' && <SettingsContent challengeType="glossary" localSettings={localSettings} enrolledSubjects={enrolledSubjects} handleLocalSettingsChange={handleLocalSettingsChange} handleLocalTopicSelectionChange={handleLocalTopicSelectionChange} handleLocalSubjectSelectionChange={handleLocalSubjectSelectionChange} studentProgress={studentProgress} allQuestionsWithContext={allQuestionsWithContext} />}
             {settingsTab === 'portuguese' && (

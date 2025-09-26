@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import * as GeminiService from '../../services/geminiService';
 import { Question, QuestionAttempt } from '../../types';
 import { markdownToHtml, generateQuestionsPdf } from '../../utils';
@@ -133,6 +133,7 @@ export const QuizView: React.FC<{
     const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
 
     const [timeLeft, setTimeLeft] = useState(durationInSeconds);
+    const quizIdRef = useRef<string | null>(null);
     const [currentIndex, setCurrentIndex] = useState(0);
 
     const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
@@ -168,25 +169,21 @@ export const QuizView: React.FC<{
 
 
     useEffect(() => {
-        // Este efeito reinicializa o estado do quiz sempre que as props mudam,
-        // garantindo que um novo desafio comece do zero.
-        const isAlreadyCompleted = questions.length > 0 && initialAttempts.length === questions.length;
+        const quizId = questions.map(q => q.id).join(',');
+        const isNewQuiz = quizIdRef.current !== quizId;
 
-        setSessionAttempts(initialAttempts);
-        setShowResults(isAlreadyCompleted);
-        setSelectedOption(null);
-        setHasCompleted(isAlreadyCompleted);
-        setTimeLeft(durationInSeconds);
-        setCurrentIndex(isAlreadyCompleted ? 0 : initialAttempts.length);
-        
-        // Reseta estados específicos da sessão
-        setReportedQuestions(new Set());
-        setThresholdsMet(new Set());
-        setMotivationalMessage(null);
-        setComboStreak(0);
-        setEliminatedOptions(new Set());
-        setFetchedJustifications({});
-        
+        if (isNewQuiz) {
+            quizIdRef.current = quizId;
+            setSessionAttempts(initialAttempts);
+            setShowResults(false);
+            setSelectedOption(null);
+            setHasCompleted(initialAttempts.length === questions.length);
+            setTimeLeft(durationInSeconds);
+            setCurrentIndex(initialAttempts.length < questions.length ? initialAttempts.length : 0);
+            setReportedQuestions(new Set());
+            setThresholdsMet(new Set());
+            setMotivationalMessage(null);
+        }
     }, [questions, initialAttempts, durationInSeconds]);
     
     useEffect(() => {
@@ -432,7 +429,7 @@ export const QuizView: React.FC<{
         }
     };
 
-    if (showResults || hasCompleted) {
+    if (showResults) {
         const score = questions.length > 0 ? (correctCount / questions.length) * 100 : 0;
         const passedChallenge = score >= 60; // 60% to pass daily challenge
         
@@ -516,7 +513,6 @@ export const QuizView: React.FC<{
 
                 <div className="text-center mt-6 flex justify-center flex-wrap gap-2">
                     {!hideBackButtonOnResults && <Button onClick={onBack} className="bg-gray-600 hover:bg-gray-500"><ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180"/> Voltar</Button>}
-                    {isDailyChallenge && onNavigateToDailyChallengeResults && <Button onClick={onNavigateToDailyChallengeResults}>Ver Resumo Final</Button>}
                     <Button onClick={handleGenerateFeedback} disabled={isFeedbackLoading}>
                         {isFeedbackLoading ? <Spinner/> : <><GeminiIcon className="h-5 w-5 mr-2" /> Gerar Feedback</>}
                     </Button>
@@ -677,7 +673,7 @@ export const QuizView: React.FC<{
                 )}
 
                 <div className="mt-6">
-                    {hasCompleted && isDailyChallenge && onNavigateToDailyChallengeResults ? (
+                    {hasCompleted && isDailyChallenge ? (
                         <div className="text-center mt-6 flex justify-center flex-wrap gap-2">
                             <p className="w-full text-green-400 font-semibold mb-2">Desafio Concluído!</p>
                             <Button onClick={onNavigateToDailyChallengeResults}>Ver Resumo Final</Button>
