@@ -11,7 +11,7 @@ interface DailyChallengesProps {
     isGeneratingAll: boolean;
 }
 
-const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
+const WEEK_DAYS = ['D', '2ª', '3ª', '4ª', '5ª', '6ª', 'S'];
 
 const CountdownTimer: React.FC = () => {
     const [timeLeft, setTimeLeft] = useState('');
@@ -60,7 +60,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
     const todayClean = new Date(todayBrasilia);
     todayClean.setUTCHours(0, 0, 0, 0);
 
-    const todayDayOfWeek = todayBrasilia.getUTCDay(); // 0 for Sunday, 1 for Monday, etc.
+    const todayDayOfWeek = todayBrasilia.getUTCDay(); // 0 for Sunday
 
     // Calculate the start of the week (Sunday)
     const weekStart = new Date(todayBrasilia);
@@ -106,7 +106,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
                     content = WEEK_DAYS[index];
                 }
 
-                const title = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' });
+                const title = date.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', timeZone: 'UTC' });
 
                 return (
                     <div key={dateISO} className={styles} title={title}>
@@ -175,7 +175,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     const shouldHighlight = !challengesGeneratedToday || hasPendingChallenges;
 
     return (
-        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-yellow-400/10 backdrop-blur-lg border border-yellow-500/20 shadow-lg shadow-yellow-500/10' : ''}`}>
+        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-yellow-500/20 to-orange-500/20 backdrop-blur-lg border border-yellow-500/30 shadow-lg shadow-orange-500/20' : ''}`}>
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-bold text-white">Sua Trilha Diária</h3>
                 {streak > 0 && (
