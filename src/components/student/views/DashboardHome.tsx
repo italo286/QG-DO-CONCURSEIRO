@@ -23,7 +23,6 @@ interface DashboardHomeProps {
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
-    onResetDailyChallenges: () => void;
 }
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
@@ -42,7 +41,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     onNavigateToTopic,
     onToggleTopicCompletion,
     onOpenNewMessageModal,
-    onResetDailyChallenges,
 }) => {
     const broadcasts = useMemo(() => messages.filter(m => m.studentId === null), [messages]);
     
@@ -87,7 +85,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     onStartDailyChallenge={onStartDailyChallenge}
                     onGenerateAllChallenges={onGenerateAllChallenges}
                     isGeneratingAll={isGeneratingAllChallenges}
-                    onResetDailyChallenges={onResetDailyChallenges}
                 />
 
                 <StudentFocusPanel enrolledCourses={enrolledCourses} studentProgress={studentProgress} />

@@ -8,7 +8,6 @@ interface DailyChallengesProps {
     studentProgress: StudentProgress;
     onStartDailyChallenge: (challenge: DailyChallenge<Question>, type: 'review' | 'glossary' | 'portuguese') => void;
     onGenerateAllChallenges: () => void;
-    onResetDailyChallenges: () => void;
     isGeneratingAll: boolean;
 }
 
@@ -94,7 +93,6 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     studentProgress,
     onStartDailyChallenge,
     onGenerateAllChallenges,
-    onResetDailyChallenges,
     isGeneratingAll,
 }) => {
     const todayISO = getLocalDateISOString(getBrasiliaDate());
@@ -105,12 +103,6 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
         !studentProgress.reviewChallenge?.isCompleted ||
         !studentProgress.glossaryChallenge?.isCompleted ||
         !studentProgress.portugueseChallenge?.isCompleted
-    );
-    
-    const someProgressMade = !needsGeneration && (
-        studentProgress.reviewChallenge?.isCompleted || (studentProgress.reviewChallenge?.sessionAttempts?.length || 0) > 0 ||
-        studentProgress.glossaryChallenge?.isCompleted || (studentProgress.glossaryChallenge?.sessionAttempts?.length || 0) > 0 ||
-        studentProgress.portugueseChallenge?.isCompleted || (studentProgress.portugueseChallenge?.sessionAttempts?.length || 0) > 0
     );
 
     const shouldHighlight = needsGeneration || hasPendingChallenges;
@@ -131,15 +123,10 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
             
             <WeeklyProgressTracker studentProgress={studentProgress} />
             
-            <div className="text-center my-6 flex justify-center items-center gap-4">
+            <div className="text-center my-6">
                  <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
                     {isGeneratingAll ? <Spinner /> : (needsGeneration ? 'Gerar Desafios de Hoje' : 'Refazer Desafios Diários')}
                 </Button>
-                 {someProgressMade && !isGeneratingAll && (
-                    <Button onClick={onResetDailyChallenges} className="bg-gray-600 hover:bg-gray-500">
-                        Reiniciar Progresso
-                    </Button>
-                )}
             </div>
             
             {!needsGeneration && (

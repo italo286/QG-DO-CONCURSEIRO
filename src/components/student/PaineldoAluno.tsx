@@ -26,7 +26,7 @@ type XpToast = {
     message?: string;
 };
 
-interface StudentDashboardProps {
+interface PaineldoAlunoProps {
     user: User;
     onLogout: () => void;
     onUpdateUser: (user: User) => void;
@@ -34,7 +34,7 @@ interface StudentDashboardProps {
     onToggleStudentView?: () => void;
 }
 
-export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
+export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
@@ -177,121 +177,49 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
     const onStartReview = (session: ReviewSession) => { setSelectedReview(session); setQuizInstanceKey(Date.now()); setView('review_quiz'); };
 
-    const saveDailyChallengeAttempt = (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => {
-        if (isPreview) return;
-
-        setStudentProgress(prevProgress => {
-            if (!prevProgress) return null;
-
-            const newProgress = JSON.parse(JSON.stringify(prevProgress));
-            const challengeKey = `${challengeType}Challenge` as const;
-            const challenge = newProgress[challengeKey];
-            if (!challenge) return prevProgress;
-
-            if (!challenge.sessionAttempts) {
-                challenge.sessionAttempts = [];
-            }
-            const existingAttemptIndex = challenge.sessionAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-            if (existingAttemptIndex > -1) {
-                challenge.sessionAttempts[existingAttemptIndex] = attempt;
-            } else {
-                challenge.sessionAttempts.push(attempt);
-            }
-            
-            setActiveChallenge(prev => prev ? { ...prev, sessionAttempts: challenge.sessionAttempts || [] } : null);
-            
-            FirebaseService.saveStudentProgress(newProgress); // Fire-and-forget save
-            return newProgress;
-        });
-    };
-
     const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[], isCatchUp: boolean = false) => {
-        if (!activeChallenge || isPreview) return;
+        if (!activeChallenge || !studentProgress) return;
+
+        const newProgress = { ...studentProgress };
         const challengeType = activeChallenge.type;
+        const challengeKey = `${challengeType}Challenge` as 'reviewChallenge' | 'glossaryChallenge' | 'portugueseChallenge';
+        const challenge = newProgress[challengeKey];
 
-        const xpToastsToAdd: XpToast[] = [];
-        let totalXpGained = 0;
+        if (!challenge) return;
 
-        const addChallengeXp = (amount: number, message?: string) => {
-            totalXpGained += amount;
-            if (message) {
-                xpToastsToAdd.push({ id: Date.now() + Math.random(), amount, message });
-            }
-        };
+        challenge.isCompleted = true;
+        challenge.sessionAttempts = finalAttempts;
+        challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
 
-        setStudentProgress(prevProgress => {
-            if (!prevProgress) return null;
+        const correctCount = finalAttempts.filter(a => a.isCorrect).length;
+        const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
+        
+        if (score >= 0.6) { // 60% to pass
+            if (isCatchUp) {
+                addXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
+            } else {
+                addXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
+                const yesterday = getBrasiliaDate();
+                yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+                const yesterdayISO = getLocalDateISOString(yesterday);
+                const todayISO = getLocalDateISOString(getBrasiliaDate());
 
-            const newProgress = JSON.parse(JSON.stringify(prevProgress));
-            const challengeKey = `${challengeType}Challenge` as const;
-            const challenge = newProgress[challengeKey];
-            if (!challenge) return prevProgress;
+                const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
+                if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
+                else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
+                streak.lastCompletedDate = todayISO;
+                streak.longest = Math.max(streak.current, streak.longest);
+                newProgress.dailyChallengeStreak = streak;
 
-            challenge.isCompleted = true;
-            challenge.sessionAttempts = finalAttempts;
-            challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
-            
-            const correctCount = finalAttempts.filter(a => a.isCorrect).length;
-            const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
-            
-            const todayISO = getLocalDateISOString(getBrasiliaDate());
-
-            if (score >= 0.6) {
-                if (isCatchUp) {
-                    addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
-                } else {
-                    addChallengeXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
-                    const yesterday = getBrasiliaDate();
-                    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-                    const yesterdayISO = getLocalDateISOString(yesterday);
-                    
-                    const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
-                    if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
-                    else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
-                    streak.lastCompletedDate = todayISO;
-                    streak.longest = Math.max(streak.current, streak.longest);
-                    newProgress.dailyChallengeStreak = streak;
-
-                    const streakBonus = Gamification.XP_CONFIG.STREAK_BONUS as Record<number, number>;
-                    if (streakBonus[streak.current]) {
-                        addChallengeXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
-                    }
+                const streakBonus = Gamification.XP_CONFIG.STREAK_BONUS as Record<number, number>;
+                if (streakBonus[streak.current]) {
+                    addXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
                 }
-                
-                if (!newProgress.dailyChallengeCompletions) newProgress.dailyChallengeCompletions = {};
-                if (!newProgress.dailyChallengeCompletions[todayISO]) newProgress.dailyChallengeCompletions[todayISO] = {};
-                newProgress.dailyChallengeCompletions[todayISO][challengeType] = true;
             }
-
-            newProgress.xp = (newProgress.xp || 0) + totalXpGained;
-            
-            FirebaseService.saveStudentProgress(newProgress);
-            
-            // Side effects after state update
-            setTimeout(() => {
-                setXpToasts(prev => [...prev, ...xpToastsToAdd]);
-                setTimeout(() => setXpToasts(prev => prev.filter(t => !xpToastsToAdd.some(tt => tt.id === t.id))), 3000);
-
-                const oldLevel = Gamification.calculateLevel(prevProgress.xp);
-                const newLevel = Gamification.calculateLevel(newProgress.xp);
-                if (newLevel > oldLevel) {
-                    setNewLevelInfo({ level: newLevel, title: Gamification.getLevelTitle(newLevel) });
-                    setIsLevelUpModalOpen(true);
-                }
-            }, 100);
-
-            return newProgress;
-        });
-
+        }
+        
         setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
-    };
-
-    const handleNavigateToDailyChallengeResults = () => {
-        if (!activeChallenge) return;
-        setDailyChallengeResults({ 
-            questions: activeChallenge.questions, 
-            sessionAttempts: activeChallenge.sessionAttempts 
-        });
+        handleUpdateStudentProgress(newProgress, studentProgress);
         setView('daily_challenge_results');
         setActiveChallenge(null);
     };
@@ -347,45 +275,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setIsGeneratingAllChallenges(false);
         }
     };
-    
-    const handleResetDailyChallenges = async () => {
-        if (!studentProgress || isPreview) return;
-
-        const todayISO = getLocalDateISOString(getBrasiliaDate());
-        const newProgress = JSON.parse(JSON.stringify(studentProgress)); // Deep copy to avoid mutation issues
-        let progressWasMade = false;
-
-        // Reset Review Challenge
-        if (newProgress.reviewChallenge?.date === todayISO && (newProgress.reviewChallenge.isCompleted || (newProgress.reviewChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.reviewChallenge.isCompleted = false;
-            newProgress.reviewChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset Glossary Challenge
-        if (newProgress.glossaryChallenge?.date === todayISO && (newProgress.glossaryChallenge.isCompleted || (newProgress.glossaryChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.glossaryChallenge.isCompleted = false;
-            newProgress.glossaryChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset Portuguese Challenge
-        if (newProgress.portugueseChallenge?.date === todayISO && (newProgress.portugueseChallenge.isCompleted || (newProgress.portugueseChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.portugueseChallenge.isCompleted = false;
-            newProgress.portugueseChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset completions for the day
-        if (newProgress.dailyChallengeCompletions && newProgress.dailyChallengeCompletions[todayISO]) {
-            delete newProgress.dailyChallengeCompletions[todayISO];
-            progressWasMade = true;
-        }
-        
-        if (progressWasMade) {
-            handleUpdateStudentProgress(newProgress, studentProgress);
-        }
-    };
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
@@ -400,14 +289,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
+                    // FIX: Changed onGenerateChallenge to onGenerateAllChallenges to match expected prop.
                     onGenerateAllChallenges={handleGenerateAllDailyChallenges}
-                    onResetDailyChallenges={handleResetDailyChallenges}
+                    isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
@@ -488,7 +378,15 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
+                    onSaveDailyChallengeAttempt={(_, attempt) => {
+                        setActiveChallenge(prev => {
+                            if(!prev) return null;
+                            const updatedChallenge = {...prev};
+                            if (!updatedChallenge.sessionAttempts) updatedChallenge.sessionAttempts = [];
+                            updatedChallenge.sessionAttempts.push(attempt);
+                            return updatedChallenge;
+                        });
+                    }}
                     handleGameComplete={(gameId) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -499,7 +397,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         FirebaseService.createReportNotification(allSubjects.find(s=>s.id === subjectId)!.teacherId, user, allSubjects.find(s => s.id === subjectId)!.name, selectedSubtopic?.name || selectedTopic!.name, (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A', reason);
                     }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
-                    onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
                     onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
                     onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
                     onDeleteQuiz={(quizId) => {
@@ -521,7 +418,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         setView('custom_quiz_list');
                         setActiveCustomQuiz(null);
                     }}
-                    onResetDailyChallenges={handleResetDailyChallenges}
                 />
             </main>
 

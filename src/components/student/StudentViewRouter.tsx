@@ -52,7 +52,6 @@ interface StudentViewRouterProps {
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
     onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
     onGenerateAllChallenges: () => void;
-    onResetDailyChallenges: () => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;

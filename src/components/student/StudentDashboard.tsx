@@ -347,45 +347,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setIsGeneratingAllChallenges(false);
         }
     };
-    
-    const handleResetDailyChallenges = async () => {
-        if (!studentProgress || isPreview) return;
-
-        const todayISO = getLocalDateISOString(getBrasiliaDate());
-        const newProgress = JSON.parse(JSON.stringify(studentProgress)); // Deep copy to avoid mutation issues
-        let progressWasMade = false;
-
-        // Reset Review Challenge
-        if (newProgress.reviewChallenge?.date === todayISO && (newProgress.reviewChallenge.isCompleted || (newProgress.reviewChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.reviewChallenge.isCompleted = false;
-            newProgress.reviewChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset Glossary Challenge
-        if (newProgress.glossaryChallenge?.date === todayISO && (newProgress.glossaryChallenge.isCompleted || (newProgress.glossaryChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.glossaryChallenge.isCompleted = false;
-            newProgress.glossaryChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset Portuguese Challenge
-        if (newProgress.portugueseChallenge?.date === todayISO && (newProgress.portugueseChallenge.isCompleted || (newProgress.portugueseChallenge.sessionAttempts?.length || 0) > 0)) {
-            newProgress.portugueseChallenge.isCompleted = false;
-            newProgress.portugueseChallenge.sessionAttempts = [];
-            progressWasMade = true;
-        }
-
-        // Reset completions for the day
-        if (newProgress.dailyChallengeCompletions && newProgress.dailyChallengeCompletions[todayISO]) {
-            delete newProgress.dailyChallengeCompletions[todayISO];
-            progressWasMade = true;
-        }
-        
-        if (progressWasMade) {
-            handleUpdateStudentProgress(newProgress, studentProgress);
-        }
-    };
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
@@ -400,15 +361,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
                     onGenerateAllChallenges={handleGenerateAllDailyChallenges}
-// FIX: The 'onResetDailyChallenges' prop was missing, causing a TypeScript compilation error.
-                    onResetDailyChallenges={handleResetDailyChallenges}
+                    isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
@@ -522,7 +482,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         setView('custom_quiz_list');
                         setActiveCustomQuiz(null);
                     }}
-                    onResetDailyChallenges={handleResetDailyChallenges}
                 />
             </main>
 
