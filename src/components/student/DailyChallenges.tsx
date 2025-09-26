@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { StudentProgress, DailyChallenge, Question } from '../../types';
 import { Card, Button, Spinner } from '../ui';
-import { CycleIcon, TagIcon, TranslateIcon, CheckCircleIcon, CheckIcon, FireIcon } from '../Icons';
+import { CycleIcon, TagIcon, TranslateIcon, CheckCircleIcon, CheckIcon, FireIcon, XCircleIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 interface DailyChallengesProps {
@@ -13,11 +13,56 @@ interface DailyChallengesProps {
 
 const WEEK_DAYS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
+const CountdownTimer: React.FC = () => {
+    const [timeLeft, setTimeLeft] = useState('');
+
+    useEffect(() => {
+        const calculateTimeLeft = () => {
+            const now = getBrasiliaDate();
+            const tomorrow = new Date(now);
+            tomorrow.setUTCDate(now.getUTCDate() + 1);
+            tomorrow.setUTCHours(0, 0, 0, 0); // Midnight in Brasília
+
+            const diff = tomorrow.getTime() - now.getTime();
+            
+            if (diff <= 0) {
+                return '00:00:00';
+            }
+
+            const hours = Math.floor(diff / (1000 * 60 * 60));
+            const minutes = Math.floor((diff / 1000 / 60) % 60);
+            const seconds = Math.floor((diff / 1000) % 60);
+            
+            return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        };
+
+        const timer = setInterval(() => {
+            setTimeLeft(calculateTimeLeft());
+        }, 1000);
+
+        // Initial calculation
+        setTimeLeft(calculateTimeLeft());
+
+        return () => clearInterval(timer);
+    }, []);
+
+    return (
+        <div className="text-center my-6">
+            <p className="text-gray-300 mb-2">Você já gerou os desafios de hoje. Volte amanhã!</p>
+            <div className="text-2xl font-bold text-cyan-400 font-mono" aria-live="polite">{timeLeft}</div>
+            <p className="text-xs text-gray-500">para novos desafios</p>
+        </div>
+    );
+};
+
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
     const today = getBrasiliaDate();
+    today.setUTCHours(0, 0, 0, 0); // Normalize to start of day for comparison
     const todayIndex = today.getUTCDay();
+
     const weekStart = getBrasiliaDate();
     weekStart.setUTCDate(today.getUTCDate() - todayIndex);
+    weekStart.setUTCHours(0, 0, 0, 0);
 
     const weekDates = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(weekStart.getTime());
@@ -28,13 +73,21 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
     return (
         <div className="flex justify-center items-center gap-3 md:gap-4 my-4">
             {weekDates.map((dateISO, index) => {
+                const dateObj = new Date(dateISO + 'T00:00:00Z');
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
-                const isCompleted = completions?.review && completions?.glossary && completions?.portuguese;
-                const isCurrentDay = index === todayIndex;
+                const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
+                const isPastDay = dateObj < today;
+                const isCurrentDay = dateObj.getTime() === today.getTime();
 
-                let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ';
-                if (isCompleted) {
+                let styles = 'w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm transition-colors duration-300 ';
+                let content: React.ReactNode = WEEK_DAYS[index];
+
+                if (isFullyCompleted) {
                     styles += 'bg-green-500 text-white';
+                    content = <CheckIcon className="h-6 w-6" />;
+                } else if (isPastDay && completions) { // A past day with partial (but not full) completion
+                    styles += 'bg-red-800 text-red-300';
+                    content = <XCircleIcon className="h-8 w-8" />;
                 } else if (isCurrentDay) {
                     styles += 'bg-cyan-500 text-white ring-2 ring-offset-2 ring-offset-gray-800 ring-cyan-400';
                 } else {
@@ -43,7 +96,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
 
                 return (
                     <div key={dateISO} className={styles} title={new Date(dateISO + 'T12:00:00Z').toLocaleDateString('pt-BR')}>
-                        {isCompleted ? <CheckIcon className="h-6 w-6" /> : WEEK_DAYS[index]}
+                        {content}
                     </div>
                 );
             })}
@@ -96,19 +149,19 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
     isGeneratingAll,
 }) => {
     const todayISO = getLocalDateISOString(getBrasiliaDate());
-    const needsGeneration = !studentProgress.reviewChallenge || studentProgress.reviewChallenge.date !== todayISO;
+    const challengesGeneratedToday = studentProgress.reviewChallenge?.date === todayISO;
     const streak = studentProgress.dailyChallengeStreak?.current || 0;
     
-    const hasPendingChallenges = !needsGeneration && (
+    const hasPendingChallenges = !challengesGeneratedToday || (
         !studentProgress.reviewChallenge?.isCompleted ||
         !studentProgress.glossaryChallenge?.isCompleted ||
         !studentProgress.portugueseChallenge?.isCompleted
     );
 
-    const shouldHighlight = needsGeneration || hasPendingChallenges;
+    const shouldHighlight = !challengesGeneratedToday || hasPendingChallenges;
 
     return (
-        <Card className={`p-6 transition-shadow ${shouldHighlight ? 'animate-pulse-border' : ''}`}>
+        <Card className={`p-6 transition-all duration-500 ${shouldHighlight ? 'bg-gradient-to-br from-yellow-400/70 to-orange-500/70 backdrop-blur-sm border border-yellow-500/20' : ''}`}>
             <div className="flex justify-between items-center mb-2">
                 <h3 className="text-2xl font-bold text-white">Sua Trilha Diária</h3>
                 {streak > 0 && (
@@ -119,17 +172,21 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
                     </div>
                 )}
             </div>
-            <p className="text-gray-400 mb-4">Complete os desafios para ganhar XP e manter sua ofensiva.</p>
+            <p className="text-gray-200 mb-4">Complete os desafios para ganhar XP e manter sua ofensiva.</p>
             
             <WeeklyProgressTracker studentProgress={studentProgress} />
             
-            <div className="text-center my-6">
-                 <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
-                    {isGeneratingAll ? <Spinner /> : (needsGeneration ? 'Gerar Desafios de Hoje' : 'Refazer Desafios Diários')}
-                </Button>
-            </div>
+            {challengesGeneratedToday ? (
+                <CountdownTimer />
+            ) : (
+                <div className="text-center my-6">
+                    <Button onClick={onGenerateAllChallenges} disabled={isGeneratingAll}>
+                        {isGeneratingAll ? <Spinner /> : 'Gerar Desafios de Hoje'}
+                    </Button>
+                </div>
+            )}
             
-            {!needsGeneration && (
+            {challengesGeneratedToday && (
                  <div className="space-y-4 animate-fade-in">
                     <ChallengeItem
                         title="Desafio da Revisão"

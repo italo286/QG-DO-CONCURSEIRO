@@ -257,7 +257,6 @@ export interface StudentProgress {
   glossaryChallenge?: DailyChallenge<Question>;
   portugueseChallenge?: DailyChallenge<Question>;
   gamesCompletedCount?: number;
-  dailyChallengeTime?: string; // e.g., "08:00"
   dailyChallengeStreak?: {
       current: number;
       longest: number;
