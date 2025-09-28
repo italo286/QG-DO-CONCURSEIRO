@@ -27,6 +27,10 @@ export interface Question {
   subjectName?: string;
   topicName?: string;
   errorCategory?: string; // For adaptive Portuguese challenges
+  isTec?: boolean;
+  // FIX: Added optional properties to hold context for questions in cross-topic quizzes like daily challenges.
+  subjectId?: string;
+  topicId?: string;
 }
 
 export interface PdfFile {

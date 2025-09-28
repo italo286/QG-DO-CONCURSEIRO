@@ -193,6 +193,13 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 dailyChallengeType={props.activeChallenge.type}
                 hideBackButtonOnResults={true}
                 onNavigateToDailyChallengeResults={props.onNavigateToDailyChallengeResults}
+                onReportQuestion={props.activeChallenge.type === 'review' 
+                    ? (question, reason) => {
+                        if (question.subjectId && question.topicId) {
+                            props.onReportQuestion(question.subjectId, question.topicId, question.id, !!question.isTec, reason);
+                        }
+                    } 
+                    : undefined}
             />;
         case 'daily_challenge_results':
             if (!props.dailyChallengeResults) return null;

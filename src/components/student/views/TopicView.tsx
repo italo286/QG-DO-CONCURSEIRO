@@ -341,7 +341,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     quizTitle={`Questões de Conteúdo: ${currentContent.name}`}
                     subjectName={selectedSubject.name}
                     onAddBonusXp={onAddBonusXp}
-                    onReportQuestion={(questionId, reason) => onReportQuestion(selectedSubject.id, currentContent.id, questionId, false, reason)}
+                    onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
                 />;
             case 'tec_questions_quiz':
                 const tecQuizId = `${currentContent.id}-tec`;
@@ -356,7 +356,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     subjectName={selectedSubject.name}
                     hideBackButtonOnResults={true}
                     onAddBonusXp={onAddBonusXp}
-                    onReportQuestion={(questionId, reason) => onReportQuestion(selectedSubject.id, currentContent.id, questionId, true, reason)}
+                    onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
                 />;
             case 'tec_caderno':
                 return (
@@ -581,7 +581,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         quizTitle="Questões (Conteúdo)"
                         subjectName={selectedSubject.name}
                         onAddBonusXp={onAddBonusXp}
-                        onReportQuestion={(questionId, reason) => onReportQuestion(selectedSubject.id, currentContent.id, questionId, false, reason)}
+                        onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
                     />;
                 case 'tec_questions_quiz':
                     const tecQuizId = `${currentContent.id}-tec`;
@@ -595,7 +595,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         quizTitle="Questões Extraídas"
                         subjectName={selectedSubject.name}
                         onAddBonusXp={onAddBonusXp}
-                        onReportQuestion={(questionId, reason) => onReportQuestion(selectedSubject.id, currentContent.id, questionId, true, reason)}
+                        onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
                     />;
                 case 'videos': {
                     if (activeVideo) {

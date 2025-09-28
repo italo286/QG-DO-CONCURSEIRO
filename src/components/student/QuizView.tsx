@@ -103,7 +103,7 @@ export const QuizView: React.FC<{
     onComplete: (attempts: QuestionAttempt[]) => void;
     onBack: () => void;
     onAddBonusXp: (amount: number, message: string) => void;
-    onReportQuestion?: (questionId: string, reason: string) => void;
+    onReportQuestion?: (question: Question, reason: string) => void;
     quizTitle: string;
     subjectName?: string;
     durationInSeconds?: number;
@@ -344,7 +344,7 @@ export const QuizView: React.FC<{
 
     const handleReportSubmit = (reason: string) => {
         if (onReportQuestion && questionToReport) {
-            onReportQuestion(questionToReport.id, reason);
+            onReportQuestion(questionToReport, reason);
             setReportedQuestions(prev => new Set(prev).add(questionToReport.id));
         }
         setQuestionToReport(null);

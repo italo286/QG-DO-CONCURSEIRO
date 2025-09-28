@@ -1,4 +1,5 @@
 
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -199,18 +200,26 @@ const shuffleArray = <T>(array: T[]): T[] => {
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
 
-    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; })[] = [];
+    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
     subjects.forEach(subject => {
         subject.topics.forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
-                const questions = [...(content.questions || []), ...(content.tecQuestions || [])];
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
-                questions.forEach(q => allQuestionsWithContext.push({ 
+                (content.questions || []).forEach(q => allQuestionsWithContext.push({ 
                     ...q, 
                     subjectId: subject.id, 
                     topicId: content.id,
                     topicName: topicName,
                     subjectName: subject.name,
+                    isTec: false,
+                }));
+                (content.tecQuestions || []).forEach(q => allQuestionsWithContext.push({ 
+                    ...q, 
+                    subjectId: subject.id, 
+                    topicId: content.id,
+                    topicName: topicName,
+                    subjectName: subject.name,
+                    isTec: true,
                 }));
             };
             addQuestions(topic);
