@@ -1,7 +1,9 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { FieldValue } from 'firebase-admin/firestore';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
+// FIX: Added 'Type' to imports for defining the question schema.
+import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { StudentProgress, Subject, Course, Question, GlossaryTerm, Topic, SubTopic, DailyChallenge } from '../../src/types.server';
 
 // --- Firebase Admin Initialization ---
@@ -30,6 +32,107 @@ try {
 // --- Gemini API Initialization ---
 const ai = new GoogleGenAI({apiKey: process.env.VITE_GEMINI_API_KEY});
 
+// FIX: Added helper functions and schema required for generatePortugueseChallenge, which were previously in a separate client-side file.
+// Helper for retrying API calls with exponential backoff for transient errors
+async function retryWithBackoff<T>(
+    apiCall: () => Promise<T>,
+    maxRetries: number = 3,
+    initialDelay: number = 1000
+): Promise<T> {
+    let delay = initialDelay;
+    for (let i = 0; i < maxRetries; i++) {
+        try {
+            return await apiCall();
+        } catch (error: any) {
+            const errorMessage = error.toString().toLowerCase();
+            const isTransientError = 
+                errorMessage.includes('503') || 
+                errorMessage.includes('500') ||
+                errorMessage.includes('429') ||
+                errorMessage.includes('unavailable') ||
+                errorMessage.includes('overloaded');
+
+            if (isTransientError && i < maxRetries - 1) {
+                console.warn(`API call failed with transient error, retrying in ${delay}ms... (Attempt ${i + 1})`, error);
+                await new Promise(resolve => setTimeout(resolve, delay));
+                delay *= 2; // Exponential backoff
+            } else {
+                throw error; // Re-throw if it's not a transient error or retries are exhausted
+            }
+        }
+    }
+    // This line should not be reachable, but is needed for TypeScript's control flow analysis
+    throw new Error('Max retries reached for API call.');
+}
+
+const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'object'): T => {
+    try {
+        let cleanJsonString = jsonString;
+        const codeBlockRegex = /```(json)?\s*([\s\S]*?)\s*```/;
+        const match = codeBlockRegex.exec(jsonString);
+        if (match && match[2]) {
+            cleanJsonString = match[2];
+        }
+
+        const parsed = JSON.parse(cleanJsonString);
+        if (expectedType === 'array' && !Array.isArray(parsed)) {
+            throw new Error("A resposta da IA não é um array.");
+        }
+        if (expectedType === 'object' && (typeof parsed !== 'object' || Array.isArray(parsed) || parsed === null)) {
+            throw new Error("A resposta da IA não é um objeto.");
+        }
+        return parsed;
+    } catch(e) {
+        console.error("Erro ao fazer o parse da resposta JSON da IA: ", e);
+        console.error("String recebida:", jsonString);
+        throw new Error("A resposta da IA não está em um formato JSON válido.");
+    }
+}
+
+const questionSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        statement: {
+          type: Type.STRING,
+          description: "A pergunta clara e concisa baseada no texto.",
+        },
+        options: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.STRING
+          },
+          description: "Um array com exatamente 5 alternativas de resposta.",
+        },
+        correctAnswer: {
+          type: Type.STRING,
+          description: "A string exata da alternativa correta, que deve estar presente no array de 'options'.",
+        },
+        justification: {
+          type: Type.STRING,
+          description: "A justificativa detalhada APENAS para a resposta CORRETA, baseada diretamente no conteúdo do PDF fornecido.",
+        },
+        optionJustifications: {
+          type: Type.ARRAY,
+          description: "Um array de objetos com justificativas para CADA alternativa. Cada objeto deve ter 'option' (o texto exato da alternativa) e 'justification'. Se não for solicitado, deve ser um array vazio.",
+          items: {
+            type: Type.OBJECT,
+            properties: {
+                option: { type: Type.STRING, description: "O texto exato de uma das 5 alternativas." },
+                justification: { type: Type.STRING, description: "A justificativa explicando por que a alternativa está certa ou errada." },
+            },
+            required: ["option", "justification"]
+          }
+        },
+        errorCategory: {
+            type: Type.STRING,
+            description: "A categoria do erro gramatical (ex: 'Crase', 'Concordância Verbal'). Apenas para questões de português. Para outros tipos, pode ser omitido."
+        }
+      },
+      required: ["statement", "options", "correctAnswer", "justification"],
+    },
+};
 
 // --- Helper Functions ---
 const getBrasiliaDate = (): Date => {
@@ -96,180 +199,224 @@ const shuffleArray = <T>(array: T[]): T[] => {
 async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
 
-    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; })[] = [];
+    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; })[] = [];
     subjects.forEach(subject => {
         subject.topics.forEach(topic => {
-            const addQuestions = (content: Topic | SubTopic) => {
+            const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const questions = [...(content.questions || []), ...(content.tecQuestions || [])];
-                questions.forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id }));
+                const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
+                questions.forEach(q => allQuestionsWithContext.push({ 
+                    ...q, 
+                    subjectId: subject.id, 
+                    topicId: content.id,
+                    topicName: topicName,
+                    subjectName: subject.name,
+                }));
             };
             addQuestions(topic);
-            topic.subtopics.forEach(addQuestions);
+            topic.subtopics.forEach(st => addQuestions(st, topic.name));
         });
     });
 
     if (allQuestionsWithContext.length === 0) return [];
 
-    const incorrectIds = new Set<string>();
+    // Prioritize questions from topics with lower scores
+    const topicsWithScores: { topicId: string; score: number }[] = [];
     Object.values(studentProgress.progressByTopic).forEach(subjectProgress => {
-        Object.values(subjectProgress).forEach(topicProgress => {
-            (topicProgress.lastAttempt || []).forEach(attempt => {
-                if (!attempt.isCorrect) incorrectIds.add(attempt.questionId);
-            });
+        Object.entries(subjectProgress).forEach(([topicId, topicData]) => {
+            topicsWithScores.push({ topicId, score: topicData.score });
         });
     });
+    topicsWithScores.sort((a, b) => a.score - b.score);
 
-    const incorrectPool = allQuestionsWithContext.filter(q => incorrectIds.has(q.id));
-    const finalQuestions = shuffleArray(incorrectPool).slice(0, questionCount);
-    
-    // Fallback if not enough incorrect questions
-    if (finalQuestions.length < questionCount) {
-        const fallbackPool = shuffleArray(allQuestionsWithContext.filter(q => !incorrectIds.has(q.id))).slice(0, questionCount - finalQuestions.length);
-        finalQuestions.push(...fallbackPool);
+    const prioritizedQuestions: Question[] = [];
+    const usedQuestionIds = new Set<string>();
+
+    for (const topic of topicsWithScores) {
+        const questionsForTopic = allQuestionsWithContext.filter(q => q.topicId === topic.topicId && !usedQuestionIds.has(q.id));
+        for (const question of shuffleArray(questionsForTopic)) {
+            if (prioritizedQuestions.length < questionCount) {
+                prioritizedQuestions.push(question);
+                usedQuestionIds.add(question.id);
+            } else {
+                break;
+            }
+        }
+        if (prioritizedQuestions.length >= questionCount) break;
     }
-    
-    return finalQuestions;
+
+    // Fill with random questions if not enough were found through prioritization
+    if (prioritizedQuestions.length < questionCount) {
+        const remainingQuestions = shuffleArray(allQuestionsWithContext.filter(q => !usedQuestionIds.has(q.id)));
+        for (const question of remainingQuestions) {
+            if (prioritizedQuestions.length < questionCount) {
+                prioritizedQuestions.push(question);
+                usedQuestionIds.add(question.id);
+            } else {
+                break;
+            }
+        }
+    }
+
+    return shuffleArray(prioritizedQuestions);
 }
 
-const generateGlossaryChallenge = (studentProgress: StudentProgress, subjects: Subject[]): Question[] => {
+async function generateGlossaryChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
-    const allTerms: GlossaryTerm[] = [];
-    subjects.forEach(s => {
-        s.topics.forEach(t => {
-            if (t.glossary) allTerms.push(...t.glossary);
-            t.subtopics.forEach(st => {
-                if (st.glossary) allTerms.push(...st.glossary);
-            });
-        });
-    });
-
-    if (allTerms.length < 5) return [];
-
+    
+    const allTerms = subjects.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
     const uniqueTerms = Array.from(new Map(allTerms.map(item => [item.term, item])).values());
+    
     if (uniqueTerms.length < 5) return [];
 
-    const shuffledTerms = shuffleArray(uniqueTerms);
-    const challengeQuestions: Question[] = [];
-
-    for (let i = 0; i < questionCount && i < shuffledTerms.length; i++) {
-        const term = shuffledTerms[i];
-        const correctAnswer = term.definition;
-        const options = [correctAnswer];
-        
-        const otherDefinitions = uniqueTerms.filter(t => t.term !== term.term).map(t => t.definition);
-        const shuffledOther = shuffleArray(otherDefinitions);
-
-        for (let j = 0; j < 4 && j < shuffledOther.length; j++) {
-            options.push(shuffledOther[j]);
-        }
-
-        challengeQuestions.push({
-            id: `glossary-${Date.now()}-${i}`,
-            statement: `Qual é a definição de "${term.term}"?`,
-            options: shuffleArray(options),
-            correctAnswer,
-            justification: `"${term.term}" significa: ${correctAnswer}.`,
-        });
-    }
-
-    return challengeQuestions;
-};
-
-async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
-    const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
+    const selectedTerms = shuffleArray(uniqueTerms).slice(0, questionCount);
     
-    // OTIMIZAÇÃO DE PERFORMANCE:
-    // A configuração `thinkingConfig: { thinkingBudget: 0 }` desativa o "tempo de reflexão" da IA.
-    // Para uma tarefa estruturada como esta, a qualidade da resposta é mantida, mas a velocidade
-    // da resposta é drasticamente maior, evitando timeouts (erro 504) na função serverless.
-    const response: GenerateContentResponse = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `Crie ${questionCount} questão(ões) de português no formato de 'encontre o erro'. A frase completa é o 'statement'. As 'options' são 5 trechos da frase. 'correctAnswer' é o trecho com o erro. 'justification' explica o erro. 'errorCategory' classifica o erro (ex: 'Crase'). Retorne um array JSON.`,
-        config: {
-            responseMimeType: 'application/json',
-            thinkingConfig: { thinkingBudget: 0 }
-        }
+    return selectedTerms.map((term, index) => {
+        const wrongOptions = shuffleArray(uniqueTerms.filter(t => t.term !== term.term)).slice(0, 4).map(t => t.definition);
+        const options = shuffleArray([term.definition, ...wrongOptions]);
+        return {
+            id: `glossary-challenge-${Date.now()}-${index}`,
+            statement: `Qual é a definição de **"${term.term}"**?`,
+            options,
+            correctAnswer: term.definition,
+            justification: `**${term.term}**: ${term.definition}`,
+        };
     });
-
-    const rawQuestions = JSON.parse(response.text.trim());
-    return rawQuestions.map((q: any, index: number) => ({
-        id: `port-challenge-${Date.now()}-${index}`,
-        ...q
-    }));
 }
 
+// FIX: Replaced call to non-existent 'GeminiService' with a local implementation of the function.
+async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
+    const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
+    const errorStats = studentProgress.portugueseErrorStats;
+    try {
+        const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
+
+        const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
+    1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
+    2. ${errorFocusPrompt}
+    3. A frase deve ser dividida em 5 partes (alternativas).
+    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
+    
+    Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
+    Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
+    Resposta Correta: "que aguardavam"
+    errorCategory: "Concordância Verbal"
+    Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
+    OptionJustifications: [
+        { "option": "A multidão,", "justification": "Este trecho não contém erros." },
+        { "option": "que aguardavam", "justification": "O verbo 'aguardar' deveria estar no singular ('aguardava') para concordar com 'A multidão'." }
+    ]
+
+    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+    `;
+    
+        const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
+            model: 'gemini-2.5-flash',
+            contents: prompt,
+            config: {
+                responseMimeType: 'application/json',
+                responseSchema: questionSchema
+            }
+        }));
+
+        const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
+
+        const questionsResult = generatedQuestions.map((q: any) => {
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (Array.isArray(q.optionJustifications)) {
+                q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                    if (item.option && item.justification) {
+                        cleanedOptionJustifications[item.option] = item.justification;
+                    }
+                });
+            }
+            
+            return {
+                statement: q.statement,
+                options: q.options,
+                correctAnswer: q.correctAnswer,
+                justification: q.justification,
+                optionJustifications: cleanedOptionJustifications,
+                errorCategory: q.errorCategory,
+            };
+        });
+
+        return questionsResult.map((q, i) => ({ ...q, id: `port-challenge-${Date.now()}-${i}` }));
+    } catch (e) {
+        console.error("Failed to generate Portuguese challenge with Gemini:", e);
+        return [];
+    }
+}
 
 // --- Main Handler ---
-export const handler: Handler = async (event: HandlerEvent) => {
-    if (!db) {
-        console.error("Firestore database is not initialized.");
-        return { statusCode: 500, body: 'Internal Server Error: Database connection failed.' };
-    }
-
+const handler: Handler = async (event: HandlerEvent) => {
     const { apiKey, studentId } = event.queryStringParameters || {};
 
-    if (apiKey !== process.env.DAILY_CHALLENGE_API_KEY) {
+    if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
         return { statusCode: 401, body: 'Unauthorized' };
     }
-    
     if (!studentId) {
         return { statusCode: 400, body: 'Missing studentId' };
+    }
+    if (!db) {
+        return { statusCode: 500, body: 'Database connection failed' };
     }
 
     try {
         const studentProgress = await getStudentProgress(studentId);
         if (!studentProgress) {
-            return { statusCode: 404, body: `Student progress not found for ${studentId}`};
+            return { statusCode: 404, body: 'Student progress not found.' };
         }
-        const subjects = await getEnrolledSubjects(studentId);
 
-        // Generate all challenges concurrently
+        const subjects = await getEnrolledSubjects(studentId);
+        const todayISO = getLocalDateISOString(getBrasiliaDate());
+
+        // Check if challenges for today were already generated
+        if (studentProgress.reviewChallenge?.date === todayISO && studentProgress.glossaryChallenge?.date === todayISO && studentProgress.portugueseChallenge?.date === todayISO) {
+             return {
+                statusCode: 200,
+                body: JSON.stringify({
+                    reviewChallenge: studentProgress.reviewChallenge,
+                    glossaryChallenge: studentProgress.glossaryChallenge,
+                    portugueseChallenge: studentProgress.portugueseChallenge,
+                }),
+                headers: { 'Content-Type': 'application/json' },
+            };
+        }
+
         const [reviewItems, glossaryItems, portugueseItems] = await Promise.all([
             generateReviewChallenge(studentProgress, subjects),
             generateGlossaryChallenge(studentProgress, subjects),
-            generatePortugueseChallenge(studentProgress)
+            generatePortugueseChallenge(studentProgress),
         ]);
-        
-        const todayISO = getLocalDateISOString(getBrasiliaDate());
 
-        // CRIAÇÃO DOS OBJETOS DE DESAFIO COMPLETOS E ZERADOS
-        // É crucial incluir `sessionAttempts: []` para garantir que tentativas anteriores sejam limpas.
-        const reviewChallenge = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-        const glossaryChallenge = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-        const portugueseChallenge = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+        const reviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
+        const glossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
+        const portugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
 
-        // ATUALIZAÇÃO ATÔMICA NO FIRESTORE
-        // Para garantir que os desafios sempre apareçam como novos, esta função primeiro deleta
-        // qualquer estado de desafio antigo do dia e depois insere os novos desafios.
-        // Isso replica a funcionalidade de "reset" do professor e previne o bug de desafios
-        // aparecerem como já concluídos.
-        const progressRef = db.collection('studentProgress').doc(studentId);
-        await progressRef.update({
-            // Substitui completamente os objetos de desafio antigos pelos novos
-            reviewChallenge: reviewChallenge,
-            glossaryChallenge: glossaryChallenge,
-            portugueseChallenge: portugueseChallenge,
-            // Deleta o registro de conclusão do dia para garantir que a UI de acompanhamento semanal seja resetada.
-            [`dailyChallengeCompletions.${todayISO}`]: FieldValue.delete()
-        });
-
-        const responsePayload = {
+        // Save generated challenges to Firestore
+        await db.collection('studentProgress').doc(studentId).update({
             reviewChallenge,
             glossaryChallenge,
             portugueseChallenge,
-        };
-        
+        });
+
         return {
             statusCode: 200,
+            body: JSON.stringify({ reviewChallenge, glossaryChallenge, portugueseChallenge }),
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(responsePayload)
         };
+
     } catch (error: any) {
-        console.error("Error generating all daily challenges:", {
-            message: error.message,
-            stack: error.stack,
-            studentId,
-        });
-        return { statusCode: 500, body: `Internal Server Error: ${error.message}` };
+        console.error('Error generating daily challenges:', error);
+        return {
+            statusCode: 500,
+            body: JSON.stringify({ error: error.message || 'An internal error occurred.' }),
+        };
     }
 };
+
+export { handler };
