@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -310,26 +311,35 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
         setIsGeneratingAllChallenges(true);
         try {
             const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
+            const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
             
-            const response = await fetch(`/.netlify/functions/generateDailyChallenges?apiKey=${apiKey}&studentId=${user.id}`);
+            const challengePromises = types.map(type => 
+                fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
+                    .then(async res => {
+                        if (!res.ok) {
+                             const errorBody = await res.text();
+                             throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
+                        }
+                        return res.json();
+                    })
+            );
             
-            if (!response.ok) {
-                const errorBody = await response.text();
-                throw new Error(`Falha ao gerar desafios: ${response.status} ${errorBody}`);
-            }
+            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
             
-            const { reviewChallenge, glossaryChallenge, portugueseChallenge } = await response.json();
+            const todayISO = getLocalDateISOString(getBrasiliaDate());
+    
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
             
-            // The server now handles the database write. We only need to update the local state for a fast UI response.
-            setStudentProgress(prev => {
-                if (!prev) return null;
-                return {
-                    ...prev,
-                    reviewChallenge,
-                    glossaryChallenge,
-                    portugueseChallenge,
-                };
-            });
+            const newProgress = {
+                ...studentProgress,
+                reviewChallenge: newReviewChallenge,
+                glossaryChallenge: newGlossaryChallenge,
+                portugueseChallenge: newPortugueseChallenge,
+            };
+            
+            handleUpdateStudentProgress(newProgress, studentProgress);
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
@@ -352,14 +362,13 @@ export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, on
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
                     onGenerateAllChallenges={handleGenerateAllDailyChallenges}
-                    isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
