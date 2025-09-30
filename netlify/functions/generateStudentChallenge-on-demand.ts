@@ -315,7 +315,11 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json', responseSchema: portugueseQuestionSchema }
+            config: { 
+                responseMimeType: 'application/json', 
+                responseSchema: portugueseQuestionSchema,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         }));
         
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
