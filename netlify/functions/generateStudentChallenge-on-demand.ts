@@ -1,9 +1,7 @@
-
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
-import { StudentProgress, Subject, Course, Question, Topic, SubTopic, DailyChallenge } from '../../src/types.server';
+import { StudentProgress, Subject, Course, Question, Topic, SubTopic, QuestionAttempt } from '../../src/types.server';
 
 // --- Firebase Admin Initialization ---
 let db: admin.firestore.Firestore;
@@ -31,7 +29,7 @@ try {
 // --- Gemini API Initialization ---
 const ai = new GoogleGenAI({apiKey: process.env.VITE_GEMINI_API_KEY});
 
-// --- Helper Functions from original file ---
+// --- Helper Functions ---
 async function retryWithBackoff<T>( apiCall: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 1000): Promise<T> {
     let delay = initialDelay;
     for (let i = 0; i < maxRetries; i++) {
@@ -135,10 +133,18 @@ const shuffleArray = <T>(array: T[]): T[] => {
 
 // --- Challenge Generation Logic ---
 
-async function generateReviewChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
+async function generateReviewChallenge(studentProgress: StudentProgress, allEnrolledSubjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.advancedReviewQuestionCount || 5;
-    const allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
-    subjects.forEach(subject => {
+
+    let subjectsToConsider = allEnrolledSubjects;
+    
+    if (studentProgress.dailyReviewMode === 'advanced' && studentProgress.advancedReviewSubjectIds && studentProgress.advancedReviewSubjectIds.length > 0) {
+        const subjectIdSet = new Set(studentProgress.advancedReviewSubjectIds);
+        subjectsToConsider = allEnrolledSubjects.filter(s => subjectIdSet.has(s.id));
+    }
+
+    let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
+    subjectsToConsider.forEach(subject => {
         subject.topics.forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
@@ -149,15 +155,54 @@ async function generateReviewChallenge(studentProgress: StudentProgress, subject
             topic.subtopics.forEach(st => addQuestions(st, topic.name));
         });
     });
+
     if (allQuestionsWithContext.length === 0) return [];
 
+    if (studentProgress.dailyReviewMode === 'advanced') {
+        let filteredQuestions = allQuestionsWithContext;
+        const topicIds = studentProgress.advancedReviewTopicIds;
+        if (topicIds && topicIds.length > 0) {
+            const topicIdSet = new Set(topicIds);
+            filteredQuestions = filteredQuestions.filter(q => topicIdSet.has(q.topicId));
+        }
+
+        const questionType = studentProgress.advancedReviewQuestionType || 'incorrect';
+        if (questionType !== 'mixed') {
+            const attemptedIds = new Set<string>();
+            const correctIds = new Set<string>();
+            Object.values(studentProgress.progressByTopic).forEach(subject => {
+                Object.values(subject).forEach(topic => {
+                    topic.lastAttempt.forEach(attempt => {
+                        attemptedIds.add(attempt.questionId);
+                        if (attempt.isCorrect) correctIds.add(attempt.questionId);
+                    });
+                });
+            });
+             (studentProgress.reviewSessions || []).forEach(session => {
+                (session.attempts || []).forEach(attempt => {
+                    attemptedIds.add(attempt.questionId);
+                    if (attempt.isCorrect) correctIds.add(attempt.questionId);
+                });
+            });
+            const incorrectIds = new Set([...attemptedIds].filter(id => !correctIds.has(id)));
+
+            switch (questionType) {
+                case 'unanswered': filteredQuestions = filteredQuestions.filter(q => !attemptedIds.has(q.id)); break;
+                case 'incorrect': filteredQuestions = filteredQuestions.filter(q => incorrectIds.has(q.id)); break;
+                case 'correct': filteredQuestions = filteredQuestions.filter(q => correctIds.has(q.id)); break;
+            }
+        }
+        return shuffleArray(filteredQuestions).slice(0, questionCount);
+    }
+    
+    // Standard mode: Prioritize by lowest score
     const topicsWithScores: { topicId: string; score: number }[] = [];
     Object.values(studentProgress.progressByTopic).forEach(subjectProgress => {
         Object.entries(subjectProgress).forEach(([topicId, topicData]) => { topicsWithScores.push({ topicId, score: topicData.score }); });
     });
     topicsWithScores.sort((a, b) => a.score - b.score);
 
-    const prioritizedQuestions: Question[] = [];
+    let prioritizedQuestions: Question[] = [];
     const usedQuestionIds = new Set<string>();
     for (const topic of topicsWithScores) {
         const questionsForTopic = allQuestionsWithContext.filter(q => q.topicId === topic.topicId && !usedQuestionIds.has(q.id));
@@ -184,7 +229,25 @@ async function generateReviewChallenge(studentProgress: StudentProgress, subject
 
 async function generateGlossaryChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     const questionCount = studentProgress.glossaryChallengeQuestionCount || 5;
-    const allTerms = subjects.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
+    
+    let subjectsToConsider = subjects;
+     if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossarySubjectIds && studentProgress.advancedGlossarySubjectIds.length > 0) {
+        const subjectIdSet = new Set(studentProgress.advancedGlossarySubjectIds);
+        subjectsToConsider = subjects.filter(s => subjectIdSet.has(s.id));
+    }
+
+    let allTerms = subjectsToConsider.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
+    
+    if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossaryTopicIds && studentProgress.advancedGlossaryTopicIds.length > 0) {
+        const topicIdSet = new Set(studentProgress.advancedGlossaryTopicIds);
+        const termsWithContext = subjectsToConsider.flatMap(s => s.topics.flatMap(t => 
+            (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
+                t.subtopics.flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+            )
+        ));
+        allTerms = termsWithContext.filter(t => topicIdSet.has(t.topicId));
+    }
+
     const uniqueTerms = Array.from(new Map(allTerms.map(item => [item.term, item])).values());
     if (uniqueTerms.length < 5) return [];
 
@@ -207,17 +270,71 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     const errorStats = studentProgress.portugueseErrorStats;
     try {
         const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-        const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática...`; // Abridged for brevity
+        const prompt = `
+        Sua tarefa é criar ${questionCount} questão(ões) para um desafio de gramática da LÍNGUA PORTUGUESA. RESPONDA APENAS EM PORTUGUÊS DO BRASIL.
+
+        Siga estas regras ESTRITAMENTE:
+        1. Crie uma única frase EM PORTUGUÊS que contenha UM ÚNICO erro gramatical sutil (concordância, regência, crase, pontuação, etc.). Esta frase será o 'statement'.
+        2. ${errorFocusPrompt}
+        3. Divida a frase em exatamente 5 partes. Estas partes serão as 'options'.
+        4. A alternativa que contém o erro gramatical é a 'correctAnswer'.
+        5. Forneça uma 'justification' geral, EM PORTUGUÊS, explicando o erro e como corrigi-lo.
+        6. Forneça a categoria do erro em 'errorCategory' (ex: 'Crase', 'Concordância Verbal').
+        7. **É OBRIGATÓRIO** fornecer um array 'optionJustifications' com uma justificativa para CADA uma das 5 alternativas.
+            - Para a alternativa com o erro, explique o erro EM PORTUGUÊS.
+            - Para as alternativas gramaticalmente corretas, a justificativa DEVE SER exatamente "Este trecho não contém erros.".
+
+        Exemplo de formato de saída:
+        {
+            "statement": "Haviam muitos motivos para a celebração da equipe.",
+            "options": ["Haviam", "muitos motivos", "para a celebração", "da equipe", "."],
+            "correctAnswer": "Haviam",
+            "justification": "O verbo 'haver', no sentido de 'existir', é impessoal e deve permanecer no singular. O correto é 'Havia'.",
+            "errorCategory": "Concordância Verbal",
+            "optionJustifications": [
+                { "option": "Haviam", "justification": "O verbo 'haver' no sentido de existir é impessoal, devendo ser usado no singular: 'Havia'." },
+                { "option": "muitos motivos", "justification": "Este trecho não contém erros." },
+                { "option": "para a celebração", "justification": "Este trecho não contém erros." },
+                { "option": "da equipe", "justification": "Este trecho não contém erros." },
+                { "option": ".", "justification": "Este trecho não contém erros." }
+            ]
+        }
+
+        Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema fornecido.
+        `;
+        
+        // Create a specific schema for this call that enforces the requirements
+        const portugueseQuestionSchema = JSON.parse(JSON.stringify(questionSchema));
+        if (!portugueseQuestionSchema.items.required.includes('optionJustifications')) {
+            portugueseQuestionSchema.items.required.push('optionJustifications');
+        }
+         if (!portugueseQuestionSchema.items.required.includes('errorCategory')) {
+            portugueseQuestionSchema.items.required.push('errorCategory');
+        }
+
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json', responseSchema: questionSchema }
+            config: { responseMimeType: 'application/json', responseSchema: portugueseQuestionSchema }
         }));
+        
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
-        const questionsResult = generatedQuestions.map((q: any) => ({
-            statement: q.statement, options: q.options, correctAnswer: q.correctAnswer,
-            justification: q.justification, optionJustifications: q.optionJustifications, errorCategory: q.errorCategory,
-        }));
+        
+        const questionsResult = generatedQuestions.map((q: any) => {
+            const cleanedOptionJustifications: { [key: string]: string } = {};
+            if (Array.isArray(q.optionJustifications)) {
+                q.optionJustifications.forEach((item: { option: string; justification: string }) => {
+                    if (item.option && item.justification) {
+                        cleanedOptionJustifications[item.option] = item.justification;
+                    }
+                });
+            }
+            return {
+                statement: q.statement, options: q.options, correctAnswer: q.correctAnswer,
+                justification: q.justification, optionJustifications: cleanedOptionJustifications, errorCategory: q.errorCategory,
+            };
+        });
+        
         return questionsResult.map((q, i) => ({ ...q, id: `port-challenge-${Date.now()}-${i}` }));
     } catch (e) {
         console.error("Failed to generate Portuguese challenge with Gemini:", e);
