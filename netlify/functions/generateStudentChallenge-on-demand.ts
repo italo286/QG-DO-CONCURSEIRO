@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -271,26 +272,29 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     try {
         const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
         const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-        1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-        2. ${errorFocusPrompt}
-        3. A frase deve ser dividida em 5 partes (alternativas).
-        4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-        5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-        6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-        7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
-        
-        Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
-        Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
-        Resposta Correta: "que aguardavam"
-        errorCategory: "Concordância Verbal"
-        Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
-        OptionJustifications: [
-            { "option": "A multidão,", "justification": "Este trecho não contém erros." },
-            { "option": "que aguardavam", "justification": "O verbo 'aguardar' deveria estar no singular ('aguardava') para concordar com 'A multidão'." }
-        ]
+    1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
+    2. ${errorFocusPrompt}
+    3. A frase deve ser dividida em 5 partes (alternativas).
+    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa que contém o erro, explique o erro. Para as alternativas corretas, a justificativa deve ser "Este trecho não contém erros.".
     
-        Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
-        `;
+    Exemplo: "Faziam dois anos que ele não aparecia."
+    Alternativas: ["Faziam", "dois anos", "que ele", "não", "aparecia."]
+    Resposta Correta: "Faziam"
+    errorCategory: "Concordância Verbal"
+    Justificativa: "O verbo 'fazer' no sentido de tempo decorrido é impessoal e deve permanecer na 3ª pessoa do singular. O correto é 'Fazia'."
+    OptionJustifications: [
+        { "option": "Faziam", "justification": "O verbo 'fazer' indicando tempo é impessoal, devendo ficar no singular: 'Fazia'." },
+        { "option": "dois anos", "justification": "Este trecho não contém erros." },
+        { "option": "que ele", "justification": "Este trecho não contém erros." },
+        { "option": "não", "justification": "Este trecho não contém erros." },
+        { "option": "aparecia.", "justification": "Este trecho não contém erros." }
+    ]
+
+    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+    `;
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,

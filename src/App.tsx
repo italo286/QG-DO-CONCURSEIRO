@@ -1,10 +1,11 @@
+
 import { useState, useEffect } from 'react';
 import { auth } from './firebaseConfig';
 import * as FirebaseService from './services/firebaseService';
 import { User } from './types';
 import { LoginPage } from './components/auth';
 import { ProfessorDashboard } from './components/ProfessorDashboard';
-import { PaineldoAluno } from './components/student/PaineldoAluno';
+import { StudentDashboard } from './components/student/StudentDashboard';
 import { Spinner } from './components/ui';
 
 window.androidGoBack = () => {
@@ -74,7 +75,7 @@ export const App = () => {
     }
     
     if (isStudentView && currentUser.role === 'professor') {
-        return <PaineldoAluno 
+        return <StudentDashboard 
             user={currentUser} 
             onLogout={() => {}} 
             onUpdateUser={() => {}} 
@@ -87,5 +88,5 @@ export const App = () => {
         return <ProfessorDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
     }
     
-    return <PaineldoAluno user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
+    return <StudentDashboard user={currentUser} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />;
 };

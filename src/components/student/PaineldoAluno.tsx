@@ -27,7 +27,7 @@ type XpToast = {
     message?: string;
 };
 
-interface PaineldoAlunoProps {
+interface StudentDashboardProps {
     user: User;
     onLogout: () => void;
     onUpdateUser: (user: User) => void;
@@ -35,7 +35,7 @@ interface PaineldoAlunoProps {
     onToggleStudentView?: () => void;
 }
 
-export const PaineldoAluno: React.FC<PaineldoAlunoProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
+export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
