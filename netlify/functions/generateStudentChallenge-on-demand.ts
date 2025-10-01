@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -271,7 +272,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     try {
         const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
         const prompt = `
-        Sua tarefa é criar ${questionCount} questão(ões) para um desafio de gramática da LÍNGUA PORTUGUESA. RESPONDA APENAS EM PORTUGUÊS DO BRASIL.
+        Sua tarefa é criar ${questionCount} questão(ões) para um desafio de gramática da LÍNGUA PORTUGUESA. RESPONDA APENAS EM PORTUGÊS DO BRASIL.
 
         Siga estas regras ESTRITAMENTE:
         1. Crie uma única frase EM PORTUGUÊS que contenha UM ÚNICO erro gramatical sutil (concordância, regência, crase, pontuação, etc.). Esta frase será o 'statement'.
@@ -317,8 +318,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json', 
-                responseSchema: portugueseQuestionSchema,
-                thinkingConfig: { thinkingBudget: 0 }
+                responseSchema: portugueseQuestionSchema
             }
         }));
         
