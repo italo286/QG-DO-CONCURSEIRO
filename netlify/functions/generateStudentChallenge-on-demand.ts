@@ -1,4 +1,3 @@
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -295,7 +294,11 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: { responseMimeType: 'application/json', responseSchema: questionSchema }
+            config: { 
+                responseMimeType: 'application/json', 
+                responseSchema: questionSchema,
+                thinkingConfig: { thinkingBudget: 0 }
+            }
         }));
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
         
