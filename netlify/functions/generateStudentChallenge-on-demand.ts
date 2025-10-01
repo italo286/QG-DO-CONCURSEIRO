@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -66,6 +67,29 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
         console.error("Received string:", jsonString);
         throw new Error("Invalid JSON format from AI response.");
     }
+};
+
+const questionSchema = {
+    type: Type.ARRAY,
+    items: {
+      type: Type.OBJECT,
+      properties: {
+        statement: { type: Type.STRING },
+        options: { type: Type.ARRAY, items: { type: Type.STRING } },
+        correctAnswer: { type: Type.STRING },
+        justification: { type: Type.STRING },
+        optionJustifications: {
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: { option: { type: Type.STRING }, justification: { type: Type.STRING } },
+            required: ["option", "justification"]
+          }
+        },
+        errorCategory: { type: Type.STRING }
+      },
+      required: ["statement", "options", "correctAnswer", "justification"],
+    },
 };
 
 const getStudentProgress = async (studentId: string): Promise<StudentProgress | null> => {
@@ -247,78 +271,35 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     const errorStats = studentProgress.portugueseErrorStats;
     try {
         const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-        const prompt = `
-        Sua tarefa é criar ${questionCount} questão(ões) para um desafio de gramática da LÍNGUA PORTUGUESA.
-
-        Siga estas regras ESTRITAMENTE:
-        1. Crie uma única frase EM PORTUGUÊS que contenha UM ÚNICO erro gramatical sutil. Esta frase será o 'statement'.
+        const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
+        1. A questão é uma única frase que contém um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
         2. ${errorFocusPrompt}
-        3. Divida a frase em exatamente 5 partes. Estas partes serão as 'options'.
-        4. A alternativa que contém o erro gramatical é a 'correctAnswer'.
-        5. Forneça uma 'justification' geral, EM PORTUGUÊS, explicando CLARAMENTE o erro.
-        6. Forneça a categoria do erro em 'errorCategory'.
-        7. Forneça OBRIGATORIAMENTE um array 'optionJustifications'. Para a alternativa INCORRETA (a resposta correta), a justificativa deve detalhar o erro. Para TODAS as outras alternativas (que estão gramaticalmente corretas), a justificativa DEVE SER exatamente "Este trecho não contém erros.".
-
-        Exemplo de formato de saída:
-        {
-            "statement": "Haviam muitos motivos para a celebração da equipe.",
-            "options": ["Haviam", "muitos motivos", "para a celebração", "da equipe", "."],
-            "correctAnswer": "Haviam",
-            "justification": "O verbo 'haver', no sentido de 'existir', é impessoal e deve permanecer no singular. O correto é 'Havia'.",
-            "errorCategory": "Concordância Verbal",
-            "optionJustifications": [
-                { "option": "Haviam", "justification": "O verbo 'haver' no sentido de existir é impessoal, portanto, deve ser usado no singular: 'Havia'." },
-                { "option": "muitos motivos", "justification": "Este trecho não contém erros." },
-                { "option": "para a celebração", "justification": "Este trecho não contém erros." },
-                { "option": "da equipe", "justification": "Este trecho não contém erros." },
-                { "option": ".", "justification": "Este trecho não contém erros." }
-            ]
-        }
-
-        Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema fornecido.
-        `;
+        3. A frase deve ser dividida em 5 partes (alternativas).
+        4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+        5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+        6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
+        7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa correta, reforce a explicação do erro. Para as alternativas incorretas (que são gramaticalmente corretas no contexto da frase), a justificativa deve ser "Este trecho não contém erros.".
         
-        const portugueseQuestionSchema = {
-            type: Type.ARRAY,
-            items: {
-                type: Type.OBJECT,
-                properties: {
-                    statement: { type: Type.STRING },
-                    options: { type: Type.ARRAY, items: { type: Type.STRING } },
-                    correctAnswer: { type: Type.STRING },
-                    justification: { type: Type.STRING },
-                    errorCategory: { type: Type.STRING },
-                    optionJustifications: {
-                        type: Type.ARRAY,
-                        description: "Justificativas para CADA alternativa.",
-                        items: {
-                            type: Type.OBJECT,
-                            properties: {
-                                option: { type: Type.STRING },
-                                justification: { type: Type.STRING },
-                            },
-                            required: ["option", "justification"]
-                        }
-                    },
-                },
-                required: ["statement", "options", "correctAnswer", "justification", "errorCategory", "optionJustifications"],
-            },
-        };
-
+        Exemplo: "A multidão, que aguardavam o resultado, estavam apreensivos."
+        Alternativas: ["A multidão,", "que aguardavam", "o resultado,", "estavam", "apreensivos."]
+        Resposta Correta: "que aguardavam"
+        errorCategory: "Concordância Verbal"
+        Justificativa: "O verbo 'aguardar' deveria concordar com o substantivo coletivo 'multidão', ficando no singular: 'que aguardava'."
+        OptionJustifications: [
+            { "option": "A multidão,", "justification": "Este trecho não contém erros." },
+            { "option": "que aguardavam", "justification": "O verbo 'aguardar' deveria estar no singular ('aguardava') para concordar com 'A multidão'." }
+        ]
+    
+        Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
+        `;
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
-            config: {
-                systemInstruction: 'Você é um especialista em gramática da língua portuguesa do Brasil. Todas as suas respostas devem ser estritamente em português do Brasil.',
-                responseMimeType: 'application/json', 
-                responseSchema: portugueseQuestionSchema,
-                thinkingConfig: { thinkingBudget: 0 }
-            }
+            config: { responseMimeType: 'application/json', responseSchema: questionSchema }
         }));
-        
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
         
-        return generatedQuestions.map((q: any, i: number) => {
+        const questionsResult = generatedQuestions.map((q: any) => {
             const cleanedOptionJustifications: { [key: string]: string } = {};
             if (Array.isArray(q.optionJustifications)) {
                 q.optionJustifications.forEach((item: { option: string; justification: string }) => {
@@ -327,18 +308,13 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
                     }
                 });
             }
-
             return {
-                id: `port-challenge-${Date.now()}-${i}`,
-                statement: q.statement,
-                options: q.options,
-                correctAnswer: q.correctAnswer,
-                justification: q.justification,
-                optionJustifications: cleanedOptionJustifications,
-                errorCategory: q.errorCategory,
+                statement: q.statement, options: q.options, correctAnswer: q.correctAnswer,
+                justification: q.justification, optionJustifications: cleanedOptionJustifications, errorCategory: q.errorCategory,
             };
         });
-
+        
+        return questionsResult.map((q, i) => ({ ...q, id: `port-challenge-${Date.now()}-${i}` }));
     } catch (e) {
         console.error("Failed to generate Portuguese challenge with Gemini:", e);
         return [];
