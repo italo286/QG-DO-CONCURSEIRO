@@ -1,4 +1,3 @@
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -69,7 +68,7 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
     }
 };
 
-const questionSchema = {
+const portugueseQuestionSchema = {
     type: Type.ARRAY,
     items: {
       type: Type.OBJECT,
@@ -78,17 +77,9 @@ const questionSchema = {
         options: { type: Type.ARRAY, items: { type: Type.STRING } },
         correctAnswer: { type: Type.STRING },
         justification: { type: Type.STRING },
-        optionJustifications: {
-          type: Type.ARRAY,
-          items: {
-            type: Type.OBJECT,
-            properties: { option: { type: Type.STRING }, justification: { type: Type.STRING } },
-            required: ["option", "justification"]
-          }
-        },
         errorCategory: { type: Type.STRING }
       },
-      required: ["statement", "options", "correctAnswer", "justification"],
+      required: ["statement", "options", "correctAnswer", "justification", "errorCategory"],
     },
 };
 
@@ -272,13 +263,12 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     try {
         const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
         const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-    1. O campo 'statement' deve conter uma frase completa com um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-    2. ${errorFocusPrompt}
-    3. A frase do 'statement' deve ser dividida em 5 partes, que serão as 'options'.
-    4. A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-    5. Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-    6. Forneça uma 'justification' geral explicando o erro e como corrigi-lo.
-    7. Forneça um array 'optionJustifications' com uma justificativa para CADA alternativa. Para a alternativa que contém o erro, explique o erro. Para as alternativas corretas, a justificativa deve ser "Este trecho não contém erros.".
+    1.  O campo 'statement' deve conter uma frase completa com um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
+    2.  ${errorFocusPrompt}
+    3.  A frase do 'statement' deve ser dividida em 5 partes, que serão as 'options'.
+    4.  A alternativa correta ('correctAnswer') é o trecho que contém o erro.
+    5.  Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
+    6.  Forneça uma 'justification' geral explicando o erro e como corrigi-lo. NÃO GERE justificativas individuais para cada alternativa.
     
     Exemplo de output JSON para uma questão:
     {
@@ -286,14 +276,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         "options": ["Faziam", "dois anos", "que ele", "não", "aparecia."],
         "correctAnswer": "Faziam",
         "errorCategory": "Concordância Verbal",
-        "justification": "O verbo 'fazer' no sentido de tempo decorrido é impessoal e deve permanecer na 3ª pessoa do singular. O correto é 'Fazia'.",
-        "optionJustifications": [
-            { "option": "Faziam", "justification": "O verbo 'fazer' indicando tempo é impessoal, devendo ficar no singular: 'Fazia'." },
-            { "option": "dois anos", "justification": "Este trecho não contém erros." },
-            { "option": "que ele", "justification": "Este trecho não contém erros." },
-            { "option": "não", "justification": "Este trecho não contém erros." },
-            { "option": "aparecia.", "justification": "Este trecho não contém erros." }
-        ]
+        "justification": "O verbo 'fazer' no sentido de tempo decorrido é impessoal e deve permanecer na 3ª pessoa do singular. O correto é 'Fazia'."
     }
 
     Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
@@ -303,25 +286,18 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json', 
-                responseSchema: questionSchema,
+                responseSchema: portugueseQuestionSchema,
             }
         }));
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
         
-        const questionsResult = generatedQuestions.map((q: any) => {
-            const cleanedOptionJustifications: { [key: string]: string } = {};
-            if (Array.isArray(q.optionJustifications)) {
-                q.optionJustifications.forEach((item: { option: string; justification: string }) => {
-                    if (item.option && item.justification) {
-                        cleanedOptionJustifications[item.option] = item.justification;
-                    }
-                });
-            }
-            return {
-                statement: q.statement, options: q.options, correctAnswer: q.correctAnswer,
-                justification: q.justification, optionJustifications: cleanedOptionJustifications, errorCategory: q.errorCategory,
-            };
-        });
+        const questionsResult = generatedQuestions.map((q: any) => ({
+            statement: q.statement, 
+            options: q.options, 
+            correctAnswer: q.correctAnswer,
+            justification: q.justification, 
+            errorCategory: q.errorCategory,
+        }));
         
         return questionsResult.map((q, i) => ({ ...q, id: `port-challenge-${Date.now()}-${i}` }));
     } catch (e) {
