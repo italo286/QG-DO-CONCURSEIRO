@@ -720,7 +720,7 @@ export const QuizView: React.FC<{
                         <p className={`font-bold text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                             {isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta.'}
                         </p>
-                         {currentJustifications ? (
+                        {currentJustifications ? (
                             <div className="mt-2 space-y-3">
                                 {options.map((option, i) => {
                                     const isCorrectAnswer = correctAnswer === option;
@@ -735,8 +735,16 @@ export const QuizView: React.FC<{
                                     )
                                 })}
                             </div>
+                        ) : questionToDisplay.justification ? (
+                            <div className="mt-2">
+                                <h5 className="font-bold text-cyan-400">Justificativa:</h5>
+                                <div 
+                                    className="mt-1 text-gray-300 prose prose-sm prose-invert max-w-none" 
+                                    dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.justification) }} 
+                                />
+                            </div>
                         ) : (
-                             <div className="mt-2 text-center">
+                            <div className="mt-2 text-center">
                                 <Button onClick={() => handleGenerateJustifications(questionToDisplay)} disabled={isFetchingJustifications === questionId} className="text-sm py-2 px-3">
                                     {isFetchingJustifications === questionId ? <Spinner/> : <><GeminiIcon className="h-4 w-4 mr-2"/> Analisar Alternativas com IA</>}
                                 </Button>
