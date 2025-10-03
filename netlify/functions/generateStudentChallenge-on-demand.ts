@@ -3,6 +3,23 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { StudentProgress, Subject, Course, Question, Topic, SubTopic, QuestionAttempt } from '../../src/types.server';
 
+/*
+ * HISTÓRICO DE MANUTENÇÃO E OTIMIZAÇÃO:
+ * Esta função passou por várias iterações para resolver erros de '504 Gateway Timeout'.
+ * O problema original era a alta complexidade do prompt, que exigia que a IA gerasse justificativas
+ * para cada alternativa, além de identificar o erro. Isso consumia muito tempo de processamento.
+ *
+ * SOLUÇÕES APLICADAS:
+ * 1. Remoção do 'thinkingBudget: 0': Permitir que o modelo use seu tempo de processamento padrão é crucial para tarefas complexas.
+ * 2. Simplificação do Schema e do Prompt: A principal otimização foi remover a exigência de 'optionJustifications'
+ *    e focar a IA em gerar apenas a justificativa principal. O prompt atual é direto e fornece um exemplo claro,
+ *    o que reduz a ambiguidade e acelera a resposta.
+ *
+ * CUIDADO AO MODIFICAR: Qualquer alteração que aumente a complexidade da tarefa da IA (como pedir mais campos,
+ * análises mais profundas ou múltiplos outputs complexos) pode reintroduzir o problema de timeout. Mantenha o prompt
+ * o mais simples e direto possível.
+ */
+
 // --- Firebase Admin Initialization ---
 let db: admin.firestore.Firestore;
 try {
@@ -264,11 +281,12 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
 
     const prompt = `Crie ${questionCount} questão(ões) de gramática. Cada questão deve ser um objeto JSON contendo:
-- 'statement': Uma frase com um erro gramatical (concordância, regência, crase, etc.). ${errorFocusPrompt}
-- 'options': Um array de 5 strings, que são a frase dividida em partes.
+- 'statement': Uma frase completa com um erro gramatical (concordância, regência, crase, etc.).
+- 'options': Um array de 5 strings, que são a frase dividida em partes. Regra importante: A pontuação final (ponto, interrogação, etc.) deve ser anexada à última palavra, não pode ser uma alternativa separada.
 - 'correctAnswer': A string exata da 'option' que contém o erro.
 - 'errorCategory': A classificação do erro (ex: 'Crase', 'Concordância Verbal').
 - 'justification': A explicação concisa do erro.
+${errorFocusPrompt}
 
 Exemplo de output JSON para uma questão:
 {

@@ -327,9 +327,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
     
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             
             const newProgress = {
                 ...studentProgress,
@@ -361,14 +361,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
                     onTopicSelect={handleTopicSelect}
                     onStartDailyChallenge={startDailyChallenge}
                     onGenerateAllChallenges={handleGenerateAllDailyChallenges}
-                    isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
