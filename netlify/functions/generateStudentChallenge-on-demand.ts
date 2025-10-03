@@ -73,11 +73,11 @@ const portugueseQuestionSchema = {
     items: {
       type: Type.OBJECT,
       properties: {
-        statement: { type: Type.STRING },
-        options: { type: Type.ARRAY, items: { type: Type.STRING } },
-        correctAnswer: { type: Type.STRING },
-        justification: { type: Type.STRING },
-        errorCategory: { type: Type.STRING }
+        statement: { type: Type.STRING, description: "A frase completa contendo o erro." },
+        options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "A frase dividida em 5 partes." },
+        correctAnswer: { type: Type.STRING, description: "O trecho exato que contém o erro." },
+        justification: { type: Type.STRING, description: "A explicação concisa do erro e a forma correta." },
+        errorCategory: { type: Type.STRING, description: "A categoria do erro gramatical." }
       },
       required: ["statement", "options", "correctAnswer", "justification", "errorCategory"],
     },
@@ -260,27 +260,28 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
 async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
     const errorStats = studentProgress.portugueseErrorStats;
-    try {
-        const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-        const prompt = `Crie ${questionCount} questão(ões) para um desafio de gramática da língua portuguesa no seguinte formato:
-    1.  O campo 'statement' deve conter uma frase completa com um erro gramatical sutil (concordância, regência, crase, pontuação, etc.).
-    2.  ${errorFocusPrompt}
-    3.  A frase do 'statement' deve ser dividida em 5 partes, que serão as 'options'.
-    4.  A alternativa correta ('correctAnswer') é o trecho que contém o erro.
-    5.  Para cada questão, inclua uma 'errorCategory' que classifique o erro (ex: 'Crase', 'Concordância Verbal', 'Regência', 'Pontuação').
-    6.  Forneça uma 'justification' geral explicando o erro e como corrigi-lo. NÃO GERE justificativas individuais para cada alternativa.
-    
-    Exemplo de output JSON para uma questão:
-    {
-        "statement": "Faziam dois anos que ele não aparecia.",
-        "options": ["Faziam", "dois anos", "que ele", "não", "aparecia."],
-        "correctAnswer": "Faziam",
-        "errorCategory": "Concordância Verbal",
-        "justification": "O verbo 'fazer' no sentido de tempo decorrido é impessoal e deve permanecer na 3ª pessoa do singular. O correto é 'Fazia'."
-    }
 
-    Retorne a(s) questão(ões) como um array de objetos JSON, seguindo estritamente o schema.
-    `;
+    const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
+
+    const prompt = `Crie ${questionCount} questão(ões) de gramática. Cada questão deve ser um objeto JSON contendo:
+- 'statement': Uma frase com um erro gramatical (concordância, regência, crase, etc.). ${errorFocusPrompt}
+- 'options': Um array de 5 strings, que são a frase dividida em partes.
+- 'correctAnswer': A string exata da 'option' que contém o erro.
+- 'errorCategory': A classificação do erro (ex: 'Crase', 'Concordância Verbal').
+- 'justification': A explicação concisa do erro.
+
+Exemplo de output JSON para uma questão:
+{
+    "statement": "Faziam dois anos que ele não aparecia.",
+    "options": ["Faziam", "dois anos", "que ele", "não", "aparecia."],
+    "correctAnswer": "Faziam",
+    "errorCategory": "Concordância Verbal",
+    "justification": "O verbo 'fazer', no sentido de tempo decorrido, é impessoal e fica no singular. O correto é 'Fazia'."
+}
+
+Retorne um array JSON com ${questionCount} objeto(s) neste formato.`;
+
+    try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
             model: 'gemini-2.5-flash',
             contents: prompt,
@@ -289,6 +290,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
                 responseSchema: portugueseQuestionSchema,
             }
         }));
+
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
         
         const questionsResult = generatedQuestions.map((q: any) => ({
@@ -300,6 +302,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
         }));
         
         return questionsResult.map((q, i) => ({ ...q, id: `port-challenge-${Date.now()}-${i}` }));
+
     } catch (e) {
         console.error("Failed to generate Portuguese challenge with Gemini:", e);
         return [];
