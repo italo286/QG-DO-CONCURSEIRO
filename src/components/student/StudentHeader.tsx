@@ -3,7 +3,6 @@ import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
 import { LogoutIcon, PencilIcon, UserCircleIcon, ChevronDownIcon } from '../Icons';
 
-// FIX: Unify ViewType with other components. Replaced 'custom_quiz_list' and 'custom_quiz_player' with 'quizzes' and 'quiz_player'.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
 
 interface StudentHeaderProps {
@@ -39,7 +38,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const navigationItems = [
         { label: 'Início', view: 'dashboard' as const },
         { label: 'Revisões', view: 'reviews' as const },
-        // FIX: Update view name to 'quizzes' for consistency.
         { label: 'Quizzes', view: 'quizzes' as const },
         { label: 'Cronograma', view: 'schedule' as const },
         { label: 'Jogos', view: 'games' as const },
@@ -71,9 +69,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             case 'review_quiz': return 'Sessão de Revisão';
             case 'daily_challenge_quiz': return 'Desafio Diário';
             case 'daily_challenge_results': return 'Resultados do Desafio';
-            // FIX: Update view name to 'quizzes' for consistency.
             case 'quizzes': return 'Meus Quizzes e Simulados';
-            // FIX: Update view name to 'quiz_player' for consistency.
             case 'quiz_player': return 'Simulado';
             default: return 'QG do Concurseiro';
         }

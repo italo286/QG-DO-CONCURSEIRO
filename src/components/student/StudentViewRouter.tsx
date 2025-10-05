@@ -42,7 +42,6 @@ interface StudentViewRouterProps {
     isSplitView: boolean;
     isSidebarCollapsed: boolean;
     quizInstanceKey: number;
-    // FIX: Renamed prop to activeQuiz to match its usage and type.
     activeQuiz: CustomQuiz | MockExam | null;
     isGeneratingAllChallenges: boolean;
 
@@ -218,11 +217,17 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             />;
         case 'quiz_player':
             if (!props.activeQuiz) return null;
-            // FIX: Extracted isMockExam, feedbackMode, and durationInSeconds to separate variables
-            // to help TypeScript with type narrowing inside the JSX props.
             const isMockExam = 'config' in props.activeQuiz;
-            const feedbackMode = isMockExam ? props.activeQuiz.feedbackMode : 'instant';
-            const durationInSeconds = isMockExam ? (props.activeQuiz.durationInSeconds === 'unlimited' ? undefined : props.activeQuiz.durationInSeconds) : undefined;
+            // FIX: Replaced ternary operators with an if-block for proper type narrowing.
+            // This resolves errors where properties specific to MockExam (feedbackMode, durationInSeconds)
+            // were being accessed on the CustomQuiz | MockExam union type.
+            let feedbackMode: 'instant' | 'final' = 'instant';
+            let durationInSeconds: number | undefined;
+            if (isMockExam) {
+                feedbackMode = props.activeQuiz.feedbackMode;
+                durationInSeconds = props.activeQuiz.durationInSeconds === 'unlimited' ? undefined : props.activeQuiz.durationInSeconds;
+            }
+            
             return <QuizView
                 key={props.quizInstanceKey}
                 questions={props.activeQuiz.questions}

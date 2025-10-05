@@ -1,10 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-// FIX: Added MockExam to imports
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, MockExam } from '../../types';
-import * as FirebaseService from '../../services/firebaseService';
-import * as Gamification from '../../gamification';
-import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner } from '../ui';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, MockExam } from '../types';
+import * as FirebaseService from '../services/firebaseService';
+import * as Gamification from '../gamification';
+import { useStudentData } from '../hooks/useStudentData';
+import { Spinner } from './ui';
 import { StudentHeader } from './student/StudentHeader';
 import { StudentViewRouter } from './student/StudentViewRouter';
 import { EditProfileModal } from './student/EditProfileModal';
@@ -16,11 +15,10 @@ import { NewMessageModal } from './student/NewMessageModal';
 import { TopicChat } from './student/TopicChat';
 import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
 import { StudentMockExamCreatorModal } from './student/StudentMockExamCreatorModal';
-import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
-import * as GeminiService from '../../services/geminiService';
-import { ArrowRightIcon } from '../Icons';
+import { getLocalDateISOString, getBrasiliaDate } from '../utils';
+import * as GeminiService from '../services/geminiService';
+import { ArrowRightIcon } from './Icons';
 
-// FIX: Updated ViewType to be consistent with other components.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
 
 type XpToast = {
@@ -44,7 +42,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
     const [selectedSubtopic, setSelectedSubtopic] = useState<SubTopic | null>(null);
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
-    // FIX: Renamed state to activeQuiz and updated its type to include MockExam.
     const [activeQuiz, setActiveQuiz] = useState<CustomQuiz | MockExam | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
@@ -61,9 +58,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
-    // FIX: Renamed state for clarity and consistency.
     const [isAiQuizCreatorOpen, setIsAiQuizCreatorOpen] = useState(false);
-    // FIX: Added state for Mock Exam Creator modal.
     const [isMockExamCreatorOpen, setIsMockExamCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
@@ -97,7 +92,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        // FIX: Updated view name from 'custom_quiz_list' to 'quizzes'.
         if (['schedule', 'performance', 'reviews', 'games', 'quizzes'].includes(view)) {
             setView('dashboard');
             return true;
@@ -108,7 +102,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        // FIX: Updated view name from 'custom_quiz_player' to 'quiz_player' and target view to 'quizzes'.
         if (view === 'quiz_player') {
             setView('quizzes');
             setActiveQuiz(null);
@@ -336,9 +329,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
     
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0 };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0 };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0 };
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             
             const newProgress = {
                 ...studentProgress,
@@ -351,7 +344,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
+            alert("Não foi possível gerar todos os desafios. Por favor, tente novamente.");
         } finally {
             setIsGeneratingAllChallenges(false);
         }

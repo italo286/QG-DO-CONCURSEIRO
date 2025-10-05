@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { MockExam, Question, QuestionAttempt, StudentProgress, Subject, Topic, SubTopic } from '../../types';
+import { MockExam, Question, StudentProgress, Subject } from '../../types';
 import { Modal, Button, Spinner } from '../ui';
-import { PlusIcon, TrashIcon } from '../Icons';
 
 type FilterType = 'mixed' | 'incorrect' | 'correct' | 'unanswered' | 'answered';
 
