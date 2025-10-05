@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -280,24 +281,19 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
 
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
 
-    const prompt = `Crie ${questionCount} questão(ões) de gramática. Cada questão deve ser um objeto JSON contendo:
-- 'statement': Uma frase completa com um erro gramatical (concordância, regência, crase, etc.).
-- 'options': Um array de 5 strings, que são a frase dividida em partes. Regra importante: A pontuação final (ponto, interrogação, etc.) deve ser anexada à última palavra, não pode ser uma alternativa separada.
-- 'correctAnswer': A string exata da 'option' que contém o erro.
-- 'errorCategory': A classificação do erro (ex: 'Crase', 'Concordância Verbal').
-- 'justification': A explicação concisa do erro.
-${errorFocusPrompt}
+    const prompt = `Aja como um professor de português criando uma questão de "identifique o erro". Gere ${questionCount} questão(ões) em JSON.
+Para cada questão, siga estritamente o formato do exemplo. A resposta deve ser um array JSON.
 
-Exemplo de output JSON para uma questão:
+Exemplo de formato para uma questão:
 {
     "statement": "Faziam dois anos que ele não aparecia.",
     "options": ["Faziam", "dois anos", "que ele", "não", "aparecia."],
     "correctAnswer": "Faziam",
     "errorCategory": "Concordância Verbal",
-    "justification": "O verbo 'fazer', no sentido de tempo decorrido, é impessoal e fica no singular. O correto é 'Fazia'."
+    "justification": "O verbo 'fazer', indicando tempo, é impessoal e fica no singular: 'Fazia'."
 }
 
-Retorne um array JSON com ${questionCount} objeto(s) neste formato.`;
+${errorFocusPrompt}`;
 
     try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
