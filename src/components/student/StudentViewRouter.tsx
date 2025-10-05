@@ -218,7 +218,11 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             />;
         case 'quiz_player':
             if (!props.activeQuiz) return null;
+            // FIX: Extracted isMockExam, feedbackMode, and durationInSeconds to separate variables
+            // to help TypeScript with type narrowing inside the JSX props.
             const isMockExam = 'config' in props.activeQuiz;
+            const feedbackMode = isMockExam ? props.activeQuiz.feedbackMode : 'instant';
+            const durationInSeconds = isMockExam ? (props.activeQuiz.durationInSeconds === 'unlimited' ? undefined : props.activeQuiz.durationInSeconds) : undefined;
             return <QuizView
                 key={props.quizInstanceKey}
                 questions={props.activeQuiz.questions}
@@ -229,8 +233,8 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 quizTitle={props.activeQuiz.name}
                 subjectName={isMockExam ? "Simulado" : "Quiz Personalizado"}
                 onAddBonusXp={props.onAddBonusXp}
-                feedbackMode={isMockExam ? props.activeQuiz.feedbackMode : 'instant'}
-                durationInSeconds={isMockExam ? (props.activeQuiz.durationInSeconds === 'unlimited' ? undefined : props.activeQuiz.durationInSeconds) : undefined}
+                feedbackMode={feedbackMode}
+                durationInSeconds={durationInSeconds}
             />;
         default:
             return <DashboardHome {...props} />;

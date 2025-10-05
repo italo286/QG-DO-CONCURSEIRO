@@ -484,15 +484,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         });
                     }}
                     handleQuizComplete={(finalAttempts) => {
-                        // This logic might need to be adapted based on quiz type (AI vs Mock)
-                        // For now, let's assume a generic completion handler
-                        if ('config' in activeQuiz!) { // It's a MockExam
+                        if (!activeQuiz) return;
+                        if ('config' in activeQuiz) { // It's a MockExam
                             // Handle MockExam completion if specific logic is needed
                         } else { // It's a CustomQuiz
-                            const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeQuiz!.id, finalAttempts, addXp);
+                            const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeQuiz.id, finalAttempts, addXp);
                             handleUpdateStudentProgress(newProgress, studentProgress);
                         }
-                        
                         setView('quizzes');
                         setActiveQuiz(null);
                     }}
