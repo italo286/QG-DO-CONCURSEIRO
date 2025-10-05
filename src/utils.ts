@@ -299,8 +299,8 @@ export const generateQuestionsPdf = (questions: Question[], topicName: string, s
     let yPos = UNIFORM_MARGIN_PT;
     
     // Column 1: Logo
-    const logoUrl = "https://i.ibb.co/4RMY5DPH/ppu.png";
-    const logoWidth = 100;
+    const logoUrl = "https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png";
+    const logoWidth = 70;
     const logoHeight = 70;
     const logoX = UNIFORM_MARGIN_PT;
     doc.addImage(logoUrl, 'PNG', logoX, yPos, logoWidth, logoHeight);
