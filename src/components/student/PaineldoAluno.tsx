@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -398,7 +397,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {

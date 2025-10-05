@@ -1,12 +1,11 @@
 
 
 import React, { useState, useEffect, useCallback } from 'react';
-// FIX: Added Simulado to the type import to resolve its usage in the component state.
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado } from '../types';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
 import * as FirebaseService from '../services/firebaseService';
-import * as Gamification from '../../gamification';
+import * as Gamification from '../gamification';
 import { useStudentData } from '../hooks/useStudentData';
-import { Spinner } from '../ui';
+import { Spinner } from './ui';
 import { StudentHeader } from './student/StudentHeader';
 import { StudentViewRouter } from './student/StudentViewRouter';
 import { EditProfileModal } from './student/EditProfileModal';
@@ -17,11 +16,10 @@ import { XpToastDisplay } from './student/XpToastDisplay';
 import { NewMessageModal } from './student/NewMessageModal';
 import { TopicChat } from './student/TopicChat';
 import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
-import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
-import * as GeminiService from '../../services/geminiService';
-import { ArrowRightIcon } from '../Icons';
+import { getLocalDateISOString, getBrasiliaDate } from '../utils';
+import * as GeminiService from '../services/geminiService';
+import { ArrowRightIcon } from './Icons';
 
-// FIX: Unified ViewType to include all possible views and remove deprecated 'custom_quiz_list'. This resolves multiple type errors.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
@@ -46,7 +44,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [selectedSubtopic, setSelectedSubtopic] = useState<SubTopic | null>(null);
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
     const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
-    // FIX: Added activeSimulado state to manage the currently active simulation quiz.
     const [activeSimulado, setActiveSimulado] = useState<Simulado | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
@@ -96,7 +93,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        // FIX: Replaced 'custom_quiz_list' with 'practice_area' to match the updated view type.
         if (['schedule', 'performance', 'reviews', 'games', 'practice_area'].includes(view)) {
             setView('dashboard');
             return true;
@@ -107,7 +103,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        // FIX: Replaced 'custom_quiz_list' with 'practice_area' and added 'simulado_player'.
         if (view === 'custom_quiz_player' || view === 'simulado_player') {
             setView('practice_area');
             setActiveCustomQuiz(null);
@@ -487,7 +482,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     handleCustomQuizComplete={(finalAttempts) => {
                         const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
-                        // FIX: Replaced 'custom_quiz_list' with 'practice_area'
                         setView('practice_area');
                         setActiveCustomQuiz(null);
                     }}

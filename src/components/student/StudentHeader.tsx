@@ -70,7 +70,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             case 'review_quiz': return 'Sessão de Revisão';
             case 'daily_challenge_quiz': return 'Desafio Diário';
             case 'daily_challenge_results': return 'Resultados do Desafio';
-            // FIX: Added missing case for 'practice_area' to display the correct header title.
             case 'practice_area': return 'Área de Prática';
             case 'custom_quiz_player': return 'Quiz Personalizado';
             case 'simulado_player': return 'Simulado';

@@ -1,6 +1,6 @@
 import React from "react";
 // FIX: Added imports for types used in the new gamification logic functions.
-import { StudentProgress, Subject, QuestionAttempt, Badge, Simulado } from "./types";
+import { StudentProgress, Subject, QuestionAttempt, Badge } from "./types";
 import { getBrasiliaDate, getLocalDateISOString } from './utils';
 import { 
     StarIcon,

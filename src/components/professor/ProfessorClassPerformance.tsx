@@ -1,5 +1,3 @@
-
-
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as FirebaseService from '../../services/firebaseService';
@@ -37,8 +35,6 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
-        // FIX: The original chained flatMap was not robust against malformed progress data, causing a TypeScript error where a parameter was inferred as 'unknown'. The logic is updated to safely filter and map the attempts.
-        // FIX: Fix type error by adding a type guard to ensure progress objects are valid before accessing properties. This prevents a crash when `p` is inferred as `unknown` due to potentially malformed data in `allProgress`.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
             .filter((p): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
