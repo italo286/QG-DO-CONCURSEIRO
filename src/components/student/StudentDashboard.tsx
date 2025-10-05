@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado } from '../../types';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
@@ -49,7 +49,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
     const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
     const [newLevelInfo, setNewLevelInfo] = useState({ level: 0, title: '' });
-    const [awardedBadges, setAwardedBadges] = useState<any[]>([]);
+    const [awardedBadges, setAwardedBadges] = useState<Badge[]>([]);
     const [xpToasts, setXpToasts] = useState<XpToast[]>([]);
     const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
     const [isChatModalOpen, setIsChatModalOpen] = useState(false);
@@ -398,8 +398,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-                        // FIX: Removed redundant type annotation for 'f' to allow TypeScript to correctly infer its type from the 'flashcards' array.
-                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {
