@@ -1,6 +1,6 @@
 import React from 'react';
 import {
-    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz, DailyChallenge
+    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz, DailyChallenge, MockExam
 } from '../../types';
 import { getLocalDateISOString } from '../../utils';
 
@@ -15,9 +15,9 @@ import { SubjectView } from './views/SubjectView';
 import { CourseView } from './views/CourseView';
 import { DashboardHome } from './views/DashboardHome';
 import { DailyChallengeResultsView } from './views/DailyChallengeResultsView';
-import { CustomQuizListView } from './views/CustomQuizListView';
+import { StudentQuizzesView } from './views/StudentQuizzesView';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
 
 interface StudentViewRouterProps {
     view: ViewType;
@@ -42,7 +42,8 @@ interface StudentViewRouterProps {
     isSplitView: boolean;
     isSidebarCollapsed: boolean;
     quizInstanceKey: number;
-    activeCustomQuiz: CustomQuiz | null;
+    // FIX: Renamed prop to activeQuiz to match its usage and type.
+    activeQuiz: CustomQuiz | MockExam | null;
     isGeneratingAllChallenges: boolean;
 
     // Callbacks
@@ -84,11 +85,12 @@ interface StudentViewRouterProps {
     onReportQuestion: (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => void;
     onCloseDailyChallengeResults: () => void;
     onNavigateToDailyChallengeResults?: () => void;
-    onOpenCreator: () => void;
-    onStartQuiz: (quiz: CustomQuiz) => void;
-    onDeleteQuiz: (quizId: string) => void;
-    saveCustomQuizAttempt: (attempt: QuestionAttempt) => void;
-    handleCustomQuizComplete: (finalAttempts: QuestionAttempt[]) => void;
+    onOpenAiQuizCreator: () => void;
+    onOpenMockExamCreator: () => void;
+    onStartQuiz: (quiz: CustomQuiz | MockExam) => void;
+    onDeleteQuiz: (quizId: string, type: 'ai' | 'mock') => void;
+    saveQuizAttempt: (attempt: QuestionAttempt) => void;
+    handleQuizComplete: (finalAttempts: QuestionAttempt[]) => void;
 }
 
 export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
@@ -206,25 +208,29 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
         case 'games':
             return <GamesView {...props} />;
-        case 'custom_quiz_list':
-            return <CustomQuizListView 
+        case 'quizzes':
+            return <StudentQuizzesView 
                 studentProgress={props.studentProgress}
                 onStartQuiz={props.onStartQuiz}
                 onDeleteQuiz={props.onDeleteQuiz}
-                onOpenCreator={props.onOpenCreator}
+                onOpenAiQuizCreator={props.onOpenAiQuizCreator}
+                onOpenMockExamCreator={props.onOpenMockExamCreator}
             />;
-        case 'custom_quiz_player':
-            if (!props.activeCustomQuiz) return null;
+        case 'quiz_player':
+            if (!props.activeQuiz) return null;
+            const isMockExam = 'config' in props.activeQuiz;
             return <QuizView
                 key={props.quizInstanceKey}
-                questions={props.activeCustomQuiz.questions}
-                initialAttempts={props.activeCustomQuiz.attempts || []}
-                onSaveAttempt={props.saveCustomQuizAttempt}
-                onComplete={props.handleCustomQuizComplete}
-                onBack={() => props.setView('custom_quiz_list')}
-                quizTitle={props.activeCustomQuiz.name}
-                subjectName="Quiz Personalizado"
+                questions={props.activeQuiz.questions}
+                initialAttempts={props.activeQuiz.attempts || []}
+                onSaveAttempt={props.saveQuizAttempt}
+                onComplete={props.handleQuizComplete}
+                onBack={() => props.setView('quizzes')}
+                quizTitle={props.activeQuiz.name}
+                subjectName={isMockExam ? "Simulado" : "Quiz Personalizado"}
                 onAddBonusXp={props.onAddBonusXp}
+                feedbackMode={isMockExam ? props.activeQuiz.feedbackMode : 'instant'}
+                durationInSeconds={isMockExam ? (props.activeQuiz.durationInSeconds === 'unlimited' ? undefined : props.activeQuiz.durationInSeconds) : undefined}
             />;
         default:
             return <DashboardHome {...props} />;

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge } from '../../types';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, MockExam } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
@@ -14,11 +14,12 @@ import { XpToastDisplay } from './XpToastDisplay';
 import { NewMessageModal } from './NewMessageModal';
 import { TopicChat } from './TopicChat';
 import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
+import { StudentMockExamCreatorModal } from './StudentMockExamCreatorModal';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
 
 type XpToast = {
     id: number;
@@ -41,7 +42,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
     const [selectedSubtopic, setSelectedSubtopic] = useState<SubTopic | null>(null);
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
-    const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
+    const [activeQuiz, setActiveQuiz] = useState<CustomQuiz | MockExam | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
@@ -57,7 +58,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
-    const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
+    const [isAiQuizCreatorOpen, setIsAiQuizCreatorOpen] = useState(false);
+    const [isMockExamCreatorOpen, setIsMockExamCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
     const {
@@ -90,7 +92,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        if (['schedule', 'performance', 'reviews', 'games', 'custom_quiz_list'].includes(view)) {
+        if (['schedule', 'performance', 'reviews', 'games', 'quizzes'].includes(view)) {
             setView('dashboard');
             return true;
         }
@@ -100,9 +102,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        if (view === 'custom_quiz_player') {
-            setView('custom_quiz_list');
-            setActiveCustomQuiz(null);
+        if (view === 'quiz_player') {
+            setView('quizzes');
+            setActiveQuiz(null);
             return true;
         }
         return false;
@@ -361,7 +363,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeQuiz={activeQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
@@ -460,26 +462,39 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
                     onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
-                    onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
-                    onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
-                    onDeleteQuiz={(quizId) => {
+                    onOpenAiQuizCreator={() => setIsAiQuizCreatorOpen(true)}
+                    onOpenMockExamCreator={() => setIsMockExamCreatorOpen(true)}
+                    onStartQuiz={(quiz) => { setActiveQuiz(quiz); setQuizInstanceKey(Date.now()); setView('quiz_player'); }}
+                    onDeleteQuiz={(quizId, type) => {
                          if (window.confirm("Tem certeza que deseja apagar este quiz?")) {
-                            const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
-                            handleUpdateStudentProgress(newProgress, studentProgress);
+                            if (type === 'ai') {
+                                const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
+                                handleUpdateStudentProgress(newProgress, studentProgress);
+                            } else { // mock
+                                const newProgress = { ...studentProgress, mockExams: (studentProgress.mockExams || []).filter(q => q.id !== quizId) };
+                                handleUpdateStudentProgress(newProgress, studentProgress);
+                            }
                         }
                     }}
-                    saveCustomQuizAttempt={(attempt) => {
-                        setActiveCustomQuiz(prev => {
+                    saveQuizAttempt={(attempt) => {
+                        setActiveQuiz(prev => {
                             if (!prev) return null;
                             const newAttempts = [...(prev.attempts || []), attempt];
                             return { ...prev, attempts: newAttempts };
                         });
                     }}
-                    handleCustomQuizComplete={(finalAttempts) => {
-                        const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
-                        handleUpdateStudentProgress(newProgress, studentProgress);
-                        setView('custom_quiz_list');
-                        setActiveCustomQuiz(null);
+                    handleQuizComplete={(finalAttempts) => {
+                        // This logic might need to be adapted based on quiz type (AI vs Mock)
+                        // For now, let's assume a generic completion handler
+                        if ('config' in activeQuiz!) { // It's a MockExam
+                            // Handle MockExam completion if specific logic is needed
+                        } else { // It's a CustomQuiz
+                            const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeQuiz!.id, finalAttempts, addXp);
+                            handleUpdateStudentProgress(newProgress, studentProgress);
+                        }
+                        
+                        setView('quizzes');
+                        setActiveQuiz(null);
                     }}
                 />
             </main>
@@ -501,10 +516,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
                 </div>
             )}
-            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={() => setIsCustomQuizCreatorOpen(false)} onSave={(quiz) => {
+            <StudentCustomQuizCreatorModal isOpen={isAiQuizCreatorOpen} onClose={() => setIsAiQuizCreatorOpen(false)} onSave={(quiz) => {
                 const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }}/>
+            <StudentMockExamCreatorModal 
+                isOpen={isMockExamCreatorOpen}
+                onClose={() => setIsMockExamCreatorOpen(false)}
+                onSave={(mockExam) => {
+                    const newProgress = { ...studentProgress, mockExams: [...(studentProgress.mockExams || []), mockExam]};
+                    handleUpdateStudentProgress(newProgress, studentProgress);
+                }}
+                allSubjects={allSubjects}
+                studentProgress={studentProgress}
+            />
         </div>
     );
 };

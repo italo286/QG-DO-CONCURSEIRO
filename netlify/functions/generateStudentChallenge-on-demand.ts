@@ -4,20 +4,22 @@ import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
 import { StudentProgress, Subject, Course, Question, Topic, SubTopic, QuestionAttempt } from '../../src/types.server';
 
 /*
- * HISTÓRICO DE MANUTENÇÃO E OTIMIZAÇÃO:
- * Esta função passou por várias iterações para resolver erros de '504 Gateway Timeout'.
- * O problema original era a alta complexidade do prompt, que exigia que a IA gerasse justificativas
- * para cada alternativa, além de identificar o erro. Isso consumia muito tempo de processamento.
+ * HISTÓRICO DE MANUTENÇÃO E OTIMIZAÇÃO (Desafio de Português):
+ * Esta função enfrentou repetidos erros de '504 Gateway Timeout' por exceder o tempo limite de execução da Netlify Function.
  *
- * SOLUÇÕES APLICADAS:
- * 1. Remoção do 'thinkingBudget: 0': Permitir que o modelo use seu tempo de processamento padrão é crucial para tarefas complexas.
- * 2. Simplificação do Schema e do Prompt: A principal otimização foi remover a exigência de 'optionJustifications'
- *    e focar a IA em gerar apenas a justificativa principal. O prompt atual é direto e fornece um exemplo claro,
- *    o que reduz a ambiguidade e acelera a resposta.
+ * PROBLEMA: A geração da questão de português, mesmo com um prompt simplificado, era uma tarefa complexa que levava a IA
+ * a demorar muito para responder.
  *
- * CUIDADO AO MODIFICAR: Qualquer alteração que aumente a complexidade da tarefa da IA (como pedir mais campos,
- * análises mais profundas ou múltiplos outputs complexos) pode reintroduzir o problema de timeout. Mantenha o prompt
- * o mais simples e direto possível.
+ * TENTATIVAS ANTERIORES:
+ * 1. Simplificação do prompt e do schema JSON para reduzir a carga cognitiva da IA. (Não foi suficiente)
+ *
+ * SOLUÇÃO APLICADA:
+ * 1. Adição do `thinkingConfig: { thinkingBudget: 0 }`. Esta configuração instrui o modelo 'gemini-2.5-flash' a
+ *    desativar seu processo de "pensamento" (um passo interno para melhorar a qualidade da resposta) e gerar a
+ *    resposta o mais rápido possível. Isso é ideal para tarefas que exigem baixa latência.
+ *
+ * CUIDADO AO MODIFICAR: A remoção do `thinkingConfig` ou o aumento da complexidade do prompt pode reintroduzir
+ * o problema de timeout. A velocidade aqui foi priorizada sobre a qualidade máxima que o modelo poderia oferecer.
  */
 
 // --- Firebase Admin Initialization ---

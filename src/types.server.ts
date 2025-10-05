@@ -199,6 +199,21 @@ export interface CustomQuiz {
   createdAt: number; // timestamp
 }
 
+export interface MockExam {
+    id: string;
+    name: string;
+    questions: Question[];
+    isCompleted: boolean;
+    attempts?: QuestionAttempt[];
+    createdAt: number; // timestamp
+    durationInSeconds?: number | 'unlimited';
+    feedbackMode: 'instant' | 'final';
+    config: {
+        subjects: { subjectId: string; questionCount: number }[];
+        filter: 'incorrect' | 'correct' | 'unanswered' | 'answered' | 'mixed';
+    };
+}
+
 export interface StudentProgress {
   studentId: string;
   progressByTopic: {
@@ -225,6 +240,7 @@ export interface StudentProgress {
   };
   customGames: MiniGame[];
   customQuizzes?: CustomQuiz[];
+  mockExams?: MockExam[];
   targetCargoByCourse?: { [courseId: string]: string; };
   aiGeneratedFlashcards?: Flashcard[];
   srsFlashcardData?: {

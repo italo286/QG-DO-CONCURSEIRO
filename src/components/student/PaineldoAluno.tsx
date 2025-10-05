@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -19,7 +18,8 @@ import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
+// FIX: Updated ViewType to be consistent with other components.
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
 
 type XpToast = {
     id: number;
@@ -91,7 +91,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        if (['schedule', 'performance', 'reviews', 'games', 'custom_quiz_list'].includes(view)) {
+        // FIX: Updated view name from 'custom_quiz_list' to 'quizzes'.
+        if (['schedule', 'performance', 'reviews', 'games', 'quizzes'].includes(view)) {
             setView('dashboard');
             return true;
         }
@@ -101,8 +102,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        if (view === 'custom_quiz_player') {
-            setView('custom_quiz_list');
+        // FIX: Updated view name from 'custom_quiz_player' to 'quiz_player' and target view to 'quizzes'.
+        if (view === 'quiz_player') {
+            setView('quizzes');
             setActiveCustomQuiz(null);
             return true;
         }
@@ -362,7 +364,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeQuiz={activeCustomQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
@@ -462,7 +464,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
                     onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
                     onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
-                    onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
+                    onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('quiz_player'); }}
                     onDeleteQuiz={(quizId) => {
                          if (window.confirm("Tem certeza que deseja apagar este quiz?")) {
                             const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
@@ -479,7 +481,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     handleCustomQuizComplete={(finalAttempts) => {
                         const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
-                        setView('custom_quiz_list');
+                        setView('quizzes');
                         setActiveCustomQuiz(null);
                     }}
                 />

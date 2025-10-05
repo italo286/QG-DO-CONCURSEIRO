@@ -3,6 +3,7 @@ import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
 import { LogoutIcon, PencilIcon, UserCircleIcon, ChevronDownIcon } from '../Icons';
 
+// FIX: Renamed 'quizzes' and 'quiz_player' back to their original names for consistency.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'custom_quiz_list' | 'custom_quiz_player';
 
 interface StudentHeaderProps {
@@ -38,7 +39,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const navigationItems = [
         { label: 'Início', view: 'dashboard' as const },
         { label: 'Revisões', view: 'reviews' as const },
-        { label: 'Questões', view: 'custom_quiz_list' as const },
+        { label: 'Quizzes', view: 'custom_quiz_list' as const },
         { label: 'Cronograma', view: 'schedule' as const },
         { label: 'Jogos', view: 'games' as const },
         { label: 'Desempenho', view: 'performance' as const },
@@ -69,8 +70,8 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             case 'review_quiz': return 'Sessão de Revisão';
             case 'daily_challenge_quiz': return 'Desafio Diário';
             case 'daily_challenge_results': return 'Resultados do Desafio';
-            case 'custom_quiz_list': return 'Minhas Questões';
-            case 'custom_quiz_player': return 'Quiz Personalizado';
+            case 'custom_quiz_list': return 'Meus Quizzes e Simulados';
+            case 'custom_quiz_player': return 'Simulado';
             default: return 'QG do Concurseiro';
         }
     };
