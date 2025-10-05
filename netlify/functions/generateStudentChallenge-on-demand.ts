@@ -1,4 +1,3 @@
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -302,6 +301,7 @@ ${errorFocusPrompt}`;
             config: { 
                 responseMimeType: 'application/json', 
                 responseSchema: portugueseQuestionSchema,
+                thinkingConfig: { thinkingBudget: 0 }
             }
         }));
 
