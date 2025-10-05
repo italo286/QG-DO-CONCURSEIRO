@@ -1,6 +1,6 @@
 import React from "react";
 // FIX: Added imports for types used in the new gamification logic functions.
-import { StudentProgress, Subject, QuestionAttempt, Badge } from "./types";
+import { StudentProgress, Subject, QuestionAttempt, Badge, Simulado } from "./types";
 import { getBrasiliaDate, getLocalDateISOString } from './utils';
 import { 
     StarIcon,
@@ -339,6 +339,37 @@ export const processCustomQuizCompletion = (
 
     newProgress.customQuizzes[quizIndex] = {
         ...newProgress.customQuizzes[quizIndex],
+        isCompleted: true,
+        attempts: attempts
+    };
+    
+    const todayISO = getLocalDateISOString(getBrasiliaDate());
+    if (!newProgress.dailyActivity[todayISO]) {
+        newProgress.dailyActivity[todayISO] = { questionsAnswered: 0 };
+    }
+    newProgress.dailyActivity[todayISO].questionsAnswered += attempts.length;
+
+    return newProgress;
+};
+
+export const processSimuladoCompletion = (
+    progress: StudentProgress,
+    simuladoId: string,
+    attempts: QuestionAttempt[],
+    addXp: (amount: number) => void
+): StudentProgress => {
+    const newProgress = { ...progress };
+    if (!newProgress.simulados) {
+        newProgress.simulados = [];
+    }
+    const simuladoIndex = newProgress.simulados.findIndex(s => s.id === simuladoId);
+    if (simuladoIndex === -1) return newProgress;
+    
+    const correctCount = attempts.filter(a => a.isCorrect).length;
+    addXp(correctCount * XP_CONFIG.CORRECT_ANSWER);
+
+    newProgress.simulados[simuladoIndex] = {
+        ...newProgress.simulados[simuladoIndex],
         isCompleted: true,
         attempts: attempts
     };

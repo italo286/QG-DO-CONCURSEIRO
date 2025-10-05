@@ -1,9 +1,12 @@
+
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, MockExam } from '../types';
+// FIX: Added Simulado to the type import to resolve its usage in the component state.
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado } from '../types';
 import * as FirebaseService from '../services/firebaseService';
-import * as Gamification from '../gamification';
+import * as Gamification from '../../gamification';
 import { useStudentData } from '../hooks/useStudentData';
-import { Spinner } from './ui';
+import { Spinner } from '../ui';
 import { StudentHeader } from './student/StudentHeader';
 import { StudentViewRouter } from './student/StudentViewRouter';
 import { EditProfileModal } from './student/EditProfileModal';
@@ -14,12 +17,12 @@ import { XpToastDisplay } from './student/XpToastDisplay';
 import { NewMessageModal } from './student/NewMessageModal';
 import { TopicChat } from './student/TopicChat';
 import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
-import { StudentMockExamCreatorModal } from './student/StudentMockExamCreatorModal';
-import { getLocalDateISOString, getBrasiliaDate } from '../utils';
-import * as GeminiService from '../services/geminiService';
-import { ArrowRightIcon } from './Icons';
+import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
+import * as GeminiService from '../../services/geminiService';
+import { ArrowRightIcon } from '../Icons';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'quizzes' | 'quiz_player';
+// FIX: Unified ViewType to include all possible views and remove deprecated 'custom_quiz_list'. This resolves multiple type errors.
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
     id: number;
@@ -42,7 +45,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [selectedTopic, setSelectedTopic] = useState<Topic | null>(null);
     const [selectedSubtopic, setSelectedSubtopic] = useState<SubTopic | null>(null);
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
-    const [activeQuiz, setActiveQuiz] = useState<CustomQuiz | MockExam | null>(null);
+    const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
+    // FIX: Added activeSimulado state to manage the currently active simulation quiz.
+    const [activeSimulado, setActiveSimulado] = useState<Simulado | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
@@ -58,8 +63,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [quizInstanceKey, setQuizInstanceKey] = useState(Date.now());
     const [activeChallenge, setActiveChallenge] = useState<{ type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null>(null);
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
-    const [isAiQuizCreatorOpen, setIsAiQuizCreatorOpen] = useState(false);
-    const [isMockExamCreatorOpen, setIsMockExamCreatorOpen] = useState(false);
+    const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
     const {
@@ -92,7 +96,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        if (['schedule', 'performance', 'reviews', 'games', 'quizzes'].includes(view)) {
+        // FIX: Replaced 'custom_quiz_list' with 'practice_area' to match the updated view type.
+        if (['schedule', 'performance', 'reviews', 'games', 'practice_area'].includes(view)) {
             setView('dashboard');
             return true;
         }
@@ -102,9 +107,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        if (view === 'quiz_player') {
-            setView('quizzes');
-            setActiveQuiz(null);
+        // FIX: Replaced 'custom_quiz_list' with 'practice_area' and added 'simulado_player'.
+        if (view === 'custom_quiz_player' || view === 'simulado_player') {
+            setView('practice_area');
+            setActiveCustomQuiz(null);
+            setActiveSimulado(null);
             return true;
         }
         return false;
@@ -344,7 +351,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert("Não foi possível gerar todos os desafios. Por favor, tente novamente.");
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
@@ -363,7 +370,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeQuiz={activeQuiz} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
@@ -462,37 +469,51 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
                     onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
-                    onOpenAiQuizCreator={() => setIsAiQuizCreatorOpen(true)}
-                    onOpenMockExamCreator={() => setIsMockExamCreatorOpen(true)}
-                    onStartQuiz={(quiz) => { setActiveQuiz(quiz); setQuizInstanceKey(Date.now()); setView('quiz_player'); }}
-                    onDeleteQuiz={(quizId, type) => {
+                    onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
+                    onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
+                    onDeleteQuiz={(quizId) => {
                          if (window.confirm("Tem certeza que deseja apagar este quiz?")) {
-                            if (type === 'ai') {
-                                const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
-                                handleUpdateStudentProgress(newProgress, studentProgress);
-                            } else { // mock
-                                const newProgress = { ...studentProgress, mockExams: (studentProgress.mockExams || []).filter(q => q.id !== quizId) };
-                                handleUpdateStudentProgress(newProgress, studentProgress);
-                            }
+                            const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
+                            handleUpdateStudentProgress(newProgress, studentProgress);
                         }
                     }}
-                    saveQuizAttempt={(attempt) => {
-                        setActiveQuiz(prev => {
+                    saveCustomQuizAttempt={(attempt) => {
+                        setActiveCustomQuiz(prev => {
                             if (!prev) return null;
                             const newAttempts = [...(prev.attempts || []), attempt];
                             return { ...prev, attempts: newAttempts };
                         });
                     }}
-                    handleQuizComplete={(finalAttempts) => {
-                        if (!activeQuiz) return;
-                        if ('config' in activeQuiz) { // It's a MockExam
-                            // Handle MockExam completion if specific logic is needed
-                        } else { // It's a CustomQuiz
-                            const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeQuiz.id, finalAttempts, addXp);
+                    handleCustomQuizComplete={(finalAttempts) => {
+                        const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                        // FIX: Replaced 'custom_quiz_list' with 'practice_area'
+                        setView('practice_area');
+                        setActiveCustomQuiz(null);
+                    }}
+                    onSaveSimulado={(simulado) => {
+                        const newProgress = { ...studentProgress, simulados: [...(studentProgress.simulados || []), simulado] };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }}
+                    onStartSimulado={(simulado) => { setActiveSimulado(simulado); setQuizInstanceKey(Date.now()); setView('simulado_player'); }}
+                    onDeleteSimulado={(simuladoId) => {
+                        if (window.confirm("Tem certeza que deseja apagar este simulado?")) {
+                            const newProgress = { ...studentProgress, simulados: (studentProgress.simulados || []).filter(s => s.id !== simuladoId) };
                             handleUpdateStudentProgress(newProgress, studentProgress);
                         }
-                        setView('quizzes');
-                        setActiveQuiz(null);
+                    }}
+                     saveSimuladoAttempt={(attempt) => {
+                        setActiveSimulado(prev => {
+                            if (!prev) return null;
+                            const newAttempts = [...(prev.attempts || []), attempt];
+                            return { ...prev, attempts: newAttempts };
+                        });
+                    }}
+                    handleSimuladoComplete={(finalAttempts) => {
+                        const newProgress = Gamification.processSimuladoCompletion(studentProgress, activeSimulado!.id, finalAttempts, addXp);
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                        setView('practice_area');
+                        setActiveSimulado(null);
                     }}
                 />
             </main>
@@ -514,20 +535,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
                 </div>
             )}
-            <StudentCustomQuizCreatorModal isOpen={isAiQuizCreatorOpen} onClose={() => setIsAiQuizCreatorOpen(false)} onSave={(quiz) => {
+            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={() => setIsCustomQuizCreatorOpen(false)} onSave={(quiz) => {
                 const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }}/>
-            <StudentMockExamCreatorModal 
-                isOpen={isMockExamCreatorOpen}
-                onClose={() => setIsMockExamCreatorOpen(false)}
-                onSave={(mockExam) => {
-                    const newProgress = { ...studentProgress, mockExams: [...(studentProgress.mockExams || []), mockExam]};
-                    handleUpdateStudentProgress(newProgress, studentProgress);
-                }}
-                allSubjects={allSubjects}
-                studentProgress={studentProgress}
-            />
         </div>
     );
 };

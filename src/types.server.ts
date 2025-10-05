@@ -1,3 +1,5 @@
+
+
 // This file contains types that are shared between the server (Netlify functions)
 // and the client, but do NOT have any frontend-specific dependencies like React.
 
@@ -199,19 +201,21 @@ export interface CustomQuiz {
   createdAt: number; // timestamp
 }
 
-export interface MockExam {
-    id: string;
-    name: string;
-    questions: Question[];
-    isCompleted: boolean;
-    attempts?: QuestionAttempt[];
-    createdAt: number; // timestamp
-    durationInSeconds?: number | 'unlimited';
-    feedbackMode: 'instant' | 'final';
-    config: {
-        subjects: { subjectId: string; questionCount: number }[];
-        filter: 'incorrect' | 'correct' | 'unanswered' | 'answered' | 'mixed';
-    };
+export interface SimuladoConfig {
+  subjects: { subjectId: string; questionCount: number }[];
+  filter: 'incorrect' | 'correct' | 'unanswered' | 'answered' | 'mixed';
+  durationInSeconds?: number;
+  feedbackMode: 'immediate' | 'at_end';
+}
+
+export interface Simulado {
+  id: string;
+  name: string;
+  createdAt: number;
+  questions: Question[];
+  config: SimuladoConfig;
+  isCompleted: boolean;
+  attempts?: QuestionAttempt[];
 }
 
 export interface StudentProgress {
@@ -240,7 +244,7 @@ export interface StudentProgress {
   };
   customGames: MiniGame[];
   customQuizzes?: CustomQuiz[];
-  mockExams?: MockExam[];
+  simulados?: Simulado[];
   targetCargoByCourse?: { [courseId: string]: string; };
   aiGeneratedFlashcards?: Flashcard[];
   srsFlashcardData?: {

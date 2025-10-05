@@ -107,14 +107,14 @@ export const QuizView: React.FC<{
     quizTitle: string;
     subjectName?: string;
     durationInSeconds?: number;
-    // FIX: Added feedbackMode to control when justifications are shown.
-    feedbackMode?: 'instant' | 'final';
     isDailyChallenge?: boolean;
     dailyChallengeType?: 'review' | 'glossary' | 'portuguese';
     hideBackButtonOnResults?: boolean;
     onNavigateToDailyChallengeResults?: () => void;
+    // FIX: Added feedbackMode prop to support delayed feedback in simulados.
+    feedbackMode?: 'immediate' | 'at_end';
 }> = ({ 
-    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion, onNavigateToDailyChallengeResults, feedbackMode = 'instant'
+    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion, onNavigateToDailyChallengeResults, feedbackMode = 'immediate'
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -256,6 +256,17 @@ export const QuizView: React.FC<{
         setSessionAttempts(updatedAttempts);
         onSaveAttempt(newAttempt);
         
+        if (feedbackMode === 'at_end') {
+            if (isLastQuestion) {
+                onComplete(updatedAttempts);
+                setHasCompleted(true);
+                setShowResults(true);
+            } else {
+                setTimeout(() => handleNext(), 300);
+            }
+            return;
+        }
+
         setMotivationalMessage(null);
         setTimeout(() => {
             let message: string | null = null;
@@ -717,7 +728,7 @@ export const QuizView: React.FC<{
                     )}
                 </div>
 
-                {isCurrentQuestionAnswered && feedbackMode === 'instant' && (
+                {isCurrentQuestionAnswered && feedbackMode === 'immediate' && (
                     <div className="mt-6 p-4 bg-gray-900/50 rounded-lg animate-fade-in">
                         <p className={`font-bold text-lg ${isCorrect ? 'text-green-400' : 'text-red-400'}`}>
                             {isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta.'}
