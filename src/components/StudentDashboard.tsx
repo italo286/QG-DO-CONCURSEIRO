@@ -1,6 +1,5 @@
-
-
 import React, { useState, useEffect, useCallback } from 'react';
+// FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
 import * as FirebaseService from '../services/firebaseService';
 import * as Gamification from '../gamification';
@@ -50,7 +49,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
     const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
     const [newLevelInfo, setNewLevelInfo] = useState({ level: 0, title: '' });
-    const [awardedBadges, setAwardedBadges] = useState<any[]>([]);
+    const [awardedBadges, setAwardedBadges] = useState<Badge[]>([]);
     const [xpToasts, setXpToasts] = useState<XpToast[]>([]);
     const [isNewMessageModalOpen, setIsNewMessageModalOpen] = useState(false);
     const [isChatModalOpen, setIsChatModalOpen] = useState(false);
