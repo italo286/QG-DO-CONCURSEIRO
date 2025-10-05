@@ -111,7 +111,6 @@ export const QuizView: React.FC<{
     dailyChallengeType?: 'review' | 'glossary' | 'portuguese';
     hideBackButtonOnResults?: boolean;
     onNavigateToDailyChallengeResults?: () => void;
-    // FIX: Added feedbackMode prop to support delayed feedback in simulados.
     feedbackMode?: 'immediate' | 'at_end';
 }> = ({ 
     questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion, onNavigateToDailyChallengeResults, feedbackMode = 'immediate'
@@ -258,11 +257,9 @@ export const QuizView: React.FC<{
         
         if (feedbackMode === 'at_end') {
             if (isLastQuestion) {
-                onComplete(updatedAttempts);
-                setHasCompleted(true);
                 setShowResults(true);
             } else {
-                setTimeout(() => handleNext(), 300);
+                handleNext();
             }
             return;
         }
@@ -676,7 +673,7 @@ export const QuizView: React.FC<{
                             const isEliminated = eliminatedOptions.has(option);
                             
                             let labelClass = 'bg-gray-700 hover:bg-gray-600';
-                            if (isCurrentQuestionAnswered) {
+                            if (isCurrentQuestionAnswered && feedbackMode === 'immediate') {
                                 if(isCorrectAnswer) labelClass = 'bg-green-600 text-white';
                                 else if (isSelected) labelClass = 'bg-red-600 text-white';
                                 else labelClass = 'bg-gray-700 opacity-60';

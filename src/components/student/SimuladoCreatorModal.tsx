@@ -51,6 +51,52 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
         );
     }, [allSubjects]);
 
+    const { attemptedIds, correctIds, incorrectIds } = useMemo(() => {
+        const attempted = new Set<string>();
+        const correct = new Set<string>();
+
+        Object.values(studentProgress.progressByTopic).forEach(subject => {
+            Object.values(subject).forEach(topic => {
+                topic.lastAttempt.forEach(attempt => {
+                    attempted.add(attempt.questionId);
+                    if (attempt.isCorrect) {
+                        correct.add(attempt.questionId);
+                    }
+                });
+            });
+        });
+        studentProgress.reviewSessions.forEach(session => {
+            (session.attempts || []).forEach(attempt => {
+                attempted.add(attempt.questionId);
+                if (attempt.isCorrect) {
+                    correct.add(attempt.questionId);
+                }
+            });
+        });
+
+        const incorrect = new Set([...attempted].filter(id => !correct.has(id)));
+        
+        return { attemptedIds: attempted, correctIds: correct, incorrectIds: incorrect };
+    }, [studentProgress]);
+
+    const getAvailableQuestionCount = (subjectId: string, filter: string): number => {
+        let subjectQuestions = allQuestionsWithContext.filter(q => q.subjectId === subjectId);
+
+        switch (filter) {
+            case 'unanswered':
+                return subjectQuestions.filter(q => !attemptedIds.has(q.id)).length;
+            case 'incorrect':
+                return subjectQuestions.filter(q => incorrectIds.has(q.id)).length;
+            case 'correct':
+                return subjectQuestions.filter(q => correctIds.has(q.id)).length;
+            case 'answered':
+                return subjectQuestions.filter(q => attemptedIds.has(q.id)).length;
+            case 'mixed':
+            default:
+                return subjectQuestions.length;
+        }
+    };
+
     const handleSave = () => {
         if (!simuladoName.trim()) {
             setError('Por favor, dê um nome ao simulado.');
@@ -61,30 +107,6 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
             return;
         }
         setError('');
-
-        const attemptedIds = new Set<string>();
-        const correctIds = new Set<string>();
-
-        Object.values(studentProgress.progressByTopic).forEach(subject => {
-            Object.values(subject).forEach(topic => {
-                topic.lastAttempt.forEach(attempt => {
-                    attemptedIds.add(attempt.questionId);
-                    if (attempt.isCorrect) {
-                        correctIds.add(attempt.questionId);
-                    }
-                });
-            });
-        });
-        studentProgress.reviewSessions.forEach(session => {
-            (session.attempts || []).forEach(attempt => {
-                attemptedIds.add(attempt.questionId);
-                if (attempt.isCorrect) {
-                    correctIds.add(attempt.questionId);
-                }
-            });
-        });
-
-        const incorrectIds = new Set([...attemptedIds].filter(id => !correctIds.has(id)));
 
         let filteredQuestions = allQuestionsWithContext;
 
@@ -132,7 +154,13 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
 
     const handleSubjectConfigChange = (index: number, field: 'subjectId' | 'questionCount', value: string | number) => {
         const newSubjects = [...config.subjects];
-        (newSubjects[index] as any)[field] = value;
+        if (field === 'questionCount') {
+            const subjectId = newSubjects[index].subjectId;
+            const maxQuestions = getAvailableQuestionCount(subjectId, config.filter);
+            (newSubjects[index] as any)[field] = Math.min(Number(value), maxQuestions);
+        } else {
+            (newSubjects[index] as any)[field] = value;
+        }
         setConfig(prev => ({ ...prev, subjects: newSubjects }));
     };
 
@@ -164,6 +192,9 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
                             </select>
                             <div className="flex items-center">
                                 <input type="number" value={subjectConfig.questionCount} onChange={e => handleSubjectConfigChange(index, 'questionCount', Number(e.target.value))} min="1" max="100" placeholder="Qtd" className="bg-gray-700 rounded p-2 text-sm flex-grow w-full" />
+                                <span className="text-xs text-gray-400 ml-2 whitespace-nowrap">
+                                    / {getAvailableQuestionCount(subjectConfig.subjectId, config.filter)}
+                                </span>
                                 <button onClick={() => removeSubjectConfig(index)} className="p-1 text-red-500 hover:text-red-400"><TrashIcon className="h-4 w-4"/></button>
                             </div>
                         </div>
