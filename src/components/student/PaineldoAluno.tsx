@@ -1,5 +1,4 @@
 
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -20,7 +19,6 @@ import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
 
-// FIX: Unified ViewType to include all possible views and remove deprecated 'custom_quiz_list'. This resolves multiple type errors.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
@@ -94,7 +92,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        // FIX: Replaced 'custom_quiz_list' with 'practice_area' to match the updated view type.
         if (['schedule', 'performance', 'reviews', 'games', 'practice_area'].includes(view)) {
             setView('dashboard');
             return true;
@@ -105,7 +102,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge(null);
             return true;
         }
-        // FIX: Replaced 'custom_quiz_list' with 'practice_area' and added 'simulado_player'.
         if (view === 'custom_quiz_player' || view === 'simulado_player') {
             setView('practice_area');
             setActiveCustomQuiz(null);
@@ -485,7 +481,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     handleCustomQuizComplete={(finalAttempts) => {
                         const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
-                        // FIX: Replaced 'custom_quiz_list' with 'practice_area'
                         setView('practice_area');
                         setActiveCustomQuiz(null);
                     }}

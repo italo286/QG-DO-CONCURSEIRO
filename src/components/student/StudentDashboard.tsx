@@ -344,7 +344,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert("Não foi possível gerar todos os desafios. Por favor, tente novamente.");
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
