@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Simulado, StudentProgress, Subject, SimuladoConfig, Question } from '../../types';
+import { Simulado, StudentProgress, Subject, SimuladoConfig, Question, QuestionAttempt } from '../../types';
 import { Modal, Button, Spinner } from '../ui';
 import { PlusIcon, TrashIcon } from '../Icons';
 
@@ -53,53 +53,38 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
 
     const { attemptedIds, correctIds, incorrectIds } = useMemo(() => {
         const attempted = new Set<string>();
-        const correct = new Set<string>();
+        const everCorrect = new Set<string>();
+        const everIncorrect = new Set<string>();
 
-        // From topic quizzes
-        Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
-            Object.values(subject || {}).forEach(topic => {
-                (topic.lastAttempt || []).forEach(attempt => {
-                    attempted.add(attempt.questionId);
-                    if (attempt.isCorrect) {
-                        correct.add(attempt.questionId);
-                    }
-                });
-            });
-        });
-
-        // From review sessions
-        (studentProgress.reviewSessions || []).forEach(session => {
-            (session.attempts || []).forEach(attempt => {
+        const processAttempts = (attempts: QuestionAttempt[] | undefined) => {
+            (attempts || []).forEach(attempt => {
                 attempted.add(attempt.questionId);
                 if (attempt.isCorrect) {
-                    correct.add(attempt.questionId);
+                    everCorrect.add(attempt.questionId);
+                } else {
+                    everIncorrect.add(attempt.questionId);
                 }
             });
-        });
-
-        // From custom quizzes
-        (studentProgress.customQuizzes || []).forEach(quiz => {
-            (quiz.attempts || []).forEach(attempt => {
-                attempted.add(attempt.questionId);
-                if(attempt.isCorrect) {
-                    correct.add(attempt.questionId);
-                }
-            });
-        });
-
-        // From past simulados
-        (studentProgress.simulados || []).forEach(simulado => {
-            (simulado.attempts || []).forEach(attempt => {
-                attempted.add(attempt.questionId);
-                if(attempt.isCorrect) {
-                    correct.add(attempt.questionId);
-                }
-            });
-        });
-
-        const incorrect = new Set([...attempted].filter(id => !correct.has(id)));
+        };
         
-        return { attemptedIds: attempted, correctIds: correct, incorrectIds: incorrect };
+        // From topic quizzes
+        Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
+            Object.values(subject || {}).forEach(topic => processAttempts(topic.lastAttempt));
+        });
+        // From review sessions
+        (studentProgress.reviewSessions || []).forEach(session => processAttempts(session.attempts));
+        // From custom quizzes
+        (studentProgress.customQuizzes || []).forEach(quiz => processAttempts(quiz.attempts));
+        // From past simulados
+        (studentProgress.simulados || []).forEach(simulado => processAttempts(simulado.attempts));
+
+        // "Certas": questions answered correctly and NEVER incorrectly.
+        const correctOnlyIds = new Set([...everCorrect].filter(id => !everIncorrect.has(id)));
+        
+        // "Erradas": questions that have been answered incorrectly at least once.
+        const incorrectEverIds = everIncorrect;
+
+        return { attemptedIds: attempted, correctIds: correctOnlyIds, incorrectIds: incorrectEverIds };
     }, [studentProgress]);
 
     const getAvailableQuestionCount = (subjectId: string, filter: string): number => {
