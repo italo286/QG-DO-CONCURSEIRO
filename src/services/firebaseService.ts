@@ -1,6 +1,6 @@
 import { db, storage, firebase } from '../firebaseConfig';
 // FIX: Imported Question type to resolve reference error.
-import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic, Question } from '../types';
+import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 
 type Unsubscribe = () => void;
@@ -653,7 +653,7 @@ export const listenToStudyPlansForTeacher = (studentIds: string[], callback: (pl
     return () => unsubs.forEach(unsub => unsub());
 };
 
-// --- Review Sessions ---
+// --- Review Sessions & Simulados ---
 export const addReviewSessionToStudents = async (studentIds: string[], session: Omit<ReviewSession, 'id' | 'createdAt'>) => {
     const batch = db.batch();
     
@@ -666,6 +666,29 @@ export const addReviewSessionToStudents = async (studentIds: string[], session: 
         };
         batch.update(studentProgressRef, {
             reviewSessions: firebase.firestore.FieldValue.arrayUnion(newSession)
+        });
+    });
+
+    await batch.commit();
+};
+
+export const addSimuladoToStudents = async (
+    studentIds: string[],
+    simuladoData: Omit<Simulado, 'id' | 'isCompleted' | 'attempts' | 'createdAt'>
+) => {
+    const batch = db.batch();
+    
+    studentIds.forEach(studentId => {
+        const studentProgressRef = db.collection('studentProgress').doc(studentId);
+        const newSimulado: Simulado = {
+            ...simuladoData,
+            id: `sim-prof-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            createdAt: Date.now(),
+            isCompleted: false,
+            attempts: [],
+        };
+        batch.update(studentProgressRef, {
+            simulados: firebase.firestore.FieldValue.arrayUnion(newSimulado)
         });
     });
 
