@@ -450,7 +450,7 @@ export const QuizView: React.FC<{
             console.error("Erro ao gerar PDF:", error);
             alert("Ocorreu um erro ao gerar o PDF.");
         } finally {
-            setIsGeneratingPdf(false);
+            setIsGeneratingPdf(null);
         }
     };
 
@@ -595,10 +595,12 @@ export const QuizView: React.FC<{
                     <div className="w-full bg-gray-700 rounded-full h-2.5">
                         <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full" style={{ width: `${((currentIndex + 1) / (questions.length || 1)) * 100}%` }}></div>
                     </div>
-                    <div className="flex justify-between text-sm text-gray-400">
-                        <span>Acertos: <span className="font-bold text-green-400">{correctCount}</span></span>
-                        <span>Erros: <span className="font-bold text-red-400">{incorrectCount}</span></span>
-                    </div>
+                    {feedbackMode !== 'at_end' && (
+                        <div className="flex justify-between text-sm text-gray-400">
+                            <span>Acertos: <span className="font-bold text-green-400">{correctCount}</span></span>
+                            <span>Erros: <span className="font-bold text-red-400">{incorrectCount}</span></span>
+                        </div>
+                    )}
                 </div>
                 
                 {comboStreak > 0 && !isCurrentQuestionAnswered && (
