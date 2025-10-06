@@ -450,7 +450,7 @@ export const QuizView: React.FC<{
             console.error("Erro ao gerar PDF:", error);
             alert("Ocorreu um erro ao gerar o PDF.");
         } finally {
-            setIsGeneratingPdf(null);
+            setIsGeneratingPdf(false);
         }
     };
 
