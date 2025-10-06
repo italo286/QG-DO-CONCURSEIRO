@@ -300,7 +300,7 @@ export const generateQuestionsPdf = (questions: Question[], topicName: string, s
     
     // Column 1: Logo
     const logoUrl = "https://i.ibb.co/B5mR4PG0/ppuw.png";
-    const logoWidth = 100;
+    const logoWidth = 70;
     const logoHeight = 34;
     const logoX = UNIFORM_MARGIN_PT;
     doc.addImage(logoUrl, 'PNG', logoX, yPos, logoWidth, logoHeight);
