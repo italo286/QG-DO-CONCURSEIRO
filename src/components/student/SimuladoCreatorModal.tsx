@@ -55,9 +55,10 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
         const attempted = new Set<string>();
         const correct = new Set<string>();
 
-        Object.values(studentProgress.progressByTopic).forEach(subject => {
-            Object.values(subject).forEach(topic => {
-                topic.lastAttempt.forEach(attempt => {
+        // From topic quizzes
+        Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
+            Object.values(subject || {}).forEach(topic => {
+                (topic.lastAttempt || []).forEach(attempt => {
                     attempted.add(attempt.questionId);
                     if (attempt.isCorrect) {
                         correct.add(attempt.questionId);
@@ -65,10 +66,32 @@ export const SimuladoCreatorModal: React.FC<SimuladoCreatorModalProps> = ({ isOp
                 });
             });
         });
-        studentProgress.reviewSessions.forEach(session => {
+
+        // From review sessions
+        (studentProgress.reviewSessions || []).forEach(session => {
             (session.attempts || []).forEach(attempt => {
                 attempted.add(attempt.questionId);
                 if (attempt.isCorrect) {
+                    correct.add(attempt.questionId);
+                }
+            });
+        });
+
+        // From custom quizzes
+        (studentProgress.customQuizzes || []).forEach(quiz => {
+            (quiz.attempts || []).forEach(attempt => {
+                attempted.add(attempt.questionId);
+                if(attempt.isCorrect) {
+                    correct.add(attempt.questionId);
+                }
+            });
+        });
+
+        // From past simulados
+        (studentProgress.simulados || []).forEach(simulado => {
+            (simulado.attempts || []).forEach(attempt => {
+                attempted.add(attempt.questionId);
+                if(attempt.isCorrect) {
                     correct.add(attempt.questionId);
                 }
             });
