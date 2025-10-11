@@ -35,11 +35,12 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
+        // FIX: Added filters and checks to safely handle potentially incomplete progress data.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
             .filter((p): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
             .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
-            .flatMap(topicProgress => topicProgress.lastAttempt ?? []);
+            .flatMap(topicProgress => topicProgress?.lastAttempt ?? []);
 
         try {
             const result = await GeminiService.analyzeStudentDifficulties(allQuestionsWithContext, allAttempts);

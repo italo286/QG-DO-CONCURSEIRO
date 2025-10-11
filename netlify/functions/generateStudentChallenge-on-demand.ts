@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -283,6 +284,7 @@ async function generatePortugueseChallenge(studentProgress: StudentProgress): Pr
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
 
     const prompt = `Aja como um professor de português criando uma questão de "identifique o erro". Gere ${questionCount} questão(ões) em JSON.
+Crie uma questão **nova e diferente** das que você já gerou. A data de hoje é ${new Date().toISOString()} para garantir a exclusividade.
 Para cada questão, siga estritamente o formato do exemplo. A resposta deve ser um array JSON.
 
 Exemplo de formato para uma questão:
