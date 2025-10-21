@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QG do concurseiro</title>
+    <style>
+      /* For custom scrollbars */
+      ::-webkit-scrollbar {
+        width: 8px;
+        height: 8px;
+      }
+      ::-webkit-scrollbar-track {
+        background: #111827; /* bg-gray-900 */
+      }
+      ::-webkit-scrollbar-thumb {
+        background: #4b5563; /* bg-gray-600 */
+        border-radius: 4px;
+      }
+      ::-webkit-scrollbar-thumb:hover {
+        background: #6b7280; /* bg-gray-500 */
+      }
+      
+      /* Accessibility Focus Ring */
+      :focus-visible {
+        outline: 3px solid #67e8f9; /* cyan-300 */
+        outline-offset: 2px;
+        border-radius: 2px;
+      }
+      
+      /* Screen-reader only class */
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        padding: 0;
+        margin: -1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        border-width: 0;
+      }
+
+      /* Animation for new elements */
+      @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+      
+      @keyframes pulse-border {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.7); } /* amber-400 */
+        50% { box-shadow: 0 0 0 4px rgba(251, 191, 36, 0); }
+      }
+      .animate-pulse-border {
+        animation: pulse-border 2.5s infinite;
+      }
+
+      /* New pulse animation for announcements */
+      @keyframes pulse-orange {
+        0%, 100% {
+            transform: scale(1);
+            box-shadow: 0 0 0 0 rgba(251, 146, 60, 0.7); /* orange-400 */
+        }
+        50% {
+            transform: scale(1.02);
+            box-shadow: 0 0 5px 5px rgba(251, 146, 60, 0);
+        }
+      }
+      .animate-pulse-orange {
+        animation: pulse-orange 2s infinite;
+      }
+
+      /* Shake animation for game errors */
+      @keyframes shake {
+        10%, 90% { transform: translate3d(-1px, 0, 0); }
+        20%, 80% { transform: translate3d(2px, 0, 0); }
+        30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+        40%, 60% { transform: translate3d(4px, 0, 0); }
+      }
+      .animate-shake {
+        animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both;
+      }
+      
+      /* Styles for touch-based drag and drop */
+      .dragging-touch {
+        opacity: 0.5;
+        background-color: #374151; /* gray-700 */
+        border: 2px dashed #67e8f9; /* cyan-300 */
+      }
+      .drop-target-highlight {
+          background-color: rgba(14, 165, 233, 0.3); /* sky-500 with opacity */
+          border: 2px dashed #0ea5e9; /* sky-500 */
+      }
+
+      /* Confetti animation for Level Up */
+      @keyframes confetti-fall {
+        0% { transform: translateY(-100%) rotateZ(0deg); opacity: 1; }
+        100% { transform: translateY(100vh) rotateZ(720deg); opacity: 0; }
+      }
+      .confetti {
+        position: absolute;
+        width: 10px;
+        height: 10px;
+        background-color: #f00;
+        opacity: 0;
+        animation: confetti-fall 3s linear infinite;
+      }
+
+      /* Landscape hint for split view */
+      .landscape-hint {
+        display: none; /* Hidden by default */
+      }
+      @media screen and (max-width: 768px) and (orientation: portrait) {
+        .landscape-hint {
+          display: block;
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          background-color: rgba(0,0,0,0.8);
+          color: white;
+          padding: 10px 20px;
+          border-radius: 20px;
+          z-index: 100;
+          font-size: 14px;
+          pointer-events: none; /* So it doesn't interfere with clicks */
+        }
+      }
+      
+      /* Footer layout */
+      html, body {
+        height: 100%;
+      }
+      body {
+        display: flex;
+        flex-direction: column;
+      }
+      #root {
+        flex: 1 0 auto;
+      }
+      footer {
+        flex-shrink: 0;
+      }
+
+    </style>
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://esm.sh/@google/genai@^1.12.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.1.1/",
+    "react/": "https://esm.sh/react@^19.1.1/",
+    "react": "https://esm.sh/react@^19.1.1",
+    "firebase/": "https://esm.sh/firebase@^12.0.0/",
+    "html2canvas": "https://esm.sh/html2canvas@^1.4.1",
+    "recharts": "https://esm.sh/recharts@^3.1.0",
+    "@vitejs/plugin-react": "https://esm.sh/@vitejs/plugin-react@^4.7.0",
+    "jspdf": "https://esm.sh/jspdf@^3.0.1",
+    "vite": "https://esm.sh/vite@^7.0.6",
+    "firebase-admin": "https://aistudiocdn.com/firebase-admin@^13.5.0",
+    "@netlify/functions": "https://aistudiocdn.com/@netlify/functions@^4.2.5",
+    "firebase-admin/": "https://aistudiocdn.com/firebase-admin@^13.5.0/"
+  }
+}
+</script>
+</head>
+  <body class="bg-gray-900 text-gray-200 font-sans">
+    <div id="root"></div>
+    <footer class="text-center text-xs text-gray-600 py-4 font-mono">
+      Feito por Ítalo Natan – 2025
+    </footer>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+</html>
