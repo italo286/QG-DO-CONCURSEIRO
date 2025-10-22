@@ -530,7 +530,7 @@ export const StudentReviewsView: React.FC<{
 
     const handleSaveSettings = async () => {
         setIsSavingSettings(true);
-        let newProgress = { ...studentProgress, ...localSettings };
+        let newProgress: StudentProgress = { ...studentProgress, ...localSettings };
 
         // Check if portugueseChallengeQuestionCount has changed and needs an immediate update
         const oldPrtCount = studentProgress.portugueseChallengeQuestionCount || 1;
@@ -544,10 +544,14 @@ export const StudentReviewsView: React.FC<{
             if (newPrtCount > currentQuestionCount) {
                 const questionsToAdd = newPrtCount - currentQuestionCount;
                 try {
-                    const newQuestions = await GeminiService.generatePortugueseChallenge(questionsToAdd);
+                    // FIX: Pass portugueseErrorStats instead of the whole progress object
+                    const newQuestions = await GeminiService.generatePortugueseChallenge(questionsToAdd, newProgress.portugueseErrorStats);
                     const newQuestionsWithIds = newQuestions.map((q, i) => ({ ...q, id: `port-challenge-${todayISO}-add-${currentQuestionCount + i}` }));
                     
                     currentChallenge.items.push(...newQuestionsWithIds);
+
+                    const newSeenStatements = [...(newProgress.seenPortugueseChallengeStatements || []), ...newQuestions.map(q => q.statement)];
+                    newProgress.seenPortugueseChallengeStatements = newSeenStatements;
 
                     // If the challenge was completed, un-complete it so the user can answer the new questions
                     if (currentChallenge.isCompleted) {

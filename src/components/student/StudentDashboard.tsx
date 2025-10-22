@@ -334,11 +334,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             
+            const newSeenStatements = [...(studentProgress.seenPortugueseChallengeStatements || []), ...portugueseItems.map(q => q.statement)];
+
             const newProgress = {
                 ...studentProgress,
                 reviewChallenge: newReviewChallenge,
                 glossaryChallenge: newGlossaryChallenge,
                 portugueseChallenge: newPortugueseChallenge,
+                seenPortugueseChallengeStatements: newSeenStatements,
             };
             
             handleUpdateStudentProgress(newProgress, studentProgress);
