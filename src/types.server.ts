@@ -280,7 +280,6 @@ export interface StudentProgress {
   reviewChallenge?: DailyChallenge<Question>;
   glossaryChallenge?: DailyChallenge<Question>;
   portugueseChallenge?: DailyChallenge<Question>;
-  seenPortugueseChallengeStatements?: string[];
   gamesCompletedCount?: number;
   dailyChallengeStreak?: {
       current: number;

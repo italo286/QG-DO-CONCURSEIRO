@@ -1,5 +1,4 @@
 
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -280,20 +279,12 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
 
 async function generatePortugueseChallenge(studentProgress: StudentProgress): Promise<Question[]> {
     const questionCount = studentProgress.portugueseChallengeQuestionCount || 1;
-    // Ask for more to have a buffer for filtering duplicates
-    const generationCount = questionCount * 2; 
     const errorStats = studentProgress.portugueseErrorStats;
-    const seenStatements = studentProgress.seenPortugueseChallengeStatements || [];
 
     const errorFocusPrompt = errorStats ? `A partir das estatísticas de erro do aluno, foque nos tipos de erro mais comuns: ${JSON.stringify(errorStats)}.` : '';
-    
-    // Add the list of seen statements to the prompt
-    const exclusionPrompt = seenStatements.length > 0 
-        ? `**REGRAS CRÍTICAS**: As questões geradas DEVEM ser completamente novas e diferentes das seguintes frases que o aluno já respondeu: ${JSON.stringify(seenStatements)}`
-        : '';
 
-    const prompt = `Aja como um professor de português criando questões de "identifique o erro". Gere ${generationCount} questões **ÚNICAS E DIFERENTES ENTRE SI** em formato JSON.
-${exclusionPrompt}
+    const prompt = `Aja como um professor de português criando uma questão de "identifique o erro". Gere ${questionCount} questão(ões) em JSON.
+Crie uma questão **nova e diferente** das que você já gerou. A data de hoje é ${new Date().toISOString()} para garantir a exclusividade.
 Para cada questão, siga estritamente o formato do exemplo. A resposta deve ser um array JSON.
 
 Exemplo de formato para uma questão:
@@ -320,28 +311,7 @@ ${errorFocusPrompt}`;
 
         const generatedQuestions = parseJsonResponse<any[]>(response.text?.trim() ?? '', 'array');
         
-        // Filter out seen questions and duplicates within the new batch
-        const seenStatementsSet = new Set(seenStatements);
-        const uniqueNewQuestions: any[] = [];
-        const newStatementsSet = new Set<string>();
-
-        for (const q of generatedQuestions) {
-            if (q.statement && !seenStatementsSet.has(q.statement) && !newStatementsSet.has(q.statement)) {
-                uniqueNewQuestions.push(q);
-                newStatementsSet.add(q.statement);
-            }
-        }
-        
-        // Take the required number of questions
-        const finalQuestions = uniqueNewQuestions.slice(0, questionCount);
-
-        if (finalQuestions.length < questionCount) {
-            // This is a potential issue, but retrying might time out.
-            // For now, we'll just return what we have. It's better than nothing.
-            console.warn(`Could only generate ${finalQuestions.length} unique questions out of ${questionCount} requested for student ${studentProgress.studentId}`);
-        }
-
-        const questionsResult = finalQuestions.map((q: any) => ({
+        const questionsResult = generatedQuestions.map((q: any) => ({
             statement: q.statement, 
             options: q.options, 
             correctAnswer: q.correctAnswer,
@@ -356,7 +326,6 @@ ${errorFocusPrompt}`;
         return [];
     }
 }
-
 
 // --- Main Handler ---
 const handler: Handler = async (event: HandlerEvent) => {

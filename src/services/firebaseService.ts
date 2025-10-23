@@ -1,4 +1,3 @@
-
 import { db, storage, firebase } from '../firebaseConfig';
 // FIX: Imported Question type to resolve reference error.
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
@@ -91,7 +90,6 @@ export const createUserProfile = async (uid: string, username: string, name: str
             lastCompletedDate: '',
         },
         dailyChallengeCompletions: {},
-        seenPortugueseChallengeStatements: [],
     };
     await progressRef.set(initialProgress);
   }
@@ -444,7 +442,6 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                     lastCompletedDate: '',
                 },
                 dailyChallengeCompletions: {},
-                seenPortugueseChallengeStatements: [],
             };
             // Asynchronously create the document in Firestore
             progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
