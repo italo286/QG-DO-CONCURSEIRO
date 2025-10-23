@@ -1,3 +1,4 @@
+
 import { db, storage, firebase } from '../firebaseConfig';
 // FIX: Imported Question type to resolve reference error.
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';

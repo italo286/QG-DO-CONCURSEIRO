@@ -1,4 +1,5 @@
 
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as FirebaseService from '../../services/firebaseService';
@@ -38,7 +39,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
 
         // FIX: Added filters and checks to safely handle potentially incomplete progress data.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
-            .filter((p): p is StudentProgress => p && !!p.progressByTopic)
+            .filter((p): p is StudentProgress => !!p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
             .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
             .flatMap(topicProgress => topicProgress?.lastAttempt ?? []);
@@ -57,7 +58,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         
         return students.map(student => {
             const progress: StudentProgress | undefined = allProgress[student.id];
-            // FIX: Added a check for `progress.progressByTopic` to safely handle incomplete progress data and resolve the type error.
+            // FIX: Added a check for `progress` and `progress.progressByTopic` to safely handle incomplete progress data and resolve the type error.
             if (!progress || !progress.progressByTopic) return { name: student.name || student.username, score: 0, studentId: student.id };
 
             let totalScore = 0;
