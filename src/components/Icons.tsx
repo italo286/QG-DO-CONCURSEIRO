@@ -1,7 +1,5 @@
-
 import React from 'react';
 
-// FIX: Added 'title' prop for tooltips, consistent with other components like Button, to resolve type errors when icons are used with a title.
 type IconProps = {
   className?: string;
   style?: React.CSSProperties;

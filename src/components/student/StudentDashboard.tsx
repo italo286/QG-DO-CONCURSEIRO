@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, Flashcard } from '../../types';
@@ -399,7 +398,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        // FIX: Added explicit type for 'f' to resolve implicit 'any' error.
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f: Omit<Flashcard, 'id'>) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {

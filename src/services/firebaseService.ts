@@ -1,4 +1,3 @@
-
 import { db, storage, firebase } from '../firebaseConfig';
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
@@ -90,6 +89,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
             lastCompletedDate: '',
         },
         dailyChallengeCompletions: {},
+        seenPortugueseChallengeStatements: [],
     };
     await progressRef.set(initialProgress);
   }
@@ -252,7 +252,8 @@ export const updateSubjectQuestion = async (
 ): Promise<void> => {
     // The topicId might be a subtopic ID. The document we need to update is the top-level topic document.
     // We assume subtopics are not nested further.
-    const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(topicId);
+    // FIX: Explicitly cast topicId to string to resolve a potential TS inference issue.
+    const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(topicId as string);
 
     await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(topicDocRef);
@@ -294,7 +295,6 @@ export const updateSubjectQuestion = async (
         if (isTec) {
             topicData.tecQuestions = updateQuestionInList(topicData.tecQuestions);
         } else {
-            // FIX: Replaced non-null assertion `!` with a safe check to prevent potential type errors.
             const updatedQuestions = updateQuestionInList(topicData.questions);
             if (updatedQuestions) {
                 topicData.questions = updatedQuestions;
@@ -309,7 +309,6 @@ export const updateSubjectQuestion = async (
                     if (updatedTec !== subtopic.tecQuestions) return { ...subtopic, tecQuestions: updatedTec };
                 } else {
                     const updatedNormal = updateQuestionInList(subtopic.questions);
-                    // FIX: Replaced non-null assertion `!` with a safe check.
                     if (updatedNormal && updatedNormal !== subtopic.questions) {
                          return { ...subtopic, questions: updatedNormal };
                     }
@@ -399,7 +398,12 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
     const progressRef = db.collection('studentProgress').doc(studentId);
     return progressRef.onSnapshot((doc) => {
         if(doc.exists) {
-            callback(doc.data() as StudentProgress);
+            const data = doc.data() as StudentProgress;
+            // Ensure seenPortugueseChallengeStatements exists for backward compatibility
+            if (!data.seenPortugueseChallengeStatements) {
+                data.seenPortugueseChallengeStatements = [];
+            }
+            callback(data);
         } else {
             // Create initial progress if it doesn't exist (e.g., for existing users without this doc)
             const initialProgress: StudentProgress = {
@@ -442,6 +446,7 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                     lastCompletedDate: '',
                 },
                 dailyChallengeCompletions: {},
+                seenPortugueseChallengeStatements: [],
             };
             // Asynchronously create the document in Firestore
             progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
@@ -533,7 +538,6 @@ export const createReportNotification = async (
     reason: string,
 ): Promise<void> => {
     const timestamp = Date.now();
-    // FIX: Fallback to username if student.name is not available to prevent constructing a message with "undefined".
     const studentDisplayName = student.name || student.username;
     const message = `Aluno ${studentDisplayName} reportou um erro na questão "${questionStatement.substring(0, 50)}..." no tópico "${topicName}". Motivo: ${reason}.`;
 
@@ -545,7 +549,6 @@ export const createReportNotification = async (
         acknowledgedBy: [], // No one has seen it yet
         type: 'system',
         context: {
-// FIX: The value for `studentName` must be a string. Using `studentDisplayName` which falls back to the username ensures a string is always provided, resolving the type error.
             studentName: studentDisplayName,
             subjectName,
             topicName,

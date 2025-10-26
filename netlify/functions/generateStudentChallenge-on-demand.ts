@@ -46,7 +46,8 @@ try {
 }
 
 // --- Gemini API Initialization ---
-const ai = new GoogleGenAI({apiKey: process.env.VITE_GEMINI_API_KEY});
+// FIX: Initialize the Gemini API client using process.env.API_KEY as per the coding guidelines.
+const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
 
 // --- Helper Functions ---
 async function retryWithBackoff<T>( apiCall: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 1000): Promise<T> {
@@ -411,4 +412,4 @@ const handler: Handler = async (event: HandlerEvent) => {
     }
 };
 
-export { handler };
+export { handler }; 

@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useId, useState } from 'react';
 
 export const Spinner: React.FC = () => (
@@ -8,7 +7,6 @@ export const Spinner: React.FC = () => (
     </div>
 );
 
-// FIX: Added 'title' to the component's props to allow passing the HTML title attribute.
 export const Button: React.FC<{ onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; className?: string; type?: 'button' | 'submit'; disabled?: boolean; title?: string; }> = 
 ({ onClick, children, className = '', type = 'button', disabled = false, title }) => (
     <button
