@@ -29,9 +29,9 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         setIsAnalysisLoading(true);
         setAnalysisResult('');
         const allQuestionsWithContext = subjects.flatMap(s =>
-            s.topics.flatMap(t =>
-                t.questions.map(q => ({ ...q, topicName: t.name, subjectName: s.name }))
-                .concat(t.subtopics.flatMap(st => st.questions.map(q => ({...q, topicName: st.name, subjectName: s.name}))))
+            (s.topics || []).flatMap(t =>
+                (t.questions || []).map(q => ({ ...q, topicName: t.name, subjectName: s.name }))
+                .concat((t.subtopics || []).flatMap(st => (st.questions || []).map(q => ({...q, topicName: st.name, subjectName: s.name}))))
             )
         );
 

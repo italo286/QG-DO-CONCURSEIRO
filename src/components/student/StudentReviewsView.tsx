@@ -162,9 +162,9 @@ const SettingsContent: React.FC<{
         }
     
         const allGlossaryTermsWithContext = enrolledSubjects.flatMap(subject =>
-            subject.topics.flatMap(topic => [
+            (subject.topics || []).flatMap(topic => [
                 ...(topic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: topic.id })),
-                ...topic.subtopics.flatMap(subtopic =>
+                ...(topic.subtopics || []).flatMap(subtopic =>
                     (subtopic.glossary || []).map(term => ({ ...term, subjectId: subject.id, topicId: subtopic.id }))
                 )
             ])
@@ -359,7 +359,7 @@ const SettingsContent: React.FC<{
                         </div>
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2 border border-gray-700 rounded-lg p-2">
                             {enrolledSubjects.map(subject => {
-                                const allContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
+                                const allContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
                                 const selectedTopicIds = new Set(localSettings[topicIdsKey] || []);
                                 const includedCount = allContentIds.filter(id => selectedTopicIds.has(id)).length;
                                 const isAllSelected = includedCount > 0 && includedCount === allContentIds.length;
@@ -373,10 +373,10 @@ const SettingsContent: React.FC<{
                                             <ChevronDownIcon className="h-4 w-4 transition-transform details-open:rotate-180" />
                                         </summary>
                                         <div className="pt-2 pl-8 space-y-1">
-                                            {subject.topics.map(topic => (
+                                            {(subject.topics || []).map(topic => (
                                                 <React.Fragment key={topic.id}>
                                                     <label className="flex items-center space-x-2 p-1 text-sm cursor-pointer"><input type="checkbox" checked={selectedTopicIds.has(topic.id)} onChange={(e) => handleLocalTopicSelectionChange(topic.id, subject.id, e.target.checked, challengeType)} className="h-4 w-4" /><span>{topic.name}</span></label>
-                                                    {topic.subtopics.map((subtopic: SubTopic) => (<label key={subtopic.id} className="flex items-center space-x-2 p-1 pl-4 text-xs cursor-pointer"><input type="checkbox" checked={selectedTopicIds.has(subtopic.id)} onChange={(e) => handleLocalTopicSelectionChange(subtopic.id, subject.id, e.target.checked, challengeType)} className="h-4 w-4"/><span>{subtopic.name}</span></label>))}
+                                                    {(topic.subtopics || []).map((subtopic: SubTopic) => (<label key={subtopic.id} className="flex items-center space-x-2 p-1 pl-4 text-xs cursor-pointer"><input type="checkbox" checked={selectedTopicIds.has(subtopic.id)} onChange={(e) => handleLocalTopicSelectionChange(subtopic.id, subject.id, e.target.checked, challengeType)} className="h-4 w-4"/><span>{subtopic.name}</span></label>))}
                                                 </React.Fragment>
                                             ))}
                                         </div>
@@ -419,12 +419,12 @@ export const StudentReviewsView: React.FC<{
 
     const allQuestionsWithContext = useMemo(() => {
         return allSubjects.flatMap(subject => 
-            subject.topics.flatMap(topic => 
+            (subject.topics || []).flatMap(topic => 
                 [
-                    ...topic.questions.map(q => ({...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name})),
+                    ...(topic.questions || []).map(q => ({...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name})),
                     ...(topic.tecQuestions || []).map(q => ({...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name})),
-                    ...topic.subtopics.flatMap(st => [
-                        ...st.questions.map(q => ({...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name})),
+                    ...(topic.subtopics || []).flatMap(st => [
+                        ...(st.questions || []).map(q => ({...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name})),
                         ...(st.tecQuestions || []).map(q => ({...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name})),
                     ])
                 ]
@@ -508,7 +508,7 @@ export const StudentReviewsView: React.FC<{
             const topicIdsKey = challengeType === 'review' ? 'advancedReviewTopicIds' : 'advancedGlossaryTopicIds';
             const subjectIdsKey = challengeType === 'review' ? 'advancedReviewSubjectIds' : 'advancedGlossarySubjectIds';
 
-            const allContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
+            const allContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
             const currentSelectedTopicIds = prev[topicIdsKey] || [];
             
             const newSelectedTopicIds = isChecked
@@ -577,7 +577,7 @@ export const StudentReviewsView: React.FC<{
         if (!filterSubject) return [];
         const subject = allSubjects.find(s => s.id === filterSubject);
         if (!subject) return [];
-        return subject.topics.flatMap(t => [{id: t.id, name: t.name}, ...t.subtopics.map(st => ({id: st.id, name: `${t.name} / ${st.name}`}))]);
+        return (subject.topics || []).flatMap(t => [{id: t.id, name: t.name}, ...(t.subtopics || []).map(st => ({id: st.id, name: `${t.name} / ${st.name}`}))]);
     }, [filterSubject, allSubjects]);
     
     const handleGenerateFlashcards = async () => {
@@ -594,7 +594,7 @@ export const StudentReviewsView: React.FC<{
         return allQuestions.filter(q => dueIds.includes(q.id));
     }, [studentProgress.srsData, allQuestions]);
     
-    const manualReviews = studentProgress.reviewSessions.filter(r => r.type === 'manual' && !r.isCompleted);
+    const manualReviews = (studentProgress.reviewSessions || []).filter(r => r.type === 'manual' && !r.isCompleted);
 
     return (
         <>

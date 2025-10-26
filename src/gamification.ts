@@ -97,7 +97,7 @@ export const ALL_BADGES: {
     'streak-30-day-challenge': { name: 'Lenda Diária', description: 'Completou os desafios diários por 30 dias seguidos!', icon: FireIcon, condition: (p) => (p.dailyChallengeStreak?.current || 0) >= 30 },
     'subject-completer': { name: 'Finalizador', description: 'Concluiu todos os tópicos de uma disciplina.', icon: CheckCircleIcon, condition: (p, subjects) => {
         for (const subject of subjects) {
-            const allTopicsAndSubtopics = subject.topics.flatMap(t => [t, ...t.subtopics]);
+            const allTopicsAndSubtopics = (subject.topics || []).flatMap(t => [t, ...(t.subtopics || [])]);
             if (allTopicsAndSubtopics.length === 0) continue;
             
             const allCompleted = allTopicsAndSubtopics.every(topic => p.progressByTopic[subject.id]?.[topic.id]?.completed);
@@ -110,7 +110,7 @@ export const ALL_BADGES: {
     }},
     'game-master-10': { name: 'Mestre dos Jogos', description: 'Completou 10 minijogos.', icon: GameControllerIcon, condition: (p) => (p.gamesCompletedCount || 0) >= 10 },
     'perfect-quiz-10': { name: 'Performance Perfeita', description: 'Gabaritou um quiz com 10+ questões.', icon: TrophyIcon, condition: (p, subjects) => {
-        const allContentItems = subjects.flatMap(s => s.topics.flatMap(t => [t, ...t.subtopics]));
+        const allContentItems = subjects.flatMap(s => (s.topics || []).flatMap(t => [t, ...(t.subtopics || [])]));
 
         for (const subjectId in p.progressByTopic) {
             const subjectProgress = p.progressByTopic[subjectId];
@@ -140,8 +140,8 @@ export const ALL_BADGES: {
     }},
     'mastery': { name: 'Mestre', description: 'Alcançou 100% em uma disciplina!', icon: TrophyIcon, condition: (p, subjects) => {
         for (const subject of subjects) {
-            const allTopics = subject.topics.length > 0;
-            const allPerfect = subject.topics.every(topic => p.progressByTopic[subject.id]?.[topic.id]?.score === 1);
+            const allTopics = (subject.topics || []).length > 0;
+            const allPerfect = (subject.topics || []).every(topic => p.progressByTopic[subject.id]?.[topic.id]?.score === 1);
             if(allTopics && allPerfect) {
                 return { name: `Mestre em ${subject.name}`, description: `100% de acertos em ${subject.name}!` };
             }
