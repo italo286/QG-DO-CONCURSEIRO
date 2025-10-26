@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, Flashcard } from '../../types';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
@@ -398,7 +398,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f: Omit<Flashcard, "id">) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        // FIX: Removed redundant type annotation for 'f' to allow TypeScript to correctly infer its type from the 'flashcards' array.
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {

@@ -35,8 +35,10 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             )
         );
 
+        // FIX: Added filters and checks to safely handle potentially incomplete progress data.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
-            .filter((p): p is StudentProgress => !!p?.progressByTopic)
+            // FIX: Explicitly cast 'p' to 'any' in the filter's type guard to allow property access on what TypeScript infers as an 'unknown' type. This resolves the compile-time error while preserving the intended filtering logic.
+            .filter((p: any): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
             .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
             .flatMap(topicProgress => topicProgress?.lastAttempt ?? []);
@@ -55,9 +57,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         
         return students.map(student => {
             const progress: StudentProgress | undefined = allProgress[student.id];
-            if (!progress || !progress.progressByTopic) {
-                return { name: student.name || student.username, score: 0, studentId: student.id };
-            }
+            if (!progress) return { name: student.name || student.username, score: 0, studentId: student.id };
 
             let totalScore = 0;
             let topicsWithScore = 0;

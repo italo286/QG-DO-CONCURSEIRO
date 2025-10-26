@@ -1,5 +1,6 @@
 import { db, storage, firebase } from '../firebaseConfig';
-import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
+// FIX: Imported Question type to resolve reference error.
+import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, SubTopic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 
 type Unsubscribe = () => void;
@@ -89,7 +90,6 @@ export const createUserProfile = async (uid: string, username: string, name: str
             lastCompletedDate: '',
         },
         dailyChallengeCompletions: {},
-        seenPortugueseChallengeStatements: [],
     };
     await progressRef.set(initialProgress);
   }
@@ -124,123 +124,66 @@ export const getSubjects = async (teacherIds: string[]): Promise<Subject[]> => {
         return [];
     }
     const subjectsRef = db.collection('subjects');
+    // Note: 'in' query supports up to 10 elements in Firebase v8
     const q = subjectsRef.where('teacherId', 'in', teacherIds);
     const querySnapshot = await q.get();
-    const subjectsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<Subject, 'id' | 'topics'>) }));
-
-    const subjectsWithTopics = await Promise.all(subjectsData.map(async (subject) => {
-        const topicsSnapshot = await db.collection('subjects').doc(subject.id).collection('topics').orderBy('order').get();
-        const topics = topicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Topic));
-        return { ...subject, topics };
-    }));
-    
-    return subjectsWithTopics;
+    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Subject));
 };
 
 export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subject[]) => void): Unsubscribe => {
     if (teacherIds.length === 0) {
         callback([]);
-        return () => {};
+        return () => {}; // Return a no-op unsubscribe function
     }
 
-    const subjectsRef = db.collection('subjects');
-    const q = subjectsRef.where('teacherId', 'in', teacherIds);
+    const chunks: string[][] = [];
+    for (let i = 0; i < teacherIds.length; i += 10) {
+        chunks.push(teacherIds.slice(i, i + 10));
+    }
 
-    let executionId = 0;
+    const allSubjects: { [id: string]: Subject } = {};
+    const unsubs: Unsubscribe[] = [];
 
-    const unsub = q.onSnapshot(async (querySnapshot) => {
-        const currentExecutionId = ++executionId;
+    const processAndCallback = () => {
+        callback(Object.values(allSubjects));
+    };
 
-        const subjectsDataPromises = querySnapshot.docs.map(async (doc) => {
-            const subjectData = doc.data();
-
-            // Fetch topics from the subcollection first. This is the new, preferred way.
-            const topicsSnapshot = await db.collection('subjects').doc(doc.id).collection('topics').orderBy('order').get();
-            let fetchedTopics: Topic[] = [];
-
-            if (!topicsSnapshot.empty) {
-                // New model: Use topics from the subcollection.
-                fetchedTopics = topicsSnapshot.docs.map(topicDoc => ({ id: topicDoc.id, ...topicDoc.data() } as Topic));
-            } else if (Array.isArray(subjectData.topics) && subjectData.topics.length > 0) {
-                // Fallback for old model: Use topics from the array field.
-                console.warn(`Subject '${subjectData.name}' (${doc.id}) is using the legacy 'topics' array. Data will be migrated on next save.`);
-                fetchedTopics = subjectData.topics;
-            }
-            
-            // Reconstruct the full subject object, ensuring the 'topics' array field from the raw data is ignored.
-            const { topics, ...baseData } = subjectData;
-            
-            return { 
-                id: doc.id,
-                ...baseData,
-                topics: fetchedTopics
-            } as Subject;
+    chunks.forEach((chunk) => {
+        const subjectsRef = db.collection('subjects');
+        const q = subjectsRef.where('teacherId', 'in', chunk);
+        const unsub = q.onSnapshot((querySnapshot) => {
+            // Remove old subjects from this chunk to handle deletions
+            Object.keys(allSubjects).forEach(id => {
+                const subject = allSubjects[id];
+                if (chunk.includes(subject.teacherId)) {
+                    delete allSubjects[id];
+                }
+            });
+            // Add new/updated subjects
+            querySnapshot.docs.forEach(doc => {
+                const subject = { id: doc.id, ...doc.data() } as Subject;
+                allSubjects[subject.id] = subject;
+            });
+            processAndCallback();
         });
-
-        const subjectsWithTopics = await Promise.all(subjectsDataPromises);
-        
-        if (currentExecutionId === executionId) {
-            callback(subjectsWithTopics);
-        }
+        unsubs.push(unsub);
     });
     
-    return () => unsub();
+    return () => unsubs.forEach(unsub => unsub());
 };
 
-
 export const saveSubject = async (subjectData: Omit<Subject, 'id'>): Promise<Subject> => {
-    const { topics, ...baseSubjectData } = subjectData;
     const newDocRef = db.collection("subjects").doc();
-    await newDocRef.set(baseSubjectData);
-    
-    // Although we expect topics to be empty on creation, handle it just in case.
-    if (topics && topics.length > 0) {
-        const batch = db.batch();
-        const topicsRef = newDocRef.collection('topics');
-        topics.forEach((topic, index) => {
-            const topicDoc = topicsRef.doc(topic.id);
-            batch.set(topicDoc, {...topic, order: index });
-        });
-        await batch.commit();
-    }
-    
-    return { ...subjectData, id: newDocRef.id };
+    const newSubject = { ...subjectData, id: newDocRef.id };
+    await newDocRef.set(subjectData);
+    return newSubject;
 };
 
 export const updateSubject = async (subject: Subject): Promise<void> => {
-    const { id, topics, ...baseSubjectData } = subject;
-    const subjectRef = db.collection('subjects').doc(id);
-    const topicsRef = subjectRef.collection('topics');
-
-    const batch = db.batch();
-
-    // Update the base subject document and remove the legacy 'topics' array field.
-    // This effectively migrates the data structure upon save.
-    const updateData = {
-        ...baseSubjectData,
-        topics: firebase.firestore.FieldValue.delete()
-    };
-    batch.update(subjectRef, updateData);
-
-    // Get existing topics to determine which ones to delete
-    const existingTopicsSnapshot = await topicsRef.get();
-    const existingTopicIds = new Set(existingTopicsSnapshot.docs.map(doc => doc.id));
-    const newTopicIds = new Set(topics.map(t => t.id));
-
-    // Delete topics that are no longer in the subject
-    existingTopicIds.forEach(topicId => {
-        if (!newTopicIds.has(topicId)) {
-            batch.delete(topicsRef.doc(topicId));
-        }
-    });
-    
-    // Set (update/create) new topics
-    topics.forEach((topic, index) => {
-        const topicDocRef = topicsRef.doc(topic.id);
-        batch.set(topicDocRef, {...topic, order: index });
-    });
-
-    await batch.commit();
+    const subjectRef = db.collection('subjects').doc(subject.id);
+    const dataToUpdate = { ...subject };
+    delete (dataToUpdate as any).id;
+    await subjectRef.update(dataToUpdate);
 };
 
 export const updateSubjectQuestion = async (
@@ -250,94 +193,70 @@ export const updateSubjectQuestion = async (
     isTec: boolean,
     reportInfo: { reason: string; studentId: string; } | null // can be null to resolve
 ): Promise<void> => {
-    // The topicId might be a subtopic ID. The document we need to update is the top-level topic document.
-    // We assume subtopics are not nested further.
-    // FIX: The type of topicId was being inferred as unknown. Using String() to ensure it's a string.
-    const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(String(topicId));
+    const subjectRef = db.collection('subjects').doc(subjectId);
 
     await db.runTransaction(async (transaction) => {
-        const doc = await transaction.get(topicDocRef);
+        const doc = await transaction.get(subjectRef);
         if (!doc.exists) {
-            // It might be a subtopic, so we can't find the parent topic this way easily.
-            // A full refactor would be needed. For now, we assume the client sends the top-level topic ID.
-            // Or, we find the parent topic, which is slow.
-            // Let's assume the component will handle finding the parent and this function will be simpler.
-            // **Correction**: The bug is document size, so we need to target the individual topic doc.
-            // The logic inside ProfessorSubjectEditor passes up the entire subject, so the parent topic is available.
-            // But this function is called from QuizView, which might not have the parent topic context.
-            // The simplest fix is to try and find the document.
-            // Let's assume topicId IS the document id in the subcollection.
-            throw new Error(`Topic document with ID ${topicId} not found in subject ${subjectId}`);
+            throw new Error("Subject not found");
         }
 
-        const topicData = doc.data() as Topic;
-        let wasUpdated = false;
+        const subjectData = doc.data() as Subject;
+        
+        const newTopics = subjectData.topics.map(topic => {
+            const findAndModifyQuestion = (contentItem: Topic | SubTopic): Topic | SubTopic | null => {
+                const originalTopicId = topicId.replace('-tec', '');
+                if (contentItem.id !== originalTopicId) return null;
 
-        const updateQuestionInList = (questions: Question[] | undefined): Question[] | undefined => {
-            if (!questions) return undefined;
-            const questionIndex = questions.findIndex(q => q.id === questionId);
-            if (questionIndex === -1) return questions;
+                const questionListKey = isTec ? 'tecQuestions' : 'questions';
+                const questions = contentItem[questionListKey as keyof typeof contentItem] as Question[] | undefined;
+                if (!questions) return null;
 
-            wasUpdated = true;
-            const updatedQuestions = [...questions];
-            const updatedQuestion = { ...updatedQuestions[questionIndex] };
+                const questionIndex = questions.findIndex(q => q.id === questionId);
+                if (questionIndex === -1) return null;
 
-            if (reportInfo) {
-                updatedQuestion.reportInfo = reportInfo;
-            } else {
-                delete updatedQuestion.reportInfo;
-            }
-            updatedQuestions[questionIndex] = updatedQuestion;
-            return updatedQuestions;
-        };
+                const updatedQuestions = [...questions];
+                const updatedQuestion = { ...updatedQuestions[questionIndex] };
 
-        // Check top-level topic questions
-        if (isTec) {
-            topicData.tecQuestions = updateQuestionInList(topicData.tecQuestions);
-        } else {
-            const updatedQuestions = updateQuestionInList(topicData.questions);
-            if (updatedQuestions) {
-                topicData.questions = updatedQuestions;
-            }
-        }
-
-        // Check subtopic questions if not updated yet
-        if (!wasUpdated && topicData.subtopics) {
-            topicData.subtopics = topicData.subtopics.map(subtopic => {
-                if (isTec) {
-                    const updatedTec = updateQuestionInList(subtopic.tecQuestions);
-                    if (updatedTec !== subtopic.tecQuestions) return { ...subtopic, tecQuestions: updatedTec };
+                if (reportInfo) {
+                    updatedQuestion.reportInfo = reportInfo;
                 } else {
-                    const updatedNormal = updateQuestionInList(subtopic.questions);
-                    if (updatedNormal && updatedNormal !== subtopic.questions) {
-                         return { ...subtopic, questions: updatedNormal };
-                    }
+                    delete updatedQuestion.reportInfo;
+                }
+                updatedQuestions[questionIndex] = updatedQuestion;
+                
+                return { ...contentItem, [questionListKey]: updatedQuestions };
+            };
+            
+            const updatedTopic = findAndModifyQuestion(topic);
+            if (updatedTopic) {
+                return updatedTopic as Topic;
+            }
+
+            let subtopicWasUpdated = false;
+            const updatedSubtopics = topic.subtopics.map(subtopic => {
+                const updatedSubtopic = findAndModifyQuestion(subtopic);
+                if (updatedSubtopic) {
+                    subtopicWasUpdated = true;
+                    return updatedSubtopic as SubTopic;
                 }
                 return subtopic;
             });
-        }
-        
-        if (wasUpdated) {
-            transaction.update(topicDocRef, topicData);
-        }
+
+            if (subtopicWasUpdated) {
+                return { ...topic, subtopics: updatedSubtopics };
+            }
+
+            return topic;
+        });
+
+        transaction.update(subjectRef, { topics: newTopics });
     });
 };
 
+
 export const deleteSubject = async (subjectId: string): Promise<void> => {
     const subjectRef = db.collection('subjects').doc(subjectId);
-    const topicsRef = subjectRef.collection('topics');
-
-    // Delete all documents in the 'topics' subcollection first
-    const topicsSnapshot = await topicsRef.get();
-    if (!topicsSnapshot.empty) {
-        const batch = db.batch();
-        topicsSnapshot.docs.forEach(doc => {
-            batch.delete(doc.ref);
-        });
-        await batch.commit();
-    }
-    
-    // Then delete the main subject document
     await subjectRef.delete();
 };
 
@@ -398,12 +317,7 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
     const progressRef = db.collection('studentProgress').doc(studentId);
     return progressRef.onSnapshot((doc) => {
         if(doc.exists) {
-            const data = doc.data() as StudentProgress;
-            // Ensure seenPortugueseChallengeStatements exists for backward compatibility
-            if (!data.seenPortugueseChallengeStatements) {
-                data.seenPortugueseChallengeStatements = [];
-            }
-            callback(data);
+            callback(doc.data() as StudentProgress);
         } else {
             // Create initial progress if it doesn't exist (e.g., for existing users without this doc)
             const initialProgress: StudentProgress = {
@@ -446,7 +360,6 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                     lastCompletedDate: '',
                 },
                 dailyChallengeCompletions: {},
-                seenPortugueseChallengeStatements: [],
             };
             // Asynchronously create the document in Firestore
             progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
@@ -538,8 +451,7 @@ export const createReportNotification = async (
     reason: string,
 ): Promise<void> => {
     const timestamp = Date.now();
-    const studentDisplayName = student.name || student.username;
-    const message = `Aluno ${studentDisplayName} reportou um erro na questão "${questionStatement.substring(0, 50)}..." no tópico "${topicName}". Motivo: ${reason}.`;
+    const message = `Aluno ${student.name} reportou um erro na questão "${questionStatement.substring(0, 50)}..." no tópico "${topicName}". Motivo: ${reason}.`;
 
     const newNotification: Omit<TeacherMessage, 'id'> = {
         teacherId,
@@ -549,7 +461,7 @@ export const createReportNotification = async (
         acknowledgedBy: [], // No one has seen it yet
         type: 'system',
         context: {
-            studentName: studentDisplayName,
+            studentName: student.name,
             subjectName,
             topicName,
             questionStatement,

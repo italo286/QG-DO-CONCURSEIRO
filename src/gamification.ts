@@ -1,4 +1,5 @@
 import React from "react";
+// FIX: Added imports for types used in the new gamification logic functions.
 import { StudentProgress, Subject, QuestionAttempt, Badge } from "./types";
 import { getBrasiliaDate, getLocalDateISOString } from './utils';
 import { 
@@ -149,6 +150,7 @@ export const ALL_BADGES: {
     }}
 };
 
+// FIX: Added missing gamification logic functions.
 export const checkAndAwardBadges = (
     progress: StudentProgress,
     subjects: Subject[],

@@ -1,3 +1,5 @@
+
+
 // This file contains types that are shared between the server (Netlify functions)
 // and the client, but do NOT have any frontend-specific dependencies like React.
 
@@ -28,6 +30,7 @@ export interface Question {
   topicName?: string;
   errorCategory?: string; // For adaptive Portuguese challenges
   isTec?: boolean;
+  // FIX: Added optional properties to hold context for questions in cross-topic quizzes like daily challenges.
   subjectId?: string;
   topicId?: string;
 }
@@ -290,7 +293,6 @@ export interface StudentProgress {
         portuguese?: boolean;
     }
   };
-  seenPortugueseChallengeStatements: string[];
 }
 
 

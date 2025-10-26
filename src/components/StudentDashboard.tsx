@@ -1,22 +1,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, Flashcard } from '../../types';
-import * as FirebaseService from '../../services/firebaseService';
-import * as Gamification from '../../gamification';
-import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner } from '../ui';
-import { StudentHeader } from './StudentHeader';
-import { StudentViewRouter } from './StudentViewRouter';
-import { EditProfileModal } from './EditProfileModal';
-import { StudentGamePlayerModal } from './StudentGamePlayerModal';
-import { LevelUpModal } from './LevelUpModal';
-import { BadgeAwardModal } from './BadgeAwardModal';
-import { XpToastDisplay } from './XpToastDisplay';
-import { NewMessageModal } from './NewMessageModal';
-import { TopicChat } from './TopicChat';
-import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
-import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
-import * as GeminiService from '../../services/geminiService';
-import { ArrowRightIcon } from '../Icons';
+// FIX: Added 'Flashcard' to the type import to resolve type errors.
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
+import * as FirebaseService from '../services/firebaseService';
+import * as Gamification from '../gamification';
+import { useStudentData } from '../hooks/useStudentData';
+import { Spinner } from './ui';
+import { StudentHeader } from './student/StudentHeader';
+import { StudentViewRouter } from './student/StudentViewRouter';
+import { EditProfileModal } from './student/EditProfileModal';
+import { StudentGamePlayerModal } from './student/StudentGamePlayerModal';
+import { LevelUpModal } from './student/LevelUpModal';
+import { BadgeAwardModal } from './student/BadgeAwardModal';
+import { XpToastDisplay } from './student/XpToastDisplay';
+import { NewMessageModal } from './student/NewMessageModal';
+import { TopicChat } from './student/TopicChat';
+import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
+import { getLocalDateISOString, getBrasiliaDate } from '../utils';
+import * as GeminiService from '../services/geminiService';
+import { ArrowRightIcon } from './Icons';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 

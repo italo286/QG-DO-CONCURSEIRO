@@ -1,7 +1,7 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
-// FIX: Initialize the Gemini API client using process.env.API_KEY as per the coding guidelines.
+// The API key is provided by the execution environment.
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 // Helper for retrying API calls with exponential backoff for transient errors

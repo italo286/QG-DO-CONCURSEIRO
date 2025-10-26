@@ -1,5 +1,6 @@
 import React from 'react';
 import { StudentProgress, Simulado } from '../../../types';
+// FIX: Imported icons from '../../Icons' instead of '../../ui' to resolve module export errors.
 import { Card, Button } from '../../ui';
 import { CheckCircleIcon, TrashIcon } from '../../Icons';
 

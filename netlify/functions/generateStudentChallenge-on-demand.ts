@@ -46,8 +46,7 @@ try {
 }
 
 // --- Gemini API Initialization ---
-// FIX: Initialize the Gemini API client using process.env.API_KEY as per the coding guidelines.
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
 
 // --- Helper Functions ---
 async function retryWithBackoff<T>( apiCall: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 1000): Promise<T> {
@@ -111,49 +110,27 @@ const getStudentProgress = async (studentId: string): Promise<StudentProgress | 
 const getEnrolledSubjects = async (studentId: string): Promise<Subject[]> => {
     const coursesSnapshot = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
     if (coursesSnapshot.empty) return [];
-
+    
     const subjectIds = new Set<string>();
     coursesSnapshot.docs.forEach(doc => {
         const course = doc.data() as Course;
-        (course.disciplines || []).forEach(d => subjectIds.add(d.subjectId));
+        course.disciplines.forEach(d => subjectIds.add(d.subjectId));
     });
 
     if (subjectIds.size === 0) return [];
-
+    
     const subjectIdArray = Array.from(subjectIds);
     const chunks: string[][] = [];
     for (let i = 0; i < subjectIdArray.length; i += 10) { chunks.push(subjectIdArray.slice(i, i + 10)); }
 
-    const subjectDocsPromises: Promise<admin.firestore.QuerySnapshot>[] = [];
+    const allSubjects: Subject[] = [];
     for (const chunk of chunks) {
         if (chunk.length > 0) {
-            subjectDocsPromises.push(db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get());
+            const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+            subjectDocs.docs.forEach(doc => { allSubjects.push({ id: doc.id, ...doc.data() } as Subject); });
         }
     }
-    
-    const subjectDocsSnapshots = await Promise.all(subjectDocsPromises);
-    const allSubjectsData: Omit<Subject, 'topics'>[] = subjectDocsSnapshots.flatMap(snapshot => 
-        snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Omit<Subject, 'topics'>))
-    );
-
-    const subjectsWithTopics = await Promise.all(allSubjectsData.map(async (subjectData) => {
-        const topicsSnapshot = await db.collection('subjects').doc(subjectData.id).collection('topics').orderBy('order').get();
-        const topics = topicsSnapshot.docs.map(topicDoc => ({ id: topicDoc.id, ...topicDoc.data() } as Topic));
-
-        if (topics.length === 0 && Array.isArray((subjectData as any).topics) && (subjectData as any).topics.length > 0) {
-            return {
-                ...subjectData,
-                topics: (subjectData as any).topics
-            } as Subject;
-        }
-
-        return {
-            ...subjectData,
-            topics: topics
-        } as Subject;
-    }));
-
-    return subjectsWithTopics;
+    return allSubjects;
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -178,15 +155,15 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
     }
 
     let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
-    (subjectsToConsider || []).forEach(subject => {
-        (subject.topics || []).forEach(topic => {
+    subjectsToConsider.forEach(subject => {
+        subject.topics.forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
                 (content.questions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: false }));
                 (content.tecQuestions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: true }));
             };
             addQuestions(topic);
-            (topic.subtopics || []).forEach(st => addQuestions(st, topic.name));
+            topic.subtopics.forEach(st => addQuestions(st, topic.name));
         });
     });
 
@@ -204,23 +181,19 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
         if (questionType !== 'mixed') {
             const attemptedIds = new Set<string>();
             const correctIds = new Set<string>();
-            Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
-                Object.values(subject || {}).forEach(topic => {
-                    if (topic && topic.lastAttempt) {
-                        topic.lastAttempt.forEach(attempt => {
-                            attemptedIds.add(attempt.questionId);
-                            if (attempt.isCorrect) correctIds.add(attempt.questionId);
-                        });
-                    }
-                });
-            });
-             (studentProgress.reviewSessions || []).forEach(session => {
-                if (session && session.attempts) {
-                    session.attempts.forEach(attempt => {
+            Object.values(studentProgress.progressByTopic).forEach(subject => {
+                Object.values(subject).forEach(topic => {
+                    topic.lastAttempt.forEach(attempt => {
                         attemptedIds.add(attempt.questionId);
                         if (attempt.isCorrect) correctIds.add(attempt.questionId);
                     });
-                }
+                });
+            });
+             (studentProgress.reviewSessions || []).forEach(session => {
+                (session.attempts || []).forEach(attempt => {
+                    attemptedIds.add(attempt.questionId);
+                    if (attempt.isCorrect) correctIds.add(attempt.questionId);
+                });
             });
             const incorrectIds = new Set([...attemptedIds].filter(id => !correctIds.has(id)));
 
@@ -235,12 +208,8 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
     
     // Standard mode: Prioritize by lowest score
     const topicsWithScores: { topicId: string; score: number }[] = [];
-    Object.values(studentProgress.progressByTopic || {}).forEach(subjectProgress => {
-        Object.entries(subjectProgress || {}).forEach(([topicId, topicData]) => { 
-            if (topicData) {
-                topicsWithScores.push({ topicId, score: topicData.score });
-            }
-        });
+    Object.values(studentProgress.progressByTopic).forEach(subjectProgress => {
+        Object.entries(subjectProgress).forEach(([topicId, topicData]) => { topicsWithScores.push({ topicId, score: topicData.score }); });
     });
     topicsWithScores.sort((a, b) => a.score - b.score);
 
@@ -278,17 +247,15 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
         subjectsToConsider = subjects.filter(s => subjectIdSet.has(s.id));
     }
 
-    let allTerms = (subjectsToConsider || []).flatMap(s => (s.topics || []).flatMap(t => [...(t.glossary || []), ...(t.subtopics || []).flatMap(st => st.glossary || [])]));
+    let allTerms = subjectsToConsider.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
     
     if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossaryTopicIds && studentProgress.advancedGlossaryTopicIds.length > 0) {
         const topicIdSet = new Set(studentProgress.advancedGlossaryTopicIds);
-        const termsWithContext = (subjectsToConsider || []).flatMap(s => 
-            (s.topics || []).flatMap(t => 
-                (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
-                    (t.subtopics || []).flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
-                )
+        const termsWithContext = subjectsToConsider.flatMap(s => s.topics.flatMap(t => 
+            (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
+                t.subtopics.flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
             )
-        );
+        ));
         allTerms = termsWithContext.filter(t => topicIdSet.has(t.topicId));
     }
 
