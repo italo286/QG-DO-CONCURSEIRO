@@ -177,7 +177,7 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
     }
 
     let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
-    subjectsToConsider.forEach(subject => {
+    (subjectsToConsider || []).forEach(subject => {
         (subject.topics || []).forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
@@ -203,19 +203,23 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
         if (questionType !== 'mixed') {
             const attemptedIds = new Set<string>();
             const correctIds = new Set<string>();
-            Object.values(studentProgress.progressByTopic).forEach(subject => {
-                Object.values(subject).forEach(topic => {
-                    topic.lastAttempt.forEach(attempt => {
-                        attemptedIds.add(attempt.questionId);
-                        if (attempt.isCorrect) correctIds.add(attempt.questionId);
-                    });
+            Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
+                Object.values(subject || {}).forEach(topic => {
+                    if (topic && topic.lastAttempt) {
+                        topic.lastAttempt.forEach(attempt => {
+                            attemptedIds.add(attempt.questionId);
+                            if (attempt.isCorrect) correctIds.add(attempt.questionId);
+                        });
+                    }
                 });
             });
              (studentProgress.reviewSessions || []).forEach(session => {
-                (session.attempts || []).forEach(attempt => {
-                    attemptedIds.add(attempt.questionId);
-                    if (attempt.isCorrect) correctIds.add(attempt.questionId);
-                });
+                if (session && session.attempts) {
+                    session.attempts.forEach(attempt => {
+                        attemptedIds.add(attempt.questionId);
+                        if (attempt.isCorrect) correctIds.add(attempt.questionId);
+                    });
+                }
             });
             const incorrectIds = new Set([...attemptedIds].filter(id => !correctIds.has(id)));
 
@@ -230,8 +234,12 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
     
     // Standard mode: Prioritize by lowest score
     const topicsWithScores: { topicId: string; score: number }[] = [];
-    Object.values(studentProgress.progressByTopic).forEach(subjectProgress => {
-        Object.entries(subjectProgress).forEach(([topicId, topicData]) => { topicsWithScores.push({ topicId, score: topicData.score }); });
+    Object.values(studentProgress.progressByTopic || {}).forEach(subjectProgress => {
+        Object.entries(subjectProgress || {}).forEach(([topicId, topicData]) => { 
+            if (topicData) {
+                topicsWithScores.push({ topicId, score: topicData.score });
+            }
+        });
     });
     topicsWithScores.sort((a, b) => a.score - b.score);
 
@@ -269,15 +277,17 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
         subjectsToConsider = subjects.filter(s => subjectIdSet.has(s.id));
     }
 
-    let allTerms = subjectsToConsider.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
+    let allTerms = (subjectsToConsider || []).flatMap(s => (s.topics || []).flatMap(t => [...(t.glossary || []), ...(t.subtopics || []).flatMap(st => st.glossary || [])]));
     
     if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossaryTopicIds && studentProgress.advancedGlossaryTopicIds.length > 0) {
         const topicIdSet = new Set(studentProgress.advancedGlossaryTopicIds);
-        const termsWithContext = subjectsToConsider.flatMap(s => s.topics.flatMap(t => 
-            (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
-                t.subtopics.flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+        const termsWithContext = (subjectsToConsider || []).flatMap(s => 
+            (s.topics || []).flatMap(t => 
+                (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
+                    (t.subtopics || []).flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+                )
             )
-        ));
+        );
         allTerms = termsWithContext.filter(t => topicIdSet.has(t.topicId));
     }
 

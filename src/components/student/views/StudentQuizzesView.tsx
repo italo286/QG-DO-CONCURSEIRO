@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { StudentProgress, Simulado } from '../../../types';
 // FIX: Imported icons from '../../Icons' instead of '../../ui' to resolve module export errors.
