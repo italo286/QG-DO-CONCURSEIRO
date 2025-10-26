@@ -47,7 +47,7 @@ export const ProfessorSubjectsView: React.FC<ProfessorSubjectsViewProps> = ({ su
                                 className="w-full text-left p-4 bg-gray-800 rounded-lg hover:bg-gray-700/50 border border-gray-700 transition-colors"
                             >
                                 <p className="font-bold text-lg text-cyan-400">{subject.name}</p>
-                                <p className="text-sm text-gray-400 mt-1">{subject.topics.length} tópico(s)</p>
+                                <p className="text-sm text-gray-400 mt-1">{(subject.topics || []).length} tópico(s)</p>
                             </button>
                         </li>
                     ))}

@@ -82,18 +82,18 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const parentTopic = selectedTopic;
 
     const tabs = [
-        { value: 'pdf', label: 'Aula', icon: DocumentTextIcon, count: currentContent.fullPdfs?.length },
-        { value: 'summary', label: 'Resumo', icon: LightBulbIcon, count: currentContent.summaryPdfs?.length },
-        { value: 'raiox', label: 'Raio X', icon: ChartLineIcon, count: currentContent.raioXPdfs?.length },
-        { value: 'videos', label: 'Vídeos', icon: VideoCameraIcon, count: currentContent.videoUrls?.length },
+        { value: 'pdf', label: 'Aula', icon: DocumentTextIcon, count: (currentContent.fullPdfs || []).length },
+        { value: 'summary', label: 'Resumo', icon: LightBulbIcon, count: (currentContent.summaryPdfs || []).length },
+        { value: 'raiox', label: 'Raio X', icon: ChartLineIcon, count: (currentContent.raioXPdfs || []).length },
+        { value: 'videos', label: 'Vídeos', icon: VideoCameraIcon, count: (currentContent.videoUrls || []).length },
         { value: 'mindMap', label: 'Mapa Mental', icon: BrainIcon, count: currentContent.mindMapUrl ? 1 : 0 },
-        { value: 'bankProfile', label: 'Perfil da Banca', icon: BriefcaseIcon, count: currentContent.bankProfilePdfs?.length },
-        { value: 'quiz', label: 'Questões (Conteúdo)', icon: ClipboardCheckIcon, count: currentContent.questions?.length },
-        { value: 'tec_questions_quiz', label: 'Questões Extraídas', icon: ClipboardCheckIcon, count: currentContent.tecQuestions?.length },
+        { value: 'bankProfile', label: 'Perfil da Banca', icon: BriefcaseIcon, count: (currentContent.bankProfilePdfs || []).length },
+        { value: 'quiz', label: 'Questões (Conteúdo)', icon: ClipboardCheckIcon, count: (currentContent.questions || []).length },
+        { value: 'tec_questions_quiz', label: 'Questões Extraídas', icon: ClipboardCheckIcon, count: (currentContent.tecQuestions || []).length },
         { value: 'tec_caderno', label: 'Caderno TEC', icon: ClipboardListIcon, count: currentContent.tecUrl ? 1 : 0 },
-        { value: 'glossary', label: 'Glossário', icon: TagIcon, count: currentContent.glossary?.length },
-        { value: 'flashcards', label: 'Flashcards', icon: FlashcardIcon, count: currentContent.flashcards?.length },
-        { value: 'games', label: 'Jogos', icon: GameControllerIcon, count: currentContent.miniGames?.length },
+        { value: 'glossary', label: 'Glossário', icon: TagIcon, count: (currentContent.glossary || []).length },
+        { value: 'flashcards', label: 'Flashcards', icon: FlashcardIcon, count: (currentContent.flashcards || []).length },
+        { value: 'games', label: 'Jogos', icon: GameControllerIcon, count: (currentContent.miniGames || []).length },
         { value: 'medals', label: 'Medalhas', icon: TrophyIcon, count: 1 },
         { value: 'notes', label: 'Anotações', icon: ClipboardListIcon, count: 1 },
     ].filter(tab => (tab.count || 0) > 0);
@@ -129,16 +129,16 @@ export const TopicView: React.FC<TopicViewProps> = ({
         switch(tabValue) {
             case 'pdf': {
                 const pdfContainerClass = 'h-full flex flex-col';
-                if (currentContent.fullPdfs?.length === 1) {
+                if ((currentContent.fullPdfs || []).length === 1) {
                     return (
                         <div className={pdfContainerClass}>
                             <div className="flex-grow min-h-0 w-full aspect-[4/5]">
-                                <PdfViewer file={currentContent.fullPdfs[0]} />
+                                <PdfViewer file={currentContent.fullPdfs![0]} />
                             </div>
                         </div>
                     );
                 }
-                if (currentContent.fullPdfs?.length > 1) {
+                if ((currentContent.fullPdfs || []).length > 1) {
                     if (activeFullPdf) {
                         return (
                             <div className={pdfContainerClass}>
@@ -159,7 +159,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                 <div className="p-4 space-y-4">
                                     <h3 className="text-xl font-bold">Aulas em PDF</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {currentContent.fullPdfs.map((pdf, i) => (
+                                        {(currentContent.fullPdfs || []).map((pdf, i) => (
                                             <Card key={i} onClick={() => setActiveFullPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                                 <div className="flex items-center space-x-3">
                                                     <DocumentTextIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
@@ -184,16 +184,16 @@ export const TopicView: React.FC<TopicViewProps> = ({
             }
             case 'summary': {
                 const summaryContainerClass = 'h-full flex flex-col';
-                if (currentContent.summaryPdfs?.length === 1) {
+                if ((currentContent.summaryPdfs || []).length === 1) {
                     return (
                         <div className={summaryContainerClass}>
                             <div className="flex-grow min-h-0 w-full aspect-[4/5]">
-                                <PdfViewer file={currentContent.summaryPdfs[0]} />
+                                <PdfViewer file={currentContent.summaryPdfs![0]} />
                             </div>
                         </div>
                     );
                 }
-                if (currentContent.summaryPdfs?.length > 1) {
+                if ((currentContent.summaryPdfs || []).length > 1) {
                     if (activeSummaryPdf) {
                         return (
                             <div className={summaryContainerClass}>
@@ -214,7 +214,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                 <div className="p-4 space-y-4">
                                     <h3 className="text-xl font-bold">Resumos em PDF</h3>
                                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {currentContent.summaryPdfs.map((pdf, i) => (
+                                        {(currentContent.summaryPdfs || []).map((pdf, i) => (
                                             <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                                 <div className="flex items-center space-x-3">
                                                     <DocumentTextIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
@@ -268,17 +268,15 @@ export const TopicView: React.FC<TopicViewProps> = ({
                             <div className={containerClass}>
                                 <div className="p-4 space-y-4">
                                     <h3 className="text-xl font-bold">PDFs de Raio X</h3>
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                        {(currentContent.raioXPdfs || []).map((pdf, i) => (
-                                            <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                                <div className="flex items-center space-x-3">
-                                                    <ChartLineIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
-                                                    <span className="truncate">{pdf.fileName}</span>
-                                                </div>
-                                                <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
-                                            </Card>
-                                        ))}
-                                    </div>
+                                    {(currentContent.raioXPdfs || []).map((pdf, i) => (
+                                        <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
+                                            <div className="flex items-center space-x-3">
+                                                <ChartLineIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
+                                                <span className="truncate">{pdf.fileName}</span>
+                                            </div>
+                                            <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
+                                        </Card>
+                                    ))}
                                 </div>
                             </div>
                         );
@@ -333,7 +331,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
             case 'quiz':
                 const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
                 return <QuizView 
-                    questions={currentContent.questions} 
+                    questions={currentContent.questions || []} 
                     initialAttempts={attempts} 
                     onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, currentContent.id, attempt)}
                     onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)}
@@ -375,7 +373,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
             case 'games':
                 return (
                     <div className="p-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        {currentContent.miniGames.map(game => (
+                        {(currentContent.miniGames || []).map(game => (
                                 <button key={game.id} onClick={() => onPlayGame(game, currentContent.id)} className="p-4 bg-gray-700 hover:bg-cyan-600 rounded-lg transition-colors text-left">
                                 <GameControllerIcon className="h-8 w-8 mb-2 text-cyan-400" />
                                 <p className="font-bold">{game.name}</p>
@@ -469,14 +467,14 @@ export const TopicView: React.FC<TopicViewProps> = ({
         const renderPanelContent = () => {
             switch (tabValue) {
                 case 'pdf': {
-                    if (currentContent.fullPdfs?.length === 1) {
+                    if ((currentContent.fullPdfs || []).length === 1) {
                         return (
                             <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.fullPdfs[0]} /></div>
+                                <div className={containerClass}><PdfViewer file={currentContent.fullPdfs![0]} /></div>
                             </div>
                         );
                     }
-                    if (currentContent.fullPdfs?.length > 1) {
+                    if ((currentContent.fullPdfs || []).length > 1) {
                         if (activePdf) {
                             return (
                                 <div className="flex flex-col h-full">
@@ -488,7 +486,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                             return (
                                 <div className="p-2 space-y-2">
                                     <h3 className="text-lg font-bold">Aulas em PDF</h3>
-                                    {currentContent.fullPdfs.map((pdf, i) => (
+                                    {(currentContent.fullPdfs || []).map((pdf, i) => (
                                         <Card key={i} onClick={() => setActivePdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                             <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
                                             <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
@@ -502,14 +500,14 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum PDF.</p></div>);
                 }
                 case 'summary': {
-                    if (currentContent.summaryPdfs?.length === 1) {
+                    if ((currentContent.summaryPdfs || []).length === 1) {
                         return (
                              <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.summaryPdfs[0]} /></div>
+                                <div className={containerClass}><PdfViewer file={currentContent.summaryPdfs![0]} /></div>
                             </div>
                         );
                     }
-                    if (currentContent.summaryPdfs?.length > 1) {
+                    if ((currentContent.summaryPdfs || []).length > 1) {
                         if (activeSummaryPdf) {
                              return (
                                 <div className="flex flex-col h-full">
@@ -521,7 +519,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                             return (
                                 <div className="p-2 space-y-2">
                                     <h3 className="text-lg font-bold">Resumos em PDF</h3>
-                                    {currentContent.summaryPdfs.map((pdf, i) => (
+                                    {(currentContent.summaryPdfs || []).map((pdf, i) => (
                                         <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
                                             <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
                                             <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
@@ -573,7 +571,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 case 'quiz':
                     const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
                     return <QuizView 
-                        questions={currentContent.questions} 
+                        questions={currentContent.questions || []} 
                         initialAttempts={attempts} 
                         onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, currentContent.id, attempt)}
                         onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)}
@@ -645,7 +643,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 case 'games':
                     return (
                         <div className="p-2 grid grid-cols-1 gap-2">
-                            {currentContent.miniGames.map(game => (
+                            {(currentContent.miniGames || []).map(game => (
                                 <button key={game.id} onClick={() => onPlayGame(game, currentContent.id)} className="p-2 bg-gray-700 hover:bg-cyan-600 rounded-lg transition-colors text-left">
                                 <GameControllerIcon className="h-6 w-6 mb-1 text-cyan-400" />
                                 <p className="font-bold text-sm">{game.name}</p>

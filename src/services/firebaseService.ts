@@ -203,7 +203,7 @@ export const updateSubjectQuestion = async (
 
         const subjectData = doc.data() as Subject;
         
-        const newTopics = subjectData.topics.map(topic => {
+        const newTopics = (subjectData.topics || []).map(topic => {
             const findAndModifyQuestion = (contentItem: Topic | SubTopic): Topic | SubTopic | null => {
                 const originalTopicId = topicId.replace('-tec', '');
                 if (contentItem.id !== originalTopicId) return null;
@@ -234,7 +234,7 @@ export const updateSubjectQuestion = async (
             }
 
             let subtopicWasUpdated = false;
-            const updatedSubtopics = topic.subtopics.map(subtopic => {
+            const updatedSubtopics = (topic.subtopics || []).map(subtopic => {
                 const updatedSubtopic = findAndModifyQuestion(subtopic);
                 if (updatedSubtopic) {
                     subtopicWasUpdated = true;

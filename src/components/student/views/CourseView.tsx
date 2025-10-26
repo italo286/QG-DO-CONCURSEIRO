@@ -16,7 +16,7 @@ interface CourseViewProps {
 }
 
 export const CourseView: React.FC<CourseViewProps> = ({ course, allSubjects, studentProgress, allStudents, allStudentProgress, currentUserId, onSubjectSelect, onSelectTargetCargo }) => {
-    const courseSubjects = allSubjects.filter(s => course.disciplines.some((d: CourseDiscipline) => d.subjectId === s.id));
+    const courseSubjects = allSubjects.filter(s => (course.disciplines || []).some((d: CourseDiscipline) => d.subjectId === s.id));
 
     return (
         <div className="space-y-6">

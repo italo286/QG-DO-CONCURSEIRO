@@ -16,7 +16,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
         let total = (getter(content) as any[])?.length || 0;
         if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
-            total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
+            total += (content.subtopics || []).reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
     };
@@ -52,7 +52,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
 
 export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgress, onTopicSelect, course }) => {
     const subjectProgressData = studentProgress?.progressByTopic[subject.id];
-    const courseDiscipline = course.disciplines.find(d => d.subjectId === subject.id);
+    const courseDiscipline = (course.disciplines || []).find(d => d.subjectId === subject.id);
     const topicFrequencies = courseDiscipline?.topicFrequencies || {};
     
     const frequencyClasses: { [key in Frequency]?: string } = {
@@ -72,7 +72,7 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
             <h2 className="text-2xl font-bold text-white">{subject.name}</h2>
             <p className="text-gray-400">{subject.description}</p>
             <ul className="space-y-3">
-                {subject.topics.map(topic => {
+                {(subject.topics || []).map(topic => {
                     const topicProgress = subjectProgressData?.[topic.id];
                     const score = topicProgress?.score !== undefined ? `${Math.round(topicProgress.score * 100)}%` : 'N/A';
                     const frequency = topicFrequencies[topic.id] as Frequency;
@@ -97,9 +97,9 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                     </div>
                                 </summary>
                                 <div className="border-t border-gray-700 px-4 pb-4">
-                                    {topic.subtopics.length > 0 ? (
+                                    {(topic.subtopics || []).length > 0 ? (
                                         <ul className="space-y-2 pt-3">
-                                            {topic.subtopics.map(subtopic => {
+                                            {(topic.subtopics || []).map(subtopic => {
                                                 const subtopicProgress = subjectProgressData?.[subtopic.id];
                                                 const subtopicScore = subtopicProgress?.score !== undefined ? `${Math.round(subtopicProgress.score * 100)}%` : 'N/A';
                                                 const subtopicFrequency = topicFrequencies[subtopic.id] as Frequency;
