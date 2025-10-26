@@ -2,7 +2,7 @@ import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai"
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
 // The API key is provided by the execution environment.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: import.meta.env.VITE_GEMINI_API_KEY });
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
