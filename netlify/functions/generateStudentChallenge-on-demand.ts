@@ -115,7 +115,7 @@ const getEnrolledSubjects = async (studentId: string): Promise<Subject[]> => {
     const subjectIds = new Set<string>();
     coursesSnapshot.docs.forEach(doc => {
         const course = doc.data() as Course;
-        (course.disciplines || []).forEach(d => subjectIds.add(d.subjectId));
+        course.disciplines.forEach(d => subjectIds.add(d.subjectId));
     });
 
     if (subjectIds.size === 0) return [];
@@ -157,14 +157,14 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
 
     let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
     subjectsToConsider.forEach(subject => {
-        (subject.topics || []).forEach(topic => {
+        subject.topics.forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
                 (content.questions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: false }));
                 (content.tecQuestions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: true }));
             };
             addQuestions(topic);
-            (topic.subtopics || []).forEach(st => addQuestions(st, topic.name));
+            topic.subtopics.forEach(st => addQuestions(st, topic.name));
         });
     });
 
@@ -248,13 +248,13 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
         subjectsToConsider = subjects.filter(s => subjectIdSet.has(s.id));
     }
 
-    let allTerms = subjectsToConsider.flatMap(s => (s.topics || []).flatMap(t => [...(t.glossary || []), ...(t.subtopics || []).flatMap(st => st.glossary || [])]));
+    let allTerms = subjectsToConsider.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
     
     if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossaryTopicIds && studentProgress.advancedGlossaryTopicIds.length > 0) {
         const topicIdSet = new Set(studentProgress.advancedGlossaryTopicIds);
-        const termsWithContext = subjectsToConsider.flatMap(s => (s.topics || []).flatMap(t => 
+        const termsWithContext = subjectsToConsider.flatMap(s => s.topics.flatMap(t => 
             (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
-                (t.subtopics || []).flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+                t.subtopics.flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
             )
         ));
         allTerms = termsWithContext.filter(t => topicIdSet.has(t.topicId));
