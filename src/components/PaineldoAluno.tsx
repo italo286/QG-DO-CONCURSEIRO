@@ -1,20 +1,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, Flashcard } from '../types';
-import * as FirebaseService from '../services/firebaseService';
-import * as Gamification from '../gamification';
-import { useStudentData } from '../hooks/useStudentData';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, Flashcard } from '../../types';
+import * as FirebaseService from '../../services/firebaseService';
+import * as Gamification from '../../gamification';
+import { useStudentData } from '../../hooks/useStudentData';
 import { Spinner } from '../ui';
-import { StudentHeader } from './student/StudentHeader';
-import { StudentViewRouter } from './student/StudentViewRouter';
-import { EditProfileModal } from './student/EditProfileModal';
-import { StudentGamePlayerModal } from './student/StudentGamePlayerModal';
-import { LevelUpModal } from './student/LevelUpModal';
-import { BadgeAwardModal } from './student/BadgeAwardModal';
-import { XpToastDisplay } from './student/XpToastDisplay';
-import { NewMessageModal } from './student/NewMessageModal';
-import { TopicChat } from './student/TopicChat';
-import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
+import { StudentHeader } from './StudentHeader';
+import { StudentViewRouter } from './StudentViewRouter';
+import { EditProfileModal } from './EditProfileModal';
+import { StudentGamePlayerModal } from './StudentGamePlayerModal';
+import { LevelUpModal } from './LevelUpModal';
+import { BadgeAwardModal } from './BadgeAwardModal';
+import { XpToastDisplay } from './XpToastDisplay';
+import { NewMessageModal } from './NewMessageModal';
+import { TopicChat } from './TopicChat';
+import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
@@ -398,7 +398,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
-                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map(f => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
+                        // FIX: Removed redundant type annotation for 'f' to allow TypeScript to correctly infer its type from the 'flashcards' array.
+                        const newProgress = { ...studentProgress, aiGeneratedFlashcards: [...(studentProgress.aiGeneratedFlashcards || []), ...flashcards.map((f) => ({...f, id: `fc-ai-${Date.now()}-${Math.random()}`}))] };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onFlashcardReview={(flashcardId, performance) => {

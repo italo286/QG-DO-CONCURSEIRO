@@ -1,4 +1,3 @@
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -111,27 +110,49 @@ const getStudentProgress = async (studentId: string): Promise<StudentProgress | 
 const getEnrolledSubjects = async (studentId: string): Promise<Subject[]> => {
     const coursesSnapshot = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
     if (coursesSnapshot.empty) return [];
-    
+
     const subjectIds = new Set<string>();
     coursesSnapshot.docs.forEach(doc => {
         const course = doc.data() as Course;
-        course.disciplines.forEach(d => subjectIds.add(d.subjectId));
+        (course.disciplines || []).forEach(d => subjectIds.add(d.subjectId));
     });
 
     if (subjectIds.size === 0) return [];
-    
+
     const subjectIdArray = Array.from(subjectIds);
     const chunks: string[][] = [];
     for (let i = 0; i < subjectIdArray.length; i += 10) { chunks.push(subjectIdArray.slice(i, i + 10)); }
 
-    const allSubjects: Subject[] = [];
+    const subjectDocsPromises: Promise<admin.firestore.QuerySnapshot>[] = [];
     for (const chunk of chunks) {
         if (chunk.length > 0) {
-            const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-            subjectDocs.docs.forEach(doc => { allSubjects.push({ id: doc.id, ...doc.data() } as Subject); });
+            subjectDocsPromises.push(db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get());
         }
     }
-    return allSubjects;
+    
+    const subjectDocsSnapshots = await Promise.all(subjectDocsPromises);
+    const allSubjectsData: Omit<Subject, 'topics'>[] = subjectDocsSnapshots.flatMap(snapshot => 
+        snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Omit<Subject, 'topics'>))
+    );
+
+    const subjectsWithTopics = await Promise.all(allSubjectsData.map(async (subjectData) => {
+        const topicsSnapshot = await db.collection('subjects').doc(subjectData.id).collection('topics').orderBy('order').get();
+        const topics = topicsSnapshot.docs.map(topicDoc => ({ id: topicDoc.id, ...topicDoc.data() } as Topic));
+
+        if (topics.length === 0 && Array.isArray((subjectData as any).topics) && (subjectData as any).topics.length > 0) {
+            return {
+                ...subjectData,
+                topics: (subjectData as any).topics
+            } as Subject;
+        }
+
+        return {
+            ...subjectData,
+            topics: topics
+        } as Subject;
+    }));
+
+    return subjectsWithTopics;
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -157,14 +178,14 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
 
     let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
     subjectsToConsider.forEach(subject => {
-        subject.topics.forEach(topic => {
+        (subject.topics || []).forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
                 (content.questions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: false }));
                 (content.tecQuestions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: true }));
             };
             addQuestions(topic);
-            topic.subtopics.forEach(st => addQuestions(st, topic.name));
+            (topic.subtopics || []).forEach(st => addQuestions(st, topic.name));
         });
     });
 
