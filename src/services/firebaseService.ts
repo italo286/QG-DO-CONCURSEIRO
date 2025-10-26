@@ -252,8 +252,8 @@ export const updateSubjectQuestion = async (
 ): Promise<void> => {
     // The topicId might be a subtopic ID. The document we need to update is the top-level topic document.
     // We assume subtopics are not nested further.
-    // FIX: Explicitly cast topicId to string to resolve a potential TS inference issue.
-    const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(topicId as string);
+    // FIX: The type of topicId was being inferred as unknown. Using String() to ensure it's a string.
+    const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(String(topicId));
 
     await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(topicDocRef);
