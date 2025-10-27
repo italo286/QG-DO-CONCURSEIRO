@@ -1,6 +1,6 @@
 {
-  "name": "03/09 QG do concurseiro",
-  "description": "An interactive learning platform for public contests, where teachers can upload materials and our AI generates practice quizzes for students, providing instant feedback and progress tracking.",
+  "name": "VERSÃO SEM PROBLEMA COM TAMANHO DE ARQUIVOS QG do concurseiro",
+  "description": "Nessa versão foi resolvido o problema que tinha ao tentar adicionar questões TEC, que tinha um limite de tamanho do arquivo",
   "requestFramePermissions": [],
   "prompt": ""
 }

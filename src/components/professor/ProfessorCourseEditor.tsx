@@ -78,15 +78,15 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
     };
     
     const handleSaveFrequencies = (frequencyMap: { [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' }) => {
-        const updatedDisciplines = (editedCourse.disciplines || []).map(discipline => {
+        const updatedDisciplines = editedCourse.disciplines.map(discipline => {
             const newFrequencies = { ...(discipline.topicFrequencies || {}) };
             const subject = allSubjects.find(s => s.id === discipline.subjectId);
             if (subject) {
-                (subject.topics || []).forEach(topic => {
+                subject.topics.forEach(topic => {
                     if (frequencyMap[topic.id]) {
                         newFrequencies[topic.id] = frequencyMap[topic.id];
                     }
-                    (topic.subtopics || []).forEach(subtopic => {
+                    topic.subtopics.forEach(subtopic => {
                         if (frequencyMap[subtopic.id]) {
                             newFrequencies[subtopic.id] = frequencyMap[subtopic.id];
                         }
@@ -146,13 +146,13 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
                     <Card className="p-4 flex flex-col items-center justify-center">
                         <BookOpenIcon className="h-8 w-8 text-cyan-400 mb-2"/>
-                        <p className="text-2xl font-bold">{(editedCourse.disciplines || []).length}</p>
+                        <p className="text-2xl font-bold">{editedCourse.disciplines.length}</p>
                         <p className="text-gray-400">Disciplinas</p>
                         <Button onClick={() => setIsManageSubjectsModalOpen(true)} className="mt-4 text-sm py-2 px-4">Gerenciar</Button>
                     </Card>
                      <Card className="p-4 flex flex-col items-center justify-center">
                         <UserGroupIcon className="h-8 w-8 text-cyan-400 mb-2"/>
-                        <p className="text-2xl font-bold">{(editedCourse.enrolledStudentIds || []).length}</p>
+                        <p className="text-2xl font-bold">{editedCourse.enrolledStudentIds.length}</p>
                         <p className="text-gray-400">Alunos</p>
                         <Button onClick={() => setIsManageStudentsModalOpen(true)} className="mt-4 text-sm py-2 px-4">Gerenciar</Button>
                     </Card>

@@ -19,8 +19,7 @@ const MemoryGame: React.FC<{ data: MemoryGameData, onComplete: () => void, onErr
     const [isChecking, setIsChecking] = useState(false);
 
     useEffect(() => {
-        const items = data.items || [];
-        const gameCards = shuffle([...items, ...items]).map((value, id) => ({ id, value, flipped: false, matched: false }));
+        const gameCards = shuffle([...data.items, ...data.items]).map((value, id) => ({ id, value, flipped: false, matched: false }));
         setCards(gameCards);
     }, [data]);
 
@@ -82,9 +81,8 @@ const AssociationGame: React.FC<{ data: AssociationGameData, onComplete: () => v
     const [touchDrag, setTouchDrag] = useState<{ concept: string, ghost: HTMLElement } | null>(null);
 
     useEffect(() => {
-        const pairs = data.pairs || [];
-        const conceptsArr = pairs.map(p => ({ value: p.concept, matched: false }));
-        const definitionsArr = pairs.map(p => ({ value: p.definition, matched: false, isDropTarget: false }));
+        const conceptsArr = data.pairs.map(p => ({ value: p.concept, matched: false }));
+        const definitionsArr = data.pairs.map(p => ({ value: p.definition, matched: false, isDropTarget: false }));
         setConcepts(shuffle(conceptsArr));
         setDefinitions(shuffle(definitionsArr));
     }, [data]);
@@ -96,7 +94,7 @@ const AssociationGame: React.FC<{ data: AssociationGameData, onComplete: () => v
     }, [concepts, onComplete]);
 
     const checkAssociation = (concept: string, definition: string) => {
-        const originalPair = (data.pairs || []).find(p => p.concept === concept);
+        const originalPair = data.pairs.find(p => p.concept === concept);
         if (originalPair && originalPair.definition === definition) {
             setConcepts(prev => prev.map(c => c.value === concept ? {...c, matched: true} : c));
             setDefinitions(prev => prev.map(d => d.value === definition ? {...d, matched: true} : d));
@@ -224,7 +222,7 @@ const OrderGame: React.FC<{ data: OrderGameData, onComplete: () => void, onError
     const listRef = useRef<HTMLUListElement>(null);
 
     useEffect(() => {
-        setItems(shuffle(data.items || []));
+        setItems(shuffle(data.items));
     }, [data]);
 
     const reorderItems = (dragIndex: number, dropIndex: number) => {
@@ -337,7 +335,7 @@ const IntruderGame: React.FC<{ data: IntruderGameData, onComplete: () => void, o
     const [options, setOptions] = useState<string[]>([]);
     const [status, setStatus] = useState<'playing' | 'correct' | 'incorrect'>('playing');
 
-    useEffect(() => setOptions(shuffle([...(data.correctItems || []), data.intruder])), [data]);
+    useEffect(() => setOptions(shuffle([...data.correctItems, data.intruder])), [data]);
 
     const handleClick = (option: string) => {
         if (status !== 'playing') return;
@@ -370,9 +368,9 @@ const CategorizeGame: React.FC<{ data: CategorizeGameData, onComplete: () => voi
     const [selectedItem, setSelectedItem] = useState<{ item: string, source: string | null } | null>(null);
 
     useEffect(() => {
-        const allItems = shuffle((data.categories || []).flatMap(c => c.items || [])) as string[];
+        const allItems = shuffle(data.categories.flatMap(c => c.items)) as string[];
         setUnassignedItems(allItems);
-        setAssignments((data.categories || []).reduce((acc, cat) => ({ ...acc, [cat.name]: [] }), {}));
+        setAssignments(data.categories.reduce((acc, cat) => ({ ...acc, [cat.name]: [] }), {}));
         setIsCorrect(null);
         setSelectedItem(null);
     }, [data]);
@@ -422,10 +420,9 @@ const CategorizeGame: React.FC<{ data: CategorizeGameData, onComplete: () => voi
         if (unassignedItems.length > 0) {
             correct = false;
         } else {
-            for (const category of (data.categories || [])) {
+            for (const category of data.categories) {
                 const assigned = assignments[category.name] || [];
-                const categoryItems = category.items || [];
-                if (assigned.length !== categoryItems.length || !assigned.every(item => categoryItems.includes(item))) {
+                if (assigned.length !== category.items.length || !assigned.every(item => category.items.includes(item))) {
                     correct = false;
                     break;
                 }
@@ -463,7 +460,7 @@ const CategorizeGame: React.FC<{ data: CategorizeGameData, onComplete: () => voi
                 {unassignedItems.length === 0 && <p className="text-gray-500">Clique aqui para desagrupar um item selecionado</p>}
             </div>
             <div className="flex flex-col md:flex-row gap-4 mt-4">
-                 {(data.categories || []).map(cat => (
+                 {data.categories.map(cat => (
                      <div 
                         key={cat.name} 
                         onClick={() => handleTargetClick(cat.name)}
@@ -527,7 +524,7 @@ export const StudentGamePlayerModal: React.FC<{
             setGameInstanceKey(prev => prev + 1); // Reset game on open
             if (game.type === 'memory') {
                 const data = game.data as MemoryGameData;
-                setMaxErrors((data.items || []).length); 
+                setMaxErrors(data.items.length); 
             } else {
                 setMaxErrors(3); // Default for other games
             }

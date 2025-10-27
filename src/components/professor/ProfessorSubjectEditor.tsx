@@ -11,7 +11,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
         let total = (getter(content) as any[])?.length || 0;
         if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
-            total += (content.subtopics || []).reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
+            total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
     };
@@ -109,13 +109,13 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const handleSaveTopic = useCallback((topicToSave: Topic) => {
         let updatedTopics: Topic[];
-        const isEditing = (currentSubject.topics || []).some(t => t.id === topicToSave.id);
+        const isEditing = currentSubject.topics.some(t => t.id === topicToSave.id);
 
         if (isEditing) {
-            updatedTopics = (currentSubject.topics || []).map(t => t.id === topicToSave.id ? topicToSave : t);
+            updatedTopics = currentSubject.topics.map(t => t.id === topicToSave.id ? topicToSave : t);
             setToastMessage("Tópico atualizado com sucesso!");
         } else {
-            updatedTopics = [...(currentSubject.topics || []), topicToSave];
+            updatedTopics = [...currentSubject.topics, topicToSave];
              setToastMessage("Tópico criado com sucesso!");
         }
         
@@ -128,19 +128,19 @@ export const ProfessorSubjectEditor: React.FC<{
     const handleSaveSubTopic = useCallback((subTopicToSave: SubTopic) => {
         if (!parentTopicForSubTopic) return;
 
-        const isEditing = (parentTopicForSubTopic.subtopics || []).some(st => st.id === subTopicToSave.id);
+        const isEditing = parentTopicForSubTopic.subtopics.some(st => st.id === subTopicToSave.id);
         let updatedSubtopics: SubTopic[];
 
         if (isEditing) {
-            updatedSubtopics = (parentTopicForSubTopic.subtopics || []).map(st => st.id === subTopicToSave.id ? subTopicToSave : st);
+            updatedSubtopics = parentTopicForSubTopic.subtopics.map(st => st.id === subTopicToSave.id ? subTopicToSave : st);
             setToastMessage("Subtópico atualizado!");
         } else {
-            updatedSubtopics = [...(parentTopicForSubTopic.subtopics || []), subTopicToSave];
+            updatedSubtopics = [...parentTopicForSubTopic.subtopics, subTopicToSave];
             setToastMessage("Subtópico criado!");
         }
 
         const updatedParentTopic = { ...parentTopicForSubTopic, subtopics: updatedSubtopics };
-        const updatedTopics = (currentSubject.topics || []).map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
+        const updatedTopics = currentSubject.topics.map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
         
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
 
@@ -163,7 +163,7 @@ export const ProfessorSubjectEditor: React.FC<{
                 questions: [],
                 miniGames: [],
                 flashcards: [],
-                subtopics: (t.subtopics || []).map((st, j) => ({
+                subtopics: t.subtopics.map((st, j) => ({
                     name: st.name,
                     description: st.description,
                     id: `st${timestamp}${i}${j}`,
@@ -177,7 +177,7 @@ export const ProfessorSubjectEditor: React.FC<{
             };
         });
 
-        const updatedTopics = [...(currentSubject.topics || []), ...newTopics];
+        const updatedTopics = [...currentSubject.topics, ...newTopics];
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         setIsAiTopicModalOpen(false);
         setToastMessage(`${newTopics.length} tópicos foram adicionados com sucesso!`);
@@ -185,16 +185,16 @@ export const ProfessorSubjectEditor: React.FC<{
     
     const handleDeleteTopic = useCallback((topicId: string, topicName: string) => {
         if(window.confirm(`Tem certeza que deseja apagar o tópico "${topicName}" e todos os seus subtópicos e jogos?`)){
-            const updatedTopics = (currentSubject.topics || []).filter(t => t.id !== topicId);
+            const updatedTopics = currentSubject.topics.filter(t => t.id !== topicId);
             updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         }
     }, [currentSubject, updateSubjectStateAndDb]);
 
     const handleDeleteSubTopic = useCallback((subTopicId: string, subTopicName: string, parentTopic: Topic) => {
          if(window.confirm(`Tem certeza que deseja apagar o subtópico "${subTopicName}" e todos os seus jogos?`)){
-            const updatedSubtopics = (parentTopic.subtopics || []).filter(st => st.id !== subTopicId);
+            const updatedSubtopics = parentTopic.subtopics.filter(st => st.id !== subTopicId);
             const updatedParentTopic = { ...parentTopic, subtopics: updatedSubtopics };
-            const updatedTopics = (currentSubject.topics || []).map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
+            const updatedTopics = currentSubject.topics.map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
             
             updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         }
@@ -219,7 +219,7 @@ export const ProfessorSubjectEditor: React.FC<{
             return;
         }
 
-        const newTopics = [...(currentSubject.topics || [])];
+        const newTopics = [...currentSubject.topics];
         const draggedItem = newTopics.splice(draggedTopicIndex, 1)[0];
         newTopics.splice(dropIndex, 0, draggedItem);
         
@@ -318,7 +318,7 @@ export const ProfessorSubjectEditor: React.FC<{
                     onTouchMove={handleTouchMove}
                     onTouchEnd={handleTouchEnd}
                 >
-                    {(currentSubject.topics || []).map((topic, index) => (
+                    {currentSubject.topics.map((topic, index) => (
                         <details 
                             key={topic.id}
                             draggable
@@ -343,9 +343,9 @@ export const ProfessorSubjectEditor: React.FC<{
                                 <MaterialSummary content={topic} />
                             </summary>
                             <div className="border-t border-gray-700 px-4 pb-4">
-                                {(topic.subtopics || []).length > 0 ? (
+                                {topic.subtopics.length > 0 ? (
                                     <div className="space-y-2 pt-3">
-                                        {(topic.subtopics || []).map(subtopic => (
+                                        {topic.subtopics.map(subtopic => (
                                             <div key={subtopic.id} className="p-2 pl-4 bg-gray-700/50 rounded-md">
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-gray-300">{subtopic.name}</span>
@@ -364,7 +364,7 @@ export const ProfessorSubjectEditor: React.FC<{
                             </div>
                         </details>
                     ))}
-                    {(currentSubject.topics || []).length === 0 && (
+                    {currentSubject.topics.length === 0 && (
                         <Card className="text-center text-gray-400 p-6">
                             Nenhum tópico adicionado ainda. Arraste para reordenar.
                         </Card>

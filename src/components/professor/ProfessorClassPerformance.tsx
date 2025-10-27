@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as FirebaseService from '../../services/firebaseService';
@@ -29,16 +30,15 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         setIsAnalysisLoading(true);
         setAnalysisResult('');
         const allQuestionsWithContext = subjects.flatMap(s =>
-            (s.topics || []).flatMap(t =>
-                (t.questions || []).map(q => ({ ...q, topicName: t.name, subjectName: s.name }))
-                .concat((t.subtopics || []).flatMap(st => (st.questions || []).map(q => ({...q, topicName: st.name, subjectName: s.name}))))
+            s.topics.flatMap(t =>
+                t.questions.map(q => ({ ...q, topicName: t.name, subjectName: s.name }))
+                .concat(t.subtopics.flatMap(st => st.questions.map(q => ({...q, topicName: st.name, subjectName: s.name}))))
             )
         );
 
         // FIX: Added filters and checks to safely handle potentially incomplete progress data.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
-            // FIX: Explicitly cast 'p' to 'any' in the filter's type guard to allow property access on what TypeScript infers as an 'unknown' type. This resolves the compile-time error while preserving the intended filtering logic.
-            .filter((p: any): p is StudentProgress => p && !!p.progressByTopic)
+            .filter((p): p is StudentProgress => p && !!p.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
             .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
             .flatMap(topicProgress => topicProgress?.lastAttempt ?? []);
@@ -57,7 +57,8 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         
         return students.map(student => {
             const progress: StudentProgress | undefined = allProgress[student.id];
-            if (!progress) return { name: student.name || student.username, score: 0, studentId: student.id };
+            // FIX: Added a check for `progress.progressByTopic` to safely handle incomplete progress data and resolve the type error.
+            if (!progress || !progress.progressByTopic) return { name: student.name || student.username, score: 0, studentId: student.id };
 
             let totalScore = 0;
             let topicsWithScore = 0;

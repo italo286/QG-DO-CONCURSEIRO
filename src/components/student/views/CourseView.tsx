@@ -16,7 +16,7 @@ interface CourseViewProps {
 }
 
 export const CourseView: React.FC<CourseViewProps> = ({ course, allSubjects, studentProgress, allStudents, allStudentProgress, currentUserId, onSubjectSelect, onSelectTargetCargo }) => {
-    const courseSubjects = allSubjects.filter(s => (course.disciplines || []).some((d: CourseDiscipline) => d.subjectId === s.id));
+    const courseSubjects = allSubjects.filter(s => course.disciplines.some((d: CourseDiscipline) => d.subjectId === s.id));
 
     return (
         <div className="space-y-6">
@@ -38,7 +38,7 @@ export const CourseView: React.FC<CourseViewProps> = ({ course, allSubjects, stu
                                 className="bg-gray-700 border border-gray-600 rounded-md shadow-sm py-1 px-2 text-white text-sm focus:outline-none focus:ring-cyan-500 focus:border-cyan-500"
                             >
                                 <option value="">Selecione um cargo...</option>
-                                {(course.editalInfo.cargosEVagas || []).map((c: { cargo: string }) => <option key={c.cargo} value={c.cargo}>{c.cargo}</option>)}
+                                {course.editalInfo.cargosEVagas.map((c: { cargo: string }) => <option key={c.cargo} value={c.cargo}>{c.cargo}</option>)}
                             </select>
                         </div>
                     )}
@@ -68,7 +68,7 @@ export const CourseView: React.FC<CourseViewProps> = ({ course, allSubjects, stu
                         allStudents={allStudents}
                         allProgress={allStudentProgress}
                         currentUserId={currentUserId}
-                        courseStudentIds={course.enrolledStudentIds || []}
+                        courseStudentIds={course.enrolledStudentIds}
                         courseName={course.name}
                     />
                 </div>

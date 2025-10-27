@@ -35,7 +35,7 @@ export const StudentPerformanceDetails: React.FC<{
 
         subjects.forEach(subject => {
             const subjectProgress = studentProgress.progressByTopic[subject.id];
-            const allSubjectTopics = (subject.topics || []).flatMap(t => [{...t, isSubtopic: false}, ...(t.subtopics || []).map(st => ({...st, isSubtopic: true}))]);
+            const allSubjectTopics = subject.topics.flatMap(t => [{...t, isSubtopic: false}, ...t.subtopics.map(st => ({...st, isSubtopic: true}))]);
             
             if (!subjectProgress) {
                 data.bySubject.push({ name: subject.name, score: 0, completion: 0 });
@@ -61,7 +61,7 @@ export const StudentPerformanceDetails: React.FC<{
                     subjectCorrectAttempts += correctAttempts;
 
                     const originalTopicId = topicId.replace('-tec', '');
-                    const allTopicsAndSubtopics = (subject.topics || []).flatMap(t => [t, ...(t.subtopics || [])]);
+                    const allTopicsAndSubtopics = subject.topics.flatMap(t => [t, ...t.subtopics]);
                     const topicInfo = allTopicsAndSubtopics.find(t => t.id === originalTopicId);
                     const topicName = topicInfo ? `${topicInfo.name}${topicId.endsWith('-tec') ? ' (Questões Extraídas)' : ''}` : 'Tópico Desconhecido';
 

@@ -28,8 +28,8 @@ export const ManageSubjectsModal: React.FC<{
         const finalDisciplines = editedDisciplines.filter(d => {
             const subject = allSubjects.find(s => s.id === d.subjectId);
             if (!subject) return false;
-            const allContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
-            return allContentIds.some(id => !(d.excludedTopicIds || []).includes(id));
+            const allContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
+            return allContentIds.some(id => !d.excludedTopicIds.includes(id));
         });
 
         onSave({ ...course, disciplines: finalDisciplines });
@@ -37,7 +37,7 @@ export const ManageSubjectsModal: React.FC<{
     };
     
     const isExcluded = (subjectId: string, contentId: string) => {
-        return (editedDisciplines.find(d => d.subjectId === subjectId)?.excludedTopicIds || []).includes(contentId);
+        return editedDisciplines.find(d => d.subjectId === subjectId)?.excludedTopicIds.includes(contentId) ?? false;
     };
     
     const toggleExclusion = (subjectId: string, contentIds: string[], shouldExclude: boolean) => {
@@ -47,9 +47,9 @@ export const ManageSubjectsModal: React.FC<{
             if (!discipline) return prev; // Should not happen
 
             if (shouldExclude) {
-                discipline.excludedTopicIds = [...new Set([...(discipline.excludedTopicIds || []), ...contentIds])];
+                discipline.excludedTopicIds = [...new Set([...discipline.excludedTopicIds, ...contentIds])];
             } else {
-                discipline.excludedTopicIds = (discipline.excludedTopicIds || []).filter(id => !contentIds.includes(id));
+                discipline.excludedTopicIds = discipline.excludedTopicIds.filter(id => !contentIds.includes(id));
             }
             return newDisciplines;
         });
@@ -64,23 +64,23 @@ export const ManageSubjectsModal: React.FC<{
     };
 
     const handleToggleTopic = (subjectId: string, topic: Topic) => {
-        const allChildIds = [topic.id, ...(topic.subtopics || []).map(st => st.id)];
+        const allChildIds = [topic.id, ...topic.subtopics.map(st => st.id)];
         const areAllExcluded = allChildIds.every(id => isExcluded(subjectId, id));
         toggleExclusion(subjectId, allChildIds, !areAllExcluded);
     };
 
     const handleToggleSubject = (subject: Subject) => {
-        const allContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
+        const allContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
         const discipline = editedDisciplines.find(d => d.subjectId === subject.id);
-        const includedCount = allContentIds.filter(id => !(discipline?.excludedTopicIds || []).includes(id)).length;
+        const includedCount = allContentIds.filter(id => !discipline?.excludedTopicIds.includes(id)).length;
         const shouldExcludeAll = includedCount > 0;
         toggleExclusion(subject.id, allContentIds, shouldExcludeAll);
     };
 
-    const allContentIds = useMemo(() => allSubjects.flatMap(s => (s.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)])), [allSubjects]);
+    const allContentIds = useMemo(() => allSubjects.flatMap(s => s.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)])), [allSubjects]);
     
     const includedCount = useMemo(() => {
-        const excludedIds = new Set(editedDisciplines.flatMap(d => d.excludedTopicIds || []));
+        const excludedIds = new Set(editedDisciplines.flatMap(d => d.excludedTopicIds));
         return allContentIds.filter(id => !excludedIds.has(id)).length;
     }, [editedDisciplines, allContentIds]);
 
@@ -92,7 +92,7 @@ export const ManageSubjectsModal: React.FC<{
         setEditedDisciplines(prev => prev.map(discipline => {
             const subject = allSubjects.find(s => s.id === discipline.subjectId);
             if (!subject) return discipline;
-            const subjectContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
+            const subjectContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
             return {
                 ...discipline,
                 excludedTopicIds: shouldSelectAll ? [] : subjectContentIds,
@@ -121,9 +121,9 @@ export const ManageSubjectsModal: React.FC<{
 
                 <div className="space-y-2 max-h-[60vh] overflow-y-auto pt-2 pr-2">
                     {allSubjects.map(subject => {
-                        const allContentIds = (subject.topics || []).flatMap(t => [t.id, ...(t.subtopics || []).map(st => st.id)]);
+                        const allContentIds = subject.topics.flatMap(t => [t.id, ...t.subtopics.map(st => st.id)]);
                         const discipline = editedDisciplines.find(d => d.subjectId === subject.id);
-                        const includedCount = allContentIds.filter(id => !(discipline?.excludedTopicIds || []).includes(id)).length;
+                        const includedCount = allContentIds.filter(id => !discipline?.excludedTopicIds.includes(id)).length;
                         
                         return (
                             <details key={subject.id} className="bg-gray-800 rounded-lg border border-gray-700" open>
@@ -140,8 +140,8 @@ export const ManageSubjectsModal: React.FC<{
                                     <ChevronDownIcon className="h-5 w-5 transition-transform details-open:rotate-180" />
                                 </summary>
                                 <div className="border-t border-gray-700 p-3 pl-6 space-y-2">
-                                    {(subject.topics || []).map(topic => {
-                                        const allChildIds = [topic.id, ...(topic.subtopics || []).map(st => st.id)];
+                                    {subject.topics.map(topic => {
+                                        const allChildIds = [topic.id, ...topic.subtopics.map(st => st.id)];
                                         const includedChildrenCount = allChildIds.filter(id => !isExcluded(subject.id, id)).length;
 
                                         return (
@@ -156,11 +156,11 @@ export const ManageSubjectsModal: React.FC<{
                                                         onClick={e => e.stopPropagation()}
                                                     />
                                                     <span className="text-sm font-medium text-gray-300 flex-grow">{topic.name}</span>
-                                                    {(topic.subtopics || []).length > 0 && <ChevronDownIcon className="h-4 w-4 transition-transform details-open:rotate-180" />}
+                                                    {topic.subtopics.length > 0 && <ChevronDownIcon className="h-4 w-4 transition-transform details-open:rotate-180" />}
                                                 </summary>
-                                                {(topic.subtopics || []).length > 0 && (
+                                                {topic.subtopics.length > 0 && (
                                                     <div className="pt-2 pl-6 space-y-1">
-                                                        {(topic.subtopics || []).map(subtopic => (
+                                                        {topic.subtopics.map(subtopic => (
                                                             <div key={subtopic.id} className="flex items-center space-x-2 text-sm cursor-pointer p-1 gap-3">
                                                                 <input
                                                                     type="checkbox"

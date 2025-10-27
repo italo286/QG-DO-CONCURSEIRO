@@ -111,8 +111,8 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         const correctQuestionIds = new Set<string>();
         const incorrectQuestionIds = new Set<string>();
         const allAttempts = [
-            ...Object.values(props.studentProgress.progressByTopic || {}).flatMap((s: any) => Object.values(s || {}).flatMap((t: any) => t.lastAttempt || [])),
-            ...(props.studentProgress.reviewSessions || []).flatMap(r => r.attempts || [])
+            ...Object.values(props.studentProgress.progressByTopic).flatMap((s: any) => Object.values(s).flatMap((t: any) => t.lastAttempt)),
+            ...props.studentProgress.reviewSessions.flatMap(r => r.attempts || [])
         ];
         allAttempts.forEach(attempt => {
             if (attempt.isCorrect) correctQuestionIds.add(attempt.questionId);
@@ -120,12 +120,12 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         });
         const finalIncorrectIds = Array.from(incorrectQuestionIds).filter(id => !correctQuestionIds.has(id));
         const allQuestionsWithContext = props.allSubjects.flatMap(subject =>
-            (subject.topics || []).flatMap(topic =>
+            subject.topics.flatMap(topic =>
                 [
-                    ...(topic.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name })),
+                    ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name })),
                     ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name })),
-                    ...(topic.subtopics || []).flatMap(st => [
-                        ...(st.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name })),
+                    ...topic.subtopics.flatMap(st => [
+                        ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name })),
                         ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name })),
                     ])
                 ]
@@ -138,7 +138,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         const today = getLocalDateISOString(new Date());
         const allFlashcards = [
             ...(props.studentProgress?.aiGeneratedFlashcards || []),
-            ...props.allSubjects.flatMap(s => (s.topics || []).flatMap(t => [...(t.flashcards || []), ...(t.subtopics || []).flatMap(st => st.flashcards || [])]))
+            ...props.allSubjects.flatMap(s => s.topics.flatMap(t => [...(t.flashcards || []), ...t.subtopics.flatMap(st => st.flashcards || [])]))
         ];
         const uniqueFlashcards = allFlashcards.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
         if (!props.studentProgress?.srsFlashcardData) return [];
@@ -149,7 +149,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
     }, [props.studentProgress, props.allSubjects]);
 
     const allQuestions = React.useMemo(() => {
-        return props.allSubjects.flatMap(s => (s.topics || []).flatMap(t => [...(t.questions || []), ...(t.tecQuestions || []), ...(t.subtopics || []).flatMap(st => [...(st.questions || []), ...(st.tecQuestions || [])])]));
+        return props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
     }, [props.allSubjects]);
 
 
