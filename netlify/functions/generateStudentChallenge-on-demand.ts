@@ -111,28 +111,51 @@ const getStudentProgress = async (studentId: string): Promise<StudentProgress | 
 const getEnrolledSubjects = async (studentId: string): Promise<Subject[]> => {
     const coursesSnapshot = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
     if (coursesSnapshot.empty) return [];
-    
+
     const subjectIds = new Set<string>();
     coursesSnapshot.docs.forEach(doc => {
         const course = doc.data() as Course;
-        course.disciplines.forEach(d => subjectIds.add(d.subjectId));
+        (course.disciplines || []).forEach(d => subjectIds.add(d.subjectId));
     });
 
     if (subjectIds.size === 0) return [];
-    
-    const subjectIdArray = Array.from(subjectIds);
-    const chunks: string[][] = [];
-    for (let i = 0; i < subjectIdArray.length; i += 10) { chunks.push(subjectIdArray.slice(i, i + 10)); }
 
-    const allSubjects: Subject[] = [];
-    for (const chunk of chunks) {
-        if (chunk.length > 0) {
-            const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-            subjectDocs.docs.forEach(doc => { allSubjects.push({ id: doc.id, ...doc.data() } as Subject); });
-        }
+    const subjectIdArray = Array.from(subjectIds);
+    // Firestore 'in' query is limited to 10 elements
+    const chunks: string[][] = [];
+    for (let i = 0; i < subjectIdArray.length; i += 10) {
+        chunks.push(subjectIdArray.slice(i, i + 10));
     }
-    return allSubjects;
+
+    const subjectPromises: Promise<Subject[]>[] = chunks.map(async (chunk) => {
+        if (chunk.length === 0) return [];
+        
+        const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+        
+        const subjectsWithTopicsPromises = subjectDocs.docs.map(async (doc) => {
+            const subjectData = doc.data();
+            
+            // Fetch topics from the subcollection, which is the new data model
+            const topicsSnapshot = await db.collection('subjects').doc(doc.id).collection('topics').orderBy('order').get();
+            const fetchedTopics: Topic[] = topicsSnapshot.docs.map(topicDoc => ({ id: topicDoc.id, ...topicDoc.data() } as Topic));
+            
+            // Reconstruct the full subject object, ignoring the legacy 'topics' array from the main doc
+            const { topics, ...baseData } = subjectData;
+            
+            return { 
+                id: doc.id,
+                ...baseData,
+                topics: fetchedTopics // This ensures .topics is always an array
+            } as Subject;
+        });
+
+        return Promise.all(subjectsWithTopicsPromises);
+    });
+
+    const subjectsByChunk = await Promise.all(subjectPromises);
+    return subjectsByChunk.flat();
 };
+
 
 const shuffleArray = <T>(array: T[]): T[] => {
     const newArray = [...array];
@@ -157,14 +180,14 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
 
     let allQuestionsWithContext: (Question & { subjectId: string; topicId: string; subjectName: string; topicName: string; isTec: boolean; })[] = [];
     subjectsToConsider.forEach(subject => {
-        subject.topics.forEach(topic => {
+        (subject.topics || []).forEach(topic => {
             const addQuestions = (content: Topic | SubTopic, parentTopicName?: string) => {
                 const topicName = parentTopicName ? `${parentTopicName} / ${content.name}` : content.name;
                 (content.questions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: false }));
                 (content.tecQuestions || []).forEach(q => allQuestionsWithContext.push({ ...q, subjectId: subject.id, topicId: content.id, topicName, subjectName: subject.name, isTec: true }));
             };
             addQuestions(topic);
-            topic.subtopics.forEach(st => addQuestions(st, topic.name));
+            (topic.subtopics || []).forEach(st => addQuestions(st, topic.name));
         });
     });
 
@@ -248,15 +271,22 @@ async function generateGlossaryChallenge(studentProgress: StudentProgress, subje
         subjectsToConsider = subjects.filter(s => subjectIdSet.has(s.id));
     }
 
-    let allTerms = subjectsToConsider.flatMap(s => s.topics.flatMap(t => [...(t.glossary || []), ...t.subtopics.flatMap(st => st.glossary || [])]));
+    let allTerms = subjectsToConsider.flatMap(s => 
+        (s.topics || []).flatMap(t => [
+            ...(t.glossary || []), 
+            ...(t.subtopics || []).flatMap(st => st.glossary || [])
+        ])
+    );
     
     if (studentProgress.glossaryChallengeMode === 'advanced' && studentProgress.advancedGlossaryTopicIds && studentProgress.advancedGlossaryTopicIds.length > 0) {
         const topicIdSet = new Set(studentProgress.advancedGlossaryTopicIds);
-        const termsWithContext = subjectsToConsider.flatMap(s => s.topics.flatMap(t => 
-            (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
-                t.subtopics.flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+        const termsWithContext = subjectsToConsider.flatMap(s => 
+            (s.topics || []).flatMap(t => 
+                (t.glossary || []).map(term => ({...term, topicId: t.id})).concat(
+                    (t.subtopics || []).flatMap(st => (st.glossary || []).map(term => ({...term, topicId: st.id})))
+                )
             )
-        ));
+        );
         allTerms = termsWithContext.filter(t => topicIdSet.has(t.topicId));
     }
 
