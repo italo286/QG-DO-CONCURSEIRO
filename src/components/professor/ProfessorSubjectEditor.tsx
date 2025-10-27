@@ -163,7 +163,7 @@ export const ProfessorSubjectEditor: React.FC<{
                 questions: [],
                 miniGames: [],
                 flashcards: [],
-                subtopics: t.subtopics.map((st, j) => ({
+                subtopics: (t.subtopics || []).map((st, j) => ({
                     name: st.name,
                     description: st.description,
                     id: `st${timestamp}${i}${j}`,
