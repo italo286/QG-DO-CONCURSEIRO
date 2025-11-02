@@ -293,8 +293,6 @@ export const updateSubjectQuestion = async (
         if (isTec) {
             topicData.tecQuestions = updateQuestionInList(topicData.tecQuestions);
         } else {
-            // FIX: Replaced non-null assertion `!` with a safe call. The updateQuestionInList function already handles undefined.
-// FIX: Removed non-null assertion as per the comment's intention. The function handles undefined.
             const updatedQuestions = updateQuestionInList(topicData.questions);
             if (updatedQuestions) {
                 topicData.questions = updatedQuestions;
@@ -308,8 +306,6 @@ export const updateSubjectQuestion = async (
                     const updatedTec = updateQuestionInList(subtopic.tecQuestions);
                     if (updatedTec !== subtopic.tecQuestions) return { ...subtopic, tecQuestions: updatedTec };
                 } else {
-                    // FIX: Replaced non-null assertion `!` with a safe call.
-// FIX: Removed non-null assertion as per the comment's intention.
                     const updatedNormal = updateQuestionInList(subtopic.questions);
                     if (updatedNormal && updatedNormal !== subtopic.questions) {
                          return { ...subtopic, questions: updatedNormal };
@@ -536,6 +532,7 @@ export const createReportNotification = async (
     const timestamp = Date.now();
     // FIX: Fallback to username if student.name is not available to prevent constructing a message with "undefined".
     const studentDisplayName = student.name || student.username;
+    // FIX: Use `studentDisplayName` to ensure a valid string is used in the message.
     const message = `Aluno ${studentDisplayName} reportou um erro na questão "${questionStatement.substring(0, 50)}..." no tópico "${topicName}". Motivo: ${reason}.`;
 
     const newNotification: Omit<TeacherMessage, 'id'> = {
@@ -546,8 +543,7 @@ export const createReportNotification = async (
         acknowledgedBy: [], // No one has seen it yet
         type: 'system',
         context: {
-// FIX: The value for `studentName` must be a string. Using `studentDisplayName` which falls back to the username ensures a string is always provided, resolving the type error.
-// FIX: Replaced `student.name` with `studentDisplayName` to ensure a string is always provided, as per the comment's intention.
+            // FIX: Use `studentDisplayName` to ensure a string is always provided, resolving potential type errors.
             studentName: studentDisplayName,
             subjectName,
             topicName,

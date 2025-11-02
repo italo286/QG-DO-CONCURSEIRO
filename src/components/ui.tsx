@@ -8,15 +8,23 @@ export const Spinner: React.FC = () => (
     </div>
 );
 
-// FIX: Added 'title' to the component's props to allow passing the HTML title attribute.
-export const Button: React.FC<{ onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void; children: React.ReactNode; className?: string; type?: 'button' | 'submit'; disabled?: boolean; title?: string; }> = 
-({ onClick, children, className = '', type = 'button', disabled = false, title }) => (
+// FIX: Added 'title' and 'style' to the component's props to allow passing HTML attributes and custom styling.
+export const Button: React.FC<{
+    onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
+    children: React.ReactNode;
+    className?: string;
+    type?: 'button' | 'submit';
+    disabled?: boolean;
+    title?: string;
+    style?: React.CSSProperties;
+}> = ({ onClick, children, className = '', type = 'button', disabled = false, title, style }) => (
     <button
         type={type}
         onClick={onClick}
         disabled={disabled}
         title={title}
-        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        style={style}
+        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white ${!style?.backgroundColor ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600' : 'hover:brightness-110'} focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
         {children}
     </button>
@@ -219,11 +227,15 @@ export const COLORS = [
   '#ef4444', // red-500
   '#f97316', // orange-500
   '#eab308', // yellow-500
+  '#84cc16', // lime-500
   '#22c55e', // green-500
+  '#14b8a6', // teal-500
   '#0ea5e9', // sky-500
   '#3b82f6', // blue-500
+  '#6366f1', // indigo-500
   '#8b5cf6', // violet-500
   '#d946ef', // fuchsia-500
+  '#ec4899', // pink-500
 ];
 
 export const ColorPalettePicker: React.FC<{
@@ -256,7 +268,7 @@ export const ColorPalettePicker: React.FC<{
             >
             </button>
             {isOpen && (
-                <div className="absolute z-10 top-full mt-2 p-2 bg-gray-900 border border-gray-600 rounded-lg shadow-lg grid grid-cols-4 gap-2">
+                <div className="absolute z-10 top-full mt-2 p-2 bg-gray-900 border border-gray-600 rounded-lg shadow-lg grid grid-cols-6 gap-2">
                     <button
                         onClick={() => { onColorSelect(undefined); setIsOpen(false); }}
                         className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-white"

@@ -100,7 +100,13 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                         </div>
                                         <div className="flex items-center space-x-4 flex-shrink-0 ml-4">
                                             <span className="text-sm text-gray-400">Score: {score}</span>
-                                            <Button onClick={(e) => { e.preventDefault(); onTopicSelect(topic); }} className="text-sm py-1 px-3">Estudar</Button>
+                                            <Button 
+                                                onClick={(e) => { e.preventDefault(); onTopicSelect(topic); }} 
+                                                className="text-sm py-1 px-3"
+                                                style={topic.color ? { backgroundColor: topic.color } : undefined}
+                                            >
+                                                Estudar
+                                            </Button>
                                             <ChevronDownIcon className="h-5 w-5 transition-transform details-open:rotate-180" />
                                         </div>
                                     </div>
@@ -125,7 +131,13 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                                             </div>
                                                             <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
                                                                 <span className="text-xs text-gray-400">Score: {subtopicScore}</span>
-                                                                <Button onClick={() => onTopicSelect(subtopic, topic)} className="text-xs py-1 px-2">Estudar</Button>
+                                                                <Button 
+                                                                    onClick={() => onTopicSelect(subtopic, topic)} 
+                                                                    className="text-xs py-1 px-2"
+                                                                    style={subtopic.color ? { backgroundColor: subtopic.color } : undefined}
+                                                                >
+                                                                    Estudar
+                                                                </Button>
                                                             </div>
                                                         </div>
                                                      </li>
