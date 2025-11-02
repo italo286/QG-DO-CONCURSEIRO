@@ -1,5 +1,3 @@
-
-
 // This file contains types that are shared between the server (Netlify functions)
 // and the client, but do NOT have any frontend-specific dependencies like React.
 
@@ -113,6 +111,7 @@ export interface SubTopic {
   miniGames: MiniGame[];
   flashcards: Flashcard[];
   glossary?: GlossaryTerm[];
+  color?: string;
 }
 
 export interface Topic {
@@ -132,6 +131,7 @@ export interface Topic {
   subtopics: SubTopic[];
   flashcards: Flashcard[];
   glossary?: GlossaryTerm[];
+  color?: string;
 }
 
 export interface Subject {
@@ -140,6 +140,7 @@ export interface Subject {
   name: string;
   description: string;
   topics: Topic[];
+  color?: string;
 }
 
 export interface CourseDiscipline {

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useId, useState } from 'react';
+import { XCircleIcon } from './Icons';
 
 export const Spinner: React.FC = () => (
     <div role="status" className="inline-flex justify-center items-center">
@@ -210,6 +211,70 @@ export const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate })
                     <div className="text-xs uppercase text-gray-400">{unitLabels[unit] || unit}</div>
                 </div>
             ))}
+        </div>
+    );
+};
+
+export const COLORS = [
+  '#ef4444', // red-500
+  '#f97316', // orange-500
+  '#eab308', // yellow-500
+  '#22c55e', // green-500
+  '#0ea5e9', // sky-500
+  '#3b82f6', // blue-500
+  '#8b5cf6', // violet-500
+  '#d946ef', // fuchsia-500
+];
+
+export const ColorPalettePicker: React.FC<{
+    currentColor?: string;
+    onColorSelect: (color: string | undefined) => void;
+}> = ({ currentColor, onColorSelect }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const wrapperRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, [wrapperRef]);
+
+    return (
+        <div ref={wrapperRef} className="relative">
+            <button
+                type="button"
+                onClick={() => setIsOpen(!isOpen)}
+                className="w-6 h-6 rounded-full border-2 border-gray-500 focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                style={{ backgroundColor: currentColor || '#4B5563' }}
+                aria-label="Selecionar cor"
+            >
+            </button>
+            {isOpen && (
+                <div className="absolute z-10 top-full mt-2 p-2 bg-gray-900 border border-gray-600 rounded-lg shadow-lg grid grid-cols-4 gap-2">
+                    <button
+                        onClick={() => { onColorSelect(undefined); setIsOpen(false); }}
+                        className="w-6 h-6 rounded-full bg-gray-600 flex items-center justify-center text-white"
+                        title="Remover cor"
+                    >
+                        <XCircleIcon className="h-5 w-5"/>
+                    </button>
+                    {COLORS.map(color => (
+                        <button
+                            key={color}
+                            onClick={() => { onColorSelect(color); setIsOpen(false); }}
+                            className={`w-6 h-6 rounded-full transition-transform hover:scale-110 ${currentColor === color ? 'ring-2 ring-white' : ''}`}
+                            style={{ backgroundColor: color }}
+                            aria-label={`Cor ${color}`}
+                        />
+                    ))}
+                </div>
+            )}
         </div>
     );
 };

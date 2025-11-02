@@ -293,7 +293,7 @@ export const updateSubjectQuestion = async (
         if (isTec) {
             topicData.tecQuestions = updateQuestionInList(topicData.tecQuestions);
         } else {
-            // FIX: Replaced non-null assertion `!` with a safe check to prevent potential type errors.
+            // FIX: Replaced non-null assertion `!` with a safe call. The updateQuestionInList function already handles undefined.
             const updatedQuestions = updateQuestionInList(topicData.questions);
             if (updatedQuestions) {
                 topicData.questions = updatedQuestions;
@@ -307,8 +307,8 @@ export const updateSubjectQuestion = async (
                     const updatedTec = updateQuestionInList(subtopic.tecQuestions);
                     if (updatedTec !== subtopic.tecQuestions) return { ...subtopic, tecQuestions: updatedTec };
                 } else {
+                    // FIX: Replaced non-null assertion `!` with a safe call.
                     const updatedNormal = updateQuestionInList(subtopic.questions);
-                    // FIX: Replaced non-null assertion `!` with a safe check.
                     if (updatedNormal && updatedNormal !== subtopic.questions) {
                          return { ...subtopic, questions: updatedNormal };
                     }

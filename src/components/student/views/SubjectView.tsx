@@ -55,10 +55,10 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
     const courseDiscipline = course.disciplines.find(d => d.subjectId === subject.id);
     const topicFrequencies = courseDiscipline?.topicFrequencies || {};
     
-    const frequencyClasses: { [key in Frequency]?: string } = {
-        'alta': 'border-red-500',
-        'media': 'border-orange-500',
-        'baixa': 'border-blue-500',
+    const frequencyColors: { [key in Frequency]?: string } = {
+        'alta': '#ef4444',  // red-500
+        'media': '#f97316', // orange-500
+        'baixa': '#3b82f6', // blue-500
     };
     
     const frequencyTitles: { [key in Frequency]?: string } = {
@@ -69,18 +69,26 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
 
     return (
         <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-white">{subject.name}</h2>
+            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                <div 
+                    className="w-4 h-8 rounded"
+                    style={{ backgroundColor: subject.color || 'transparent' }}
+                ></div>
+                {subject.name}
+            </h2>
             <p className="text-gray-400">{subject.description}</p>
             <ul className="space-y-3">
                 {subject.topics.map(topic => {
                     const topicProgress = subjectProgressData?.[topic.id];
                     const score = topicProgress?.score !== undefined ? `${Math.round(topicProgress.score * 100)}%` : 'N/A';
                     const frequency = topicFrequencies[topic.id] as Frequency;
-                    const topicBorderClass = frequencyClasses[frequency] || 'border-l-transparent';
+                    const topicStyle = {
+                        borderLeftColor: topic.color || frequencyColors[frequency] || 'transparent'
+                    };
 
                     return (
                         <li key={topic.id}>
-                            <details className={`bg-gray-800 rounded-lg border border-gray-700/50 border-l-4 ${topicBorderClass}`} open title={frequencyTitles[frequency]}>
+                            <details className="bg-gray-800 rounded-lg border border-gray-700/50 border-l-4" style={topicStyle} open title={frequencyTitles[frequency]}>
                                 <summary className="p-4 cursor-pointer list-none">
                                     <div className="flex justify-between items-center">
                                         <div className="flex-grow min-w-0">
@@ -103,10 +111,12 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                                 const subtopicProgress = subjectProgressData?.[subtopic.id];
                                                 const subtopicScore = subtopicProgress?.score !== undefined ? `${Math.round(subtopicProgress.score * 100)}%` : 'N/A';
                                                 const subtopicFrequency = topicFrequencies[subtopic.id] as Frequency;
-                                                const subtopicBorderClass = frequencyClasses[subtopicFrequency] || 'border-l-transparent';
+                                                const subtopicStyle = {
+                                                    borderLeftColor: subtopic.color || frequencyColors[subtopicFrequency] || 'transparent'
+                                                };
 
                                                 return (
-                                                     <li key={subtopic.id} className={`p-2 pl-4 bg-gray-700/50 rounded-md border-l-4 ${subtopicBorderClass}`} title={frequencyTitles[subtopicFrequency]}>
+                                                     <li key={subtopic.id} className="p-2 pl-4 bg-gray-700/50 rounded-md border-l-4" style={subtopicStyle} title={frequencyTitles[subtopicFrequency]}>
                                                         <div className="flex justify-between items-center">
                                                             <div className="flex-grow min-w-0">
                                                                 <span className="text-sm text-gray-300 flex items-center">{subtopic.name}</span>

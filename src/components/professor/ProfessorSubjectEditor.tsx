@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback, DragEvent, TouchEvent } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { Subject, Topic, SubTopic } from '../../types';
-import { Card, Button, Spinner } from '../ui';
+import { Card, Button, Spinner, ColorPalettePicker } from '../ui';
 import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
@@ -52,6 +52,7 @@ export const ProfessorSubjectEditor: React.FC<{
     const [currentSubject, setCurrentSubject] = useState(subject);
     const [localName, setLocalName] = useState(subject.name);
     const [localDescription, setLocalDescription] = useState(subject.description);
+    const [localColor, setLocalColor] = useState(subject.color);
 
     const [isSaving, setIsSaving] = useState(false);
     
@@ -70,6 +71,7 @@ export const ProfessorSubjectEditor: React.FC<{
         setCurrentSubject(subject);
         setLocalName(subject.name);
         setLocalDescription(subject.description);
+        setLocalColor(subject.color);
     }, [subject]);
 
     const updateSubjectStateAndDb = useCallback(async (updatedSubject: Subject) => {
@@ -82,7 +84,7 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const handleDetailsBlur = () => {
         if (localName !== subject.name || localDescription !== subject.description) {
-            const updatedSubject = { ...currentSubject, name: localName, description: localDescription };
+            const updatedSubject = { ...currentSubject, name: localName, description: localDescription, color: localColor };
             updateSubjectStateAndDb(updatedSubject);
             setToastMessage("Detalhes da disciplina salvos.");
         }
@@ -349,13 +351,42 @@ export const ProfessorSubjectEditor: React.FC<{
         e.stopPropagation();
     };
 
+    const handleTopicColorChange = (topicId: string, color: string | undefined) => {
+        const updatedTopics = currentSubject.topics.map(t => 
+            t.id === topicId ? { ...t, color } : t
+        );
+        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
+    };
+
+    const handleSubtopicColorChange = (parentTopicId: string, subtopicId: string, color: string | undefined) => {
+        const updatedTopics = currentSubject.topics.map(t => {
+            if (t.id === parentTopicId) {
+                const updatedSubtopics = t.subtopics.map(st => 
+                    st.id === subtopicId ? { ...st, color } : st
+                );
+                return { ...t, subtopics: updatedSubtopics };
+            }
+            return t;
+        });
+        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
+    };
+
 
     return (
         <div className="max-w-4xl mx-auto">
             <Card className="p-6 relative">
                  {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
                  <div className="flex justify-between items-start">
-                    <div>
+                    <div className="flex items-center gap-4">
+                        <ColorPalettePicker 
+                            currentColor={localColor}
+                            onColorSelect={(color) => {
+                                setLocalColor(color);
+                                const updatedSubject = { ...currentSubject, name: localName, description: localDescription, color: color };
+                                updateSubjectStateAndDb(updatedSubject);
+                                setToastMessage("Cor da disciplina atualizada.");
+                            }}
+                        />
                         <label htmlFor="subject-name-editor" className="sr-only">Nome da disciplina</label>
                         <input 
                             id="subject-name-editor"
@@ -414,7 +445,13 @@ export const ProfessorSubjectEditor: React.FC<{
                         >
                             <summary className="p-4 list-none cursor-pointer">
                                 <div className="flex justify-between items-center">
-                                    <span className="font-semibold text-gray-200">{topic.name}</span>
+                                    <div className="flex items-center gap-3">
+                                        <ColorPalettePicker 
+                                            currentColor={topic.color}
+                                            onColorSelect={(color) => handleTopicColorChange(topic.id, color)}
+                                        />
+                                        <span className="font-semibold text-gray-200">{topic.name}</span>
+                                    </div>
                                     <div className="flex items-center space-x-2">
                                         <button onClick={(e) => {e.stopPropagation(); handleOpenSubTopicModal(null, topic)}} className="p-1 text-gray-400 hover:text-green-400 text-xs bg-gray-700 rounded-md" aria-label={`Adicionar subtópico em ${topic.name}`}>Adicionar Subtópico</button>
                                         <button onClick={(e) => {e.stopPropagation(); handleOpenTopicModal(topic)}} className="p-2 text-gray-400 hover:text-cyan-400" aria-label={`Editar tópico ${topic.name}`}><PencilIcon className="h-5 w-5"/></button>
@@ -445,7 +482,13 @@ export const ProfessorSubjectEditor: React.FC<{
                                                 className={`p-2 pl-4 bg-gray-700/50 rounded-md transition-opacity ${draggedSubtopicInfo !== null ? 'cursor-grabbing' : 'cursor-grab'} ${draggedSubtopicInfo?.parentIndex === index && draggedSubtopicInfo?.subtopicIndex === subIndex ? 'opacity-30' : 'opacity-100'}`}
                                             >
                                                 <div className="flex justify-between items-center">
-                                                    <span className="text-sm text-gray-300">{subtopic.name}</span>
+                                                    <div className="flex items-center gap-3">
+                                                        <ColorPalettePicker 
+                                                            currentColor={subtopic.color}
+                                                            onColorSelect={(color) => handleSubtopicColorChange(topic.id, subtopic.id, color)}
+                                                        />
+                                                        <span className="text-sm text-gray-300">{subtopic.name}</span>
+                                                    </div>
                                                     <div className="flex space-x-2">
                                                         <button onClick={() => handleOpenSubTopicModal(subtopic, topic)} className="p-1 text-gray-400 hover:text-cyan-400" aria-label={`Editar subtópico ${subtopic.name}`}><PencilIcon className="h-4 w-4"/></button>
                                                         <button onClick={() => handleDeleteSubTopic(subtopic.id, subtopic.name, topic)} className="p-1 text-gray-400 hover:text-red-500" aria-label={`Apagar subtópico ${subtopic.name}`}><TrashIcon className="h-4 w-4" /></button>
