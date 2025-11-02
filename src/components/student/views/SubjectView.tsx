@@ -1,6 +1,6 @@
 import React from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
-import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon } from '../../Icons';
+import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../../Icons';
 import { Button } from '../../ui';
 
 type Frequency = 'alta' | 'media' | 'baixa' | 'nenhuma';
@@ -25,6 +25,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
         { label: 'PDFs da Aula', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
         { label: 'PDFs de Resumo', icon: DocumentTextIcon, count: calculateTotal(c => c.summaryPdfs) },
         { label: 'PDFs de Raio X', icon: ChartLineIcon, count: calculateTotal(c => c.raioXPdfs) },
+        { label: 'Vídeos', icon: VideoCameraIcon, count: calculateTotal(c => c.videoUrls) },
         { label: 'Questões de Conteúdo', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) },
         { label: 'Questões (TEC)', icon: ClipboardCheckIcon, count: calculateTotal(c => c.tecQuestions) },
         { label: 'Jogos', icon: GameControllerIcon, count: calculateTotal(c => c.miniGames) },

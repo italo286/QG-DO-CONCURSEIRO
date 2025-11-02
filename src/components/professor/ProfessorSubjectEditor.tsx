@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, DragEvent, TouchEvent } from '
 import * as FirebaseService from '../../services/firebaseService';
 import { Subject, Topic, SubTopic } from '../../types';
 import { Card, Button, Spinner, ColorPalettePicker } from '../ui';
-import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon } from '../Icons';
+import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
 import { ProfessorSubTopicEditor } from './ProfessorSubTopicEditor';
@@ -20,6 +20,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
         { label: 'PDFs da Aula', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
         { label: 'PDFs de Resumo', icon: DocumentTextIcon, count: calculateTotal(c => c.summaryPdfs) },
         { label: 'PDFs de Raio X', icon: ChartLineIcon, count: calculateTotal(c => c.raioXPdfs) },
+        { label: 'Vídeos', icon: VideoCameraIcon, count: calculateTotal(c => c.videoUrls) },
         { label: 'Questões de Conteúdo', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) },
         { label: 'Questões (TEC)', icon: ClipboardCheckIcon, count: calculateTotal(c => c.tecQuestions) },
         { label: 'Jogos', icon: GameControllerIcon, count: calculateTotal(c => c.miniGames) },
