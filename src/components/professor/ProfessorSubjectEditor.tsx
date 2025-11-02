@@ -64,6 +64,7 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const [isAiTopicModalOpen, setIsAiTopicModalOpen] = useState(false);
     const [draggedTopicIndex, setDraggedTopicIndex] = useState<number | null>(null);
+    const [draggedSubtopicInfo, setDraggedSubtopicInfo] = useState<{ parentIndex: number; subtopicIndex: number } | null>(null);
     
     useEffect(() => {
         setCurrentSubject(subject);
@@ -267,6 +268,87 @@ export const ProfessorSubjectEditor: React.FC<{
         }
         setDraggedTopicIndex(null); // Always reset
     };
+    
+    // --- NEW SUBTOPIC DRAG HANDLERS ---
+    const handleSubtopicDragStart = (e: DragEvent<HTMLDivElement>, parentIndex: number, subtopicIndex: number) => {
+        setDraggedSubtopicInfo({ parentIndex, subtopicIndex });
+        e.dataTransfer.effectAllowed = 'move';
+        e.stopPropagation(); // Prevent topic drag from firing
+    };
+
+    const handleSubtopicDragOver = (e: DragEvent<HTMLDivElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+    };
+
+    const reorderSubtopics = (dragParentIndex: number, dragSubtopicIndex: number, dropParentIndex: number, dropSubtopicIndex: number) => {
+        if (dragParentIndex !== dropParentIndex) return;
+
+        const newTopics = [...currentSubject.topics];
+        const parentTopic = newTopics[dragParentIndex];
+        const newSubtopics = [...parentTopic.subtopics];
+        const [draggedItem] = newSubtopics.splice(dragSubtopicIndex, 1);
+        newSubtopics.splice(dropSubtopicIndex, 0, draggedItem);
+
+        parentTopic.subtopics = newSubtopics;
+        const updatedSubject = { ...currentSubject, topics: newTopics };
+        updateSubjectStateAndDb(updatedSubject);
+    }
+
+    const handleSubtopicDrop = (dropParentIndex: number, dropSubtopicIndex: number) => {
+        if (!draggedSubtopicInfo || draggedSubtopicInfo.parentIndex !== dropParentIndex) {
+            setDraggedSubtopicInfo(null);
+            return;
+        }
+
+        const { parentIndex, subtopicIndex: dragSubtopicIndex } = draggedSubtopicInfo;
+
+        if (dragSubtopicIndex !== dropSubtopicIndex) {
+            reorderSubtopics(parentIndex, dragSubtopicIndex, dropParentIndex, dropSubtopicIndex);
+        }
+        
+        setDraggedSubtopicInfo(null);
+    };
+
+    const handleSubtopicDragEnd = (e: DragEvent<HTMLDivElement>) => {
+        setDraggedSubtopicInfo(null);
+        e.stopPropagation();
+    };
+    
+    // --- NEW SUBTOPIC TOUCH HANDLERS ---
+    const handleSubtopicTouchStart = (e: TouchEvent<HTMLDivElement>, parentIndex: number, subtopicIndex: number) => {
+        setDraggedSubtopicInfo({ parentIndex, subtopicIndex });
+        e.currentTarget.classList.add('dragging-touch');
+        e.stopPropagation();
+    };
+
+    const handleSubtopicTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
+        if (!draggedSubtopicInfo) return;
+        
+        const draggedElement = document.querySelector('.dragging-touch');
+        draggedElement?.classList.remove('dragging-touch');
+        
+        const touch = e.changedTouches[0];
+        const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
+        
+        if (!elementUnder) {
+            setDraggedSubtopicInfo(null);
+            return;
+        }
+
+        const dropTarget = elementUnder.closest('[data-subtopic-index]');
+        if (dropTarget) {
+            const dropParentIndex = Number((dropTarget as HTMLElement).dataset.parentIndex);
+            const dropSubtopicIndex = Number((dropTarget as HTMLElement).dataset.subtopicIndex);
+
+            if (draggedSubtopicInfo.parentIndex === dropParentIndex && draggedSubtopicInfo.subtopicIndex !== dropSubtopicIndex) {
+                reorderSubtopics(draggedSubtopicInfo.parentIndex, draggedSubtopicInfo.subtopicIndex, dropParentIndex, dropSubtopicIndex);
+            }
+        }
+        setDraggedSubtopicInfo(null);
+        e.stopPropagation();
+    };
+
 
     return (
         <div className="max-w-4xl mx-auto">
@@ -344,9 +426,24 @@ export const ProfessorSubjectEditor: React.FC<{
                             </summary>
                             <div className="border-t border-gray-700 px-4 pb-4">
                                 {topic.subtopics.length > 0 ? (
-                                    <div className="space-y-2 pt-3">
-                                        {topic.subtopics.map(subtopic => (
-                                            <div key={subtopic.id} className="p-2 pl-4 bg-gray-700/50 rounded-md">
+                                    <div
+                                        className="space-y-2 pt-3"
+                                        onTouchMove={handleTouchMove}
+                                        onTouchEnd={handleSubtopicTouchEnd}
+                                    >
+                                        {topic.subtopics.map((subtopic, subIndex) => (
+                                            <div
+                                                key={subtopic.id}
+                                                draggable
+                                                onDragStart={(e) => handleSubtopicDragStart(e, index, subIndex)}
+                                                onDragOver={handleSubtopicDragOver}
+                                                onDrop={() => handleSubtopicDrop(index, subIndex)}
+                                                onDragEnd={handleSubtopicDragEnd}
+                                                onTouchStart={(e) => handleSubtopicTouchStart(e, index, subIndex)}
+                                                data-parent-index={index}
+                                                data-subtopic-index={subIndex}
+                                                className={`p-2 pl-4 bg-gray-700/50 rounded-md transition-opacity ${draggedSubtopicInfo !== null ? 'cursor-grabbing' : 'cursor-grab'} ${draggedSubtopicInfo?.parentIndex === index && draggedSubtopicInfo?.subtopicIndex === subIndex ? 'opacity-30' : 'opacity-100'}`}
+                                            >
                                                 <div className="flex justify-between items-center">
                                                     <span className="text-sm text-gray-300">{subtopic.name}</span>
                                                     <div className="flex space-x-2">
