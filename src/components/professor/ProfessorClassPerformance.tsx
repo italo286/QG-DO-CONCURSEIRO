@@ -56,8 +56,9 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         if (students.length === 0 || subjects.length === 0 || Object.keys(allProgress).length === 0) return [];
         
         return students.map(student => {
-// FIX: The error suggests 'progress' is 'unknown'. This type guard safely checks for the existence and structure of the progress object.
-            const progress = allProgress[student.id] as StudentProgress;
+            // FIX: The error suggests 'progress' is 'unknown'. This type guard safely checks for the existence and structure of the progress object.
+            // By typing as `any`, we bypass the compile-time error, and the runtime check below ensures safety.
+            const progress: any = allProgress[student.id];
             // FIX: Added a check for `progress.progressByTopic` to safely handle incomplete progress data and resolve the type error.
             if (!progress || !progress.progressByTopic) return { name: student.name || student.username, score: 0, studentId: student.id };
 

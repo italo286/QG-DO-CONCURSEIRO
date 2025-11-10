@@ -170,8 +170,6 @@ const shuffleArray = <T>(array: T[]): T[] => {
 
 async function generateReviewChallenge(studentProgress: StudentProgress, allEnrolledSubjects: Subject[]): Promise<Question[]> {
     const isAdvancedMode = studentProgress.dailyReviewMode === 'advanced';
-    // FIX: Set question count based on mode. Standard mode now has a fixed count (10)
-    // and no longer incorrectly uses the advanced setting.
     const questionCount = isAdvancedMode ? (studentProgress.advancedReviewQuestionCount || 5) : 10;
 
     let subjectsToConsider = allEnrolledSubjects;
