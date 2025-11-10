@@ -169,11 +169,14 @@ const shuffleArray = <T>(array: T[]): T[] => {
 // --- Challenge Generation Logic ---
 
 async function generateReviewChallenge(studentProgress: StudentProgress, allEnrolledSubjects: Subject[]): Promise<Question[]> {
-    const questionCount = studentProgress.advancedReviewQuestionCount || 5;
+    const isAdvancedMode = studentProgress.dailyReviewMode === 'advanced';
+    // FIX: Set question count based on mode. Standard mode now has a fixed count (10)
+    // and no longer incorrectly uses the advanced setting.
+    const questionCount = isAdvancedMode ? (studentProgress.advancedReviewQuestionCount || 5) : 10;
 
     let subjectsToConsider = allEnrolledSubjects;
     
-    if (studentProgress.dailyReviewMode === 'advanced' && studentProgress.advancedReviewSubjectIds && studentProgress.advancedReviewSubjectIds.length > 0) {
+    if (isAdvancedMode && studentProgress.advancedReviewSubjectIds && studentProgress.advancedReviewSubjectIds.length > 0) {
         const subjectIdSet = new Set(studentProgress.advancedReviewSubjectIds);
         subjectsToConsider = allEnrolledSubjects.filter(s => subjectIdSet.has(s.id));
     }
@@ -193,7 +196,7 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
 
     if (allQuestionsWithContext.length === 0) return [];
 
-    if (studentProgress.dailyReviewMode === 'advanced') {
+    if (isAdvancedMode) {
         let filteredQuestions = allQuestionsWithContext;
         const topicIds = studentProgress.advancedReviewTopicIds;
         if (topicIds && topicIds.length > 0) {
@@ -259,7 +262,9 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
             } else break;
         }
     }
-    return shuffleArray(prioritizedQuestions);
+    // FIX: Safely slice the result to ensure it respects the question count.
+    const finalStandardQuestions = shuffleArray(prioritizedQuestions);
+    return finalStandardQuestions.slice(0, questionCount);
 }
 
 async function generateGlossaryChallenge(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {

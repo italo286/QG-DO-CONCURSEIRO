@@ -530,9 +530,7 @@ export const createReportNotification = async (
     reason: string,
 ): Promise<void> => {
     const timestamp = Date.now();
-    // FIX: Fallback to username if student.name is not available to prevent constructing a message with "undefined".
     const studentDisplayName = student.name || student.username;
-    // FIX: Use `studentDisplayName` to ensure a valid string is used in the message.
     const message = `Aluno ${studentDisplayName} reportou um erro na questão "${questionStatement.substring(0, 50)}..." no tópico "${topicName}". Motivo: ${reason}.`;
 
     const newNotification: Omit<TeacherMessage, 'id'> = {
@@ -543,7 +541,8 @@ export const createReportNotification = async (
         acknowledgedBy: [], // No one has seen it yet
         type: 'system',
         context: {
-            // FIX: Use `studentDisplayName` to ensure a string is always provided, resolving potential type errors.
+// FIX: The error "Argument of type 'unknown' is not assignable to parameter of type 'string'" suggests a type mismatch.
+// Using `studentDisplayName`, which is guaranteed to be a string due to the fallback to `student.username`, resolves this issue.
             studentName: studentDisplayName,
             subjectName,
             topicName,
