@@ -2,8 +2,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon, BookOpenIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon, BookOpenIcon, DownloadIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 export const StudentScheduler: React.FC<{
     fullStudyPlan: StudyPlan;
@@ -11,6 +13,7 @@ export const StudentScheduler: React.FC<{
     onSaveFullPlan: (fullPlan: StudyPlan) => Promise<void>;
 }> = ({ fullStudyPlan, subjects, onSaveFullPlan }) => {
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
+    const [isReadOnly, setIsReadOnly] = useState(false);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newPlanName, setNewPlanName] = useState('');
     const [isSaving, setIsSaving] = useState(false);
@@ -26,7 +29,6 @@ export const StudentScheduler: React.FC<{
     const plans = fullStudyPlan.plans || [];
     const editingPlan = plans.find(p => p.id === editingPlanId);
 
-    // Reset picker state when modal opens/closes
     useEffect(() => {
         if (!isPickerOpen) {
             setSelectedSubjectForPicker(null);
@@ -49,16 +51,12 @@ export const StudentScheduler: React.FC<{
 
     const filteredPickerItems = useMemo(() => {
         let items = allTopicsAndSubtopics;
-        
         if (selectedSubjectForPicker) {
             items = items.filter(item => item.subjectId === selectedSubjectForPicker);
         }
-
         if (!pickerSearch.trim()) return items;
         const search = pickerSearch.toLowerCase();
-        return items.filter(item => 
-            item.name.toLowerCase().includes(search)
-        );
+        return items.filter(item => item.name.toLowerCase().includes(search));
     }, [allTopicsAndSubtopics, pickerSearch, selectedSubjectForPicker]);
 
     const getTopicName = (topicId: string) => {
@@ -75,11 +73,7 @@ export const StudentScheduler: React.FC<{
             id: `plan-${Date.now()}`,
             name: newPlanName,
             type: 'standard',
-            settings: {
-                recurrence: 'weekly',
-                notifications: true,
-                intensity: 'moderate'
-            },
+            settings: { recurrence: 'weekly', notifications: true, intensity: 'moderate' },
             weeklyRoutine: {}
         };
         const updatedPlan: StudyPlan = {
@@ -120,12 +114,48 @@ export const StudentScheduler: React.FC<{
         }
     }
 
+    const handleDownloadPdf = () => {
+        if (!editingPlan) return;
+        const doc = new jsPDF('landscape');
+        const days = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+        
+        doc.setFontSize(18);
+        doc.text(`Cronograma: ${editingPlan.name}`, 14, 15);
+        doc.setFontSize(10);
+        doc.text(`Gerado em: ${new Date().toLocaleDateString()}`, 14, 22);
+
+        const allTimes = new Set<string>();
+        Object.values(editingPlan.weeklyRoutine).forEach(day => {
+            Object.keys(day).forEach(t => allTimes.add(t));
+        });
+        const sortedTimes = Array.from(allTimes).sort();
+
+        const tableBody = sortedTimes.map(time => {
+            const row = [time];
+            for (let d = 0; d <= 6; d++) {
+                const content = editingPlan.weeklyRoutine[d]?.[time] || '';
+                const isTopic = content.startsWith('t') || content.startsWith('st');
+                row.push(isTopic ? getTopicName(content) : content);
+            }
+            return row;
+        });
+
+        autoTable(doc, {
+            head: [['Hora', ...days]],
+            body: tableBody,
+            startY: 28,
+            styles: { fontSize: 8, cellPadding: 2 },
+            headStyles: { fillColor: [14, 165, 233] }
+        });
+
+        doc.save(`${editingPlan.name}.pdf`);
+        setToastMessage("PDF gerado com sucesso!");
+    };
+
     const updatePlanSettings = (field: string, value: any) => {
         if (!editingPlan) return;
         const newPlans = plans.map(p => {
-            if (p.id === editingPlanId) {
-                return { ...p, settings: { ...p.settings, [field]: value } };
-            }
+            if (p.id === editingPlanId) return { ...p, settings: { ...p.settings, [field]: value } };
             return p;
         });
         onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
@@ -148,21 +178,17 @@ export const StudentScheduler: React.FC<{
 
     const addTimeSlot = () => {
         if (!editingPlan) return;
-        
         const currentTimes = new Set<string>();
         Object.values(editingPlan.weeklyRoutine).forEach(day => {
             Object.keys(day).forEach(t => currentTimes.add(t));
         });
-
         let nextTime = "08:00";
         if (currentTimes.size > 0) {
             const sorted = Array.from(currentTimes).sort();
             const last = sorted[sorted.length - 1];
             const [h, m] = last.split(':').map(Number);
-            nextTime = `${(h + 1).toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+            nextTime = `${((h + 1) % 24).toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
         }
-
-        // Adiciona um placeholder vazio na segunda-feira para a linha aparecer
         updatePlanRoutine(1, nextTime, "");
     };
 
@@ -172,7 +198,7 @@ export const StudentScheduler: React.FC<{
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
                 for (let d = 0; d <= 6; d++) {
-                    if (routine[d] && routine[d].hasOwnProperty(oldTime)) {
+                    if (routine[d]?.hasOwnProperty(oldTime)) {
                         routine[d][newTime] = routine[d][oldTime];
                         delete routine[d][oldTime];
                     }
@@ -189,9 +215,7 @@ export const StudentScheduler: React.FC<{
         const newPlans = plans.map(p => {
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
-                for (let d = 0; d <= 6; d++) {
-                    if (routine[d]) delete routine[d][time];
-                }
+                for (let d = 0; d <= 6; d++) if (routine[d]) delete routine[d][time];
                 return { ...p, weeklyRoutine: routine };
             }
             return p;
@@ -217,53 +241,61 @@ export const StudentScheduler: React.FC<{
             <div className="flex flex-col gap-4 h-[calc(100vh-130px)] animate-fade-in">
                 {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
                 
-                {/* Header Integrado e Compacto */}
                 <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-800/60 p-4 rounded-xl border border-gray-700/50 shadow-lg">
                     <div className="flex items-center gap-4">
-                        <button onClick={() => setEditingPlanId(null)} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-cyan-400 transition-colors shadow-sm border border-gray-600">
+                        <button onClick={() => setEditingPlanId(null)} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-cyan-400 transition-colors shadow-sm border border-gray-600" title="Voltar para galeria">
                             <ArrowRightIcon className="h-5 w-5 rotate-180" />
                         </button>
                         <div>
                             <h2 className="text-xl font-bold text-white flex items-center gap-3">
                                 {editingPlan.name}
-                                <span className="hidden sm:inline text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Editor</span>
+                                <button 
+                                    onClick={() => setIsReadOnly(!isReadOnly)}
+                                    className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase transition-all border ${isReadOnly ? 'bg-amber-500/20 text-amber-400 border-amber-500/40' : 'bg-cyan-500/20 text-cyan-400 border-cyan-500/40'}`}
+                                >
+                                    {isReadOnly ? 'Modo Visualização' : 'Modo Edição'}
+                                </button>
                             </h2>
                         </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 sm:gap-4">
-                        {/* Recorrência */}
-                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
-                            <CycleIcon className="h-4 w-4 text-cyan-400" />
-                            <select 
-                                value={editingPlan.settings?.recurrence}
-                                onChange={(e) => updatePlanSettings('recurrence', e.target.value)}
-                                className="bg-transparent text-xs font-bold text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
-                            >
-                                <option value="weekly">Semanal</option>
-                                <option value="once">Única</option>
-                            </select>
-                        </div>
-
-                        {/* Notificações */}
-                        <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
-                            <BellIcon className={`h-4 w-4 ${editingPlan.settings?.notifications ? 'text-emerald-400' : 'text-gray-500'}`} />
-                            <button 
-                                onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
-                                className={`w-8 h-4 rounded-full relative transition-all ${editingPlan.settings?.notifications ? 'bg-emerald-600' : 'bg-gray-700'}`}
-                            >
-                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-4.5' : 'left-0.5'}`} />
-                            </button>
-                        </div>
-
-                        {/* Salvar */}
-                        <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-6 bg-emerald-600 hover:bg-emerald-500 border-none shadow-lg shadow-emerald-900/20 font-bold">
-                            {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar</>}
+                        <Button onClick={handleDownloadPdf} className="text-xs py-2 px-4 bg-gray-700 hover:bg-gray-600 border-none">
+                            <DownloadIcon className="h-4 w-4 mr-2" /> PDF
                         </Button>
+                        
+                        {!isReadOnly && (
+                            <>
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
+                                    <CycleIcon className="h-4 w-4 text-cyan-400" />
+                                    <select 
+                                        value={editingPlan.settings?.recurrence}
+                                        onChange={(e) => updatePlanSettings('recurrence', e.target.value)}
+                                        className="bg-transparent text-xs font-bold text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
+                                    >
+                                        <option value="weekly">Semanal</option>
+                                        <option value="once">Única</option>
+                                    </select>
+                                </div>
+
+                                <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
+                                    <BellIcon className={`h-4 w-4 ${editingPlan.settings?.notifications ? 'text-emerald-400' : 'text-gray-500'}`} />
+                                    <button 
+                                        onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
+                                        className={`w-8 h-4 rounded-full relative transition-all ${editingPlan.settings?.notifications ? 'bg-emerald-600' : 'bg-gray-700'}`}
+                                    >
+                                        <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-4.5' : 'left-0.5'}`} />
+                                    </button>
+                                </div>
+
+                                <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-6 bg-emerald-600 hover:bg-emerald-500 border-none shadow-lg shadow-emerald-900/20 font-bold">
+                                    {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar</>}
+                                </Button>
+                            </>
+                        )}
                     </div>
                 </div>
 
-                {/* Grid Full Width - Ocupa o máximo de espaço */}
                 <Card className="flex-grow p-1 overflow-hidden flex flex-col bg-gray-900/20 border-gray-800">
                     <div className="flex-grow overflow-y-auto custom-scrollbar">
                         <WeeklyStudyGrid 
@@ -276,94 +308,51 @@ export const StudentScheduler: React.FC<{
                             selectedTopicId={null}
                             getTopicName={getTopicName}
                             getTopicColor={getTopicColor}
+                            readOnly={isReadOnly}
                         />
                     </div>
                 </Card>
 
-                {/* Modal Global de Picker - Estilo Redesenhado */}
-                <Modal 
-                    isOpen={isPickerOpen} 
-                    onClose={() => setIsPickerOpen(false)} 
-                    title={selectedSubjectForPicker ? "Escolher Conteúdo" : "Selecione a Disciplina"} 
-                    size="2xl"
-                >
+                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title={selectedSubjectForPicker ? "Escolher Conteúdo" : "Selecione a Disciplina"} size="2xl">
                     <div className="space-y-6">
                         {!selectedSubjectForPicker ? (
-                            /* Passo 1: Seleção de Disciplina */
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
                                 {subjects.map(subject => (
-                                    <button
-                                        key={subject.id}
-                                        onClick={() => setSelectedSubjectForPicker(subject.id)}
-                                        className="text-left p-4 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all flex items-center gap-4 group"
-                                    >
-                                        <div 
-                                            className="w-3 h-8 rounded-full shadow-sm flex-shrink-0" 
-                                            style={{ backgroundColor: subject.color || '#4B5563' }}
-                                        />
+                                    <button key={subject.id} onClick={() => setSelectedSubjectForPicker(subject.id)} className="text-left p-4 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all flex items-center gap-4 group">
+                                        <div className="w-3 h-8 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: subject.color || '#4B5563' }} />
                                         <div className="min-w-0">
                                             <p className="font-bold text-white group-hover:text-cyan-400 transition-colors truncate">{subject.name}</p>
                                             <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{subject.topics.length} Tópicos</p>
                                         </div>
                                     </button>
                                 ))}
-                                {subjects.length === 0 && (
-                                    <div className="col-span-full text-center py-12 text-gray-500 italic">
-                                        Nenhuma disciplina disponível.
-                                    </div>
-                                )}
                             </div>
                         ) : (
-                            /* Passo 2: Seleção de Tópico */
                             <div className="space-y-4 animate-fade-in">
                                 <div className="flex items-center justify-between gap-4">
-                                    <button 
-                                        onClick={() => setSelectedSubjectForPicker(null)}
-                                        className="text-cyan-400 text-xs font-bold flex items-center gap-1 hover:underline"
-                                    >
+                                    <button onClick={() => setSelectedSubjectForPicker(null)} className="text-cyan-400 text-xs font-bold flex items-center gap-1 hover:underline">
                                         <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Disciplinas
                                     </button>
                                     <span className="text-[10px] bg-gray-700 text-gray-400 px-2 py-1 rounded font-bold uppercase">
                                         {subjects.find(s => s.id === selectedSubjectForPicker)?.name}
                                     </span>
                                 </div>
-
                                 <div className="relative">
                                     <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
-                                    <input 
-                                        type="text"
-                                        value={pickerSearch}
-                                        onChange={e => setPickerSearch(e.target.value)}
-                                        placeholder="Filtrar nesta disciplina..."
-                                        className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                                        autoFocus
-                                    />
+                                    <input type="text" value={pickerSearch} onChange={e => setPickerSearch(e.target.value)} placeholder="Filtrar nesta disciplina..." className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all" autoFocus />
                                 </div>
-
                                 <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
                                     {filteredPickerItems.map(item => (
-                                        <button
-                                            key={item.id}
-                                            onClick={() => handlePickTopic(item.id)}
-                                            className="w-full text-left p-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all group"
-                                        >
+                                        <button key={item.id} onClick={() => handlePickTopic(item.id)} className="w-full text-left p-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all group">
                                             <div className="flex items-center justify-between">
                                                 <div className="min-w-0 pr-4">
                                                     <p className="text-[9px] uppercase font-bold text-cyan-500/70 mb-0.5 truncate">{item.subjectName}</p>
                                                     <p className="font-bold text-white group-hover:text-cyan-400 transition-colors text-sm truncate">{item.name}</p>
                                                 </div>
-                                                <div 
-                                                    className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" 
-                                                    style={{ backgroundColor: item.color || '#0ea5e9' }}
-                                                />
+                                                <div className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: item.color || '#0ea5e9' }} />
                                             </div>
                                         </button>
                                     ))}
-                                    {filteredPickerItems.length === 0 && (
-                                        <div className="text-center py-8 text-gray-500 italic">
-                                            Nenhum tópico encontrado para "{pickerSearch}"
-                                        </div>
-                                    )}
                                 </div>
                             </div>
                         )}
@@ -376,24 +365,11 @@ export const StudentScheduler: React.FC<{
     return (
         <div className="space-y-8 animate-fade-in">
             {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
-            
-            <ConfirmModal 
-                isOpen={!!confirmDeleteId}
-                onClose={() => setConfirmDeleteId(null)}
-                onConfirm={executeDeletePlan}
-                title="Excluir Planejamento"
-                message="Tem certeza que deseja excluir este planejamento permanentemente? Esta ação não pode ser desfeita."
-                confirmLabel="Excluir"
-                variant="danger"
-            />
-
+            <ConfirmModal isOpen={!!confirmDeleteId} onClose={() => setConfirmDeleteId(null)} onConfirm={executeDeletePlan} title="Excluir Planejamento" message="Tem certeza que deseja excluir este planejamento permanentemente?" confirmLabel="Excluir" variant="danger" />
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-white tracking-tight">Meus Cronogramas</h2>
-                <Button onClick={() => setIsCreateModalOpen(true)}>
-                    <PlusIcon className="h-5 w-5 mr-2" /> Novo Cronograma
-                </Button>
+                <Button onClick={() => setIsCreateModalOpen(true)}><PlusIcon className="h-5 w-5 mr-2" /> Novo Cronograma</Button>
             </div>
-
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans.map(plan => (
                     <Card key={plan.id} className={`p-6 flex flex-col border-2 transition-all group ${fullStudyPlan.activePlanId === plan.id ? 'border-cyan-500 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'}`}>
@@ -401,59 +377,23 @@ export const StudentScheduler: React.FC<{
                             <div className="flex-grow">
                                 <div className="flex items-center gap-2">
                                     <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">{plan.name}</h3>
-                                    {fullStudyPlan.activePlanId === plan.id && (
-                                        <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center animate-pulse">
-                                            <CheckCircleIcon className="h-3 w-3 mr-1" /> ATIVO
-                                        </span>
-                                    )}
+                                    {fullStudyPlan.activePlanId === plan.id && <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center animate-pulse"><CheckCircleIcon className="h-3 w-3 mr-1" /> ATIVO</span>}
                                 </div>
-                                <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-bold">
-                                    {plan.settings?.recurrence === 'weekly' ? 'Repete Semanalmente' : 'Válido para esta semana'}
-                                </p>
+                                <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-bold">{plan.settings?.recurrence === 'weekly' ? 'Repete Semanalmente' : 'Válido para esta semana'}</p>
                             </div>
-                            <button onClick={() => setConfirmDeleteId(plan.id)} className="text-gray-500 hover:text-red-400 p-1">
-                                <TrashIcon className="h-5 w-5" />
-                            </button>
+                            <button onClick={() => setConfirmDeleteId(plan.id)} className="text-gray-500 hover:text-red-400 p-1"><TrashIcon className="h-5 w-5" /></button>
                         </div>
-                        
                         <div className="mt-auto flex gap-2 pt-4">
-                            <Button onClick={() => setEditingPlanId(plan.id)} className="flex-1 text-sm py-2 bg-gray-700 hover:bg-gray-600 border-none">
-                                <PencilIcon className="h-4 w-4 mr-2" /> Configurar
-                            </Button>
-                            {fullStudyPlan.activePlanId !== plan.id && (
-                                <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none font-bold">
-                                    Ativar
-                                </Button>
-                            )}
+                            <Button onClick={() => setEditingPlanId(plan.id)} className="flex-1 text-sm py-2 bg-gray-700 hover:bg-gray-600 border-none"><PencilIcon className="h-4 w-4 mr-2" /> Configurar</Button>
+                            {fullStudyPlan.activePlanId !== plan.id && <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none font-bold">Ativar</Button>}
                         </div>
                     </Card>
                 ))}
-                {plans.length === 0 && (
-                    <Card className="col-span-full p-16 flex flex-col items-center justify-center text-center bg-gray-800/20 border-dashed border-2 border-gray-700/50 rounded-2xl">
-                        <div className="bg-gray-800 p-6 rounded-full mb-6">
-                            <CalendarIcon className="h-16 w-16 text-gray-600" />
-                        </div>
-                        <h3 className="text-2xl font-bold text-gray-300">Organize sua Aprovação</h3>
-                        <p className="text-gray-500 mt-2 max-w-sm">Crie seu primeiro planejamento personalizado para gerenciar seus horários de estudo de forma eficiente.</p>
-                        <Button onClick={() => setIsCreateModalOpen(true)} className="mt-8 scale-110">Criar Agora</Button>
-                    </Card>
-                )}
             </div>
-
             <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Novo Cronograma">
                 <div className="space-y-6">
-                    <div>
-                        <label htmlFor="plan-name-input" className="block text-sm font-medium text-gray-400 mb-2">Qual o nome do seu planejamento?</label>
-                        <input 
-                            id="plan-name-input"
-                            type="text" 
-                            value={newPlanName} 
-                            onChange={e => setNewPlanName(e.target.value)}
-                            placeholder="Ex: Pós-Edital PF 2025"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-all"
-                            autoFocus
-                        />
-                    </div>
+                    <label htmlFor="plan-name-input" className="block text-sm font-medium text-gray-400 mb-2">Qual o nome do seu planejamento?</label>
+                    <input id="plan-name-input" type="text" value={newPlanName} onChange={e => setNewPlanName(e.target.value)} placeholder="Ex: Pós-Edital PF 2025" className="w-full bg-gray-700 border border-gray-600 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 transition-all" autoFocus />
                     <Button onClick={handleCreatePlan} disabled={!newPlanName.trim()} className="w-full py-4 text-lg font-bold">Gerar Planejamento</Button>
                 </div>
             </Modal>
