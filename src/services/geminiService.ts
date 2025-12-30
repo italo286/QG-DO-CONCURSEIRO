@@ -1,16 +1,8 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
-const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY;
-
-if (!GEMINI_API_KEY) {
-  // In a real app, you'd want to handle this more gracefully.
-  // For this environment, we'll alert and log, but the app will fail on API calls.
-  console.error("Gemini API key is missing. Please set the VITE_GEMINI_API_KEY environment variable in your .env file.");
-  // alert("Chave da API do Gemini não encontrada. A funcionalidade de IA está desabilitada.");
-}
-
-const ai = new GoogleGenAI({ apiKey: GEMINI_API_KEY! });
+// Initializing the Gemini API using process.env.API_KEY as per guidelines.
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(

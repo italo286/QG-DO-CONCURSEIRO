@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TrashIcon, PlusIcon } from '../Icons';
+import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
     weeklyRoutine: { [day: number]: { [time: string]: string } };
@@ -11,7 +11,6 @@ interface WeeklyStudyGridProps {
     selectedTopicId: string | null;
     getTopicName: (id: string) => string;
     getTopicColor: (id: string) => string | undefined;
-    mode: 'standard' | 'custom';
 }
 
 const DAYS = [
@@ -33,32 +32,21 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     selectedTopicId,
     getTopicName,
     getTopicColor,
-    mode
 }) => {
-    // Coletar todos os horários únicos definidos em todos os dias
     const allTimes = React.useMemo(() => {
         const timesSet = new Set<string>();
-        // Garantir que existam horários padrão se a rotina estiver vazia
         const defaultHours = Array.from({ length: 14 }).map((_, i) => `${(i + 7).toString().padStart(2, '0')}:00`);
-        
         defaultHours.forEach(t => timesSet.add(t));
-        
         Object.values(weeklyRoutine).forEach(dayRoutine => {
             Object.keys(dayRoutine).forEach(time => timesSet.add(time));
         });
-        
         return Array.from(timesSet).sort();
     }, [weeklyRoutine]);
 
-    const handleCellClick = (dayId: number, time: string) => {
-        if (mode === 'standard' && selectedTopicId) {
+    const handleCellAction = (dayId: number, time: string) => {
+        if (selectedTopicId) {
             onUpdateRoutine(dayId, time, selectedTopicId);
         }
-    };
-
-    const handleClearCell = (e: React.MouseEvent, dayId: number, time: string) => {
-        e.stopPropagation();
-        onUpdateRoutine(dayId, time, null);
     };
 
     const handleTextChange = (dayId: number, time: string, text: string) => {
@@ -66,107 +54,124 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     };
 
     return (
-        <div className="overflow-x-auto rounded-lg border border-gray-700 bg-gray-900/50">
-            <table className="w-full text-xs md:text-sm border-collapse min-w-[700px]">
-                <thead>
-                    <tr className="bg-gray-800">
-                        <th className="p-2 border-r border-b border-gray-700 w-24">Hora</th>
-                        {DAYS.map((day) => (
-                            <th key={day.id} className="p-2 border-b border-gray-700">
-                                {day.label}
-                            </th>
-                        ))}
-                    </tr>
-                </thead>
-                <tbody>
-                    {allTimes.map((time) => (
-                        <tr key={time} className="group/row">
-                            <td className="p-1 text-center font-mono border-r border-gray-700 bg-gray-800/30 relative">
-                                <div className="flex items-center justify-between gap-1 px-1">
-                                    <input 
-                                        type="time" 
-                                        defaultValue={time}
-                                        onBlur={(e) => {
-                                            if (e.target.value && e.target.value !== time) {
-                                                onRenameTime(time, e.target.value);
-                                            }
-                                        }}
-                                        className="bg-transparent border-none focus:ring-0 text-white w-full text-xs md:text-sm p-0 text-center"
-                                    />
-                                    <button 
-                                        onClick={() => onRemoveTime(time)}
-                                        className="opacity-0 group-hover/row:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
-                                        title="Remover linha"
-                                    >
-                                        <TrashIcon className="h-3 w-3" />
-                                    </button>
-                                </div>
-                            </td>
-                            {DAYS.map((day) => {
-                                const content = weeklyRoutine[day.id]?.[time];
-                                
-                                if (mode === 'custom') {
+        <div className="space-y-4">
+            <div className="bg-blue-900/30 border border-blue-500/30 p-4 rounded-lg flex items-start gap-3">
+                <div className="bg-blue-500 p-1 rounded-full mt-0.5">
+                    <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <p className="text-xs text-blue-100 leading-relaxed">
+                    <span className="font-bold">Dica:</span> Selecione um tópico na barra lateral e clique em um horário para agendá-lo rapidamente. Se preferir algo personalizado, basta clicar e digitar o conteúdo desejado diretamente na célula.
+                </p>
+            </div>
+
+            <div className="overflow-x-auto rounded-lg border border-gray-700 bg-gray-900/50">
+                <table className="w-full text-xs md:text-sm border-collapse min-w-[800px]">
+                    <thead>
+                        <tr className="bg-gray-800">
+                            <th className="p-2 border-r border-b border-gray-700 w-24">Hora</th>
+                            {DAYS.map((day) => (
+                                <th key={day.id} className="p-2 border-b border-gray-700 text-gray-300 font-bold">
+                                    {day.label}
+                                </th>
+                            ))}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {allTimes.map((time) => (
+                            <tr key={time} className="group/row">
+                                <td className="p-1 text-center font-mono border-r border-gray-700 bg-gray-800/30 relative">
+                                    <div className="flex items-center justify-between gap-1 px-1">
+                                        <input 
+                                            type="time" 
+                                            defaultValue={time}
+                                            onBlur={(e) => {
+                                                if (e.target.value && e.target.value !== time) {
+                                                    onRenameTime(time, e.target.value);
+                                                }
+                                            }}
+                                            className="bg-transparent border-none focus:ring-0 text-white w-full text-xs md:text-sm p-0 text-center"
+                                        />
+                                        <button 
+                                            onClick={() => onRemoveTime(time)}
+                                            className="opacity-0 group-hover/row:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                                            title="Remover linha"
+                                        >
+                                            <TrashIcon className="h-3 w-3" />
+                                        </button>
+                                    </div>
+                                </td>
+                                {DAYS.map((day) => {
+                                    const content = weeklyRoutine[day.id]?.[time] || '';
+                                    const isTopicId = content.startsWith('t') || content.startsWith('st');
+                                    const topicName = isTopicId ? getTopicName(content) : null;
+                                    const topicColor = isTopicId ? getTopicColor(content) : null;
+                                    
                                     return (
-                                        <td key={day.id} className="p-1 border border-gray-700 h-16 min-w-[100px]">
-                                            <textarea
-                                                value={content || ''}
-                                                onChange={(e) => handleTextChange(day.id, time, e.target.value)}
-                                                placeholder="..."
-                                                className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500 text-xs text-gray-200 resize-none p-1"
-                                            />
+                                        <td
+                                            key={day.id}
+                                            onClick={() => handleCellAction(day.id, time)}
+                                            className={`p-1 border border-gray-700 h-20 min-w-[110px] relative group transition-colors hover:bg-gray-800/50 ${selectedTopicId ? 'cursor-copy' : 'cursor-text'}`}
+                                        >
+                                            {isTopicId ? (
+                                                <div 
+                                                    className="w-full h-full rounded p-1.5 flex flex-col justify-between overflow-hidden shadow-inner"
+                                                    style={{ backgroundColor: topicColor ? `${topicColor}22` : '#0ea5e922', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
+                                                >
+                                                    <div className="flex items-center gap-1 mb-1">
+                                                        <BookOpenIcon className="w-3 h-3 text-white/50" />
+                                                        <span className="text-[9px] uppercase font-bold text-white/40 tracking-tighter">Tópico</span>
+                                                    </div>
+                                                    <span className="text-[10px] md:text-xs font-bold text-white line-clamp-2 leading-tight">
+                                                        {topicName || 'Carregando...'}
+                                                    </span>
+                                                    <button
+                                                        onClick={(e) => { e.stopPropagation(); onUpdateRoutine(day.id, time, null); }}
+                                                        className="absolute top-1 right-1 p-0.5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                                                        title="Remover conteúdo"
+                                                    >
+                                                        <TrashIcon className="h-3 w-3" />
+                                                    </button>
+                                                </div>
+                                            ) : (
+                                                <div className="w-full h-full relative">
+                                                    <textarea
+                                                        value={content}
+                                                        onChange={(e) => handleTextChange(day.id, time, e.target.value)}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                        placeholder="..."
+                                                        className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500/50 text-[11px] text-gray-200 resize-none p-1 font-medium leading-tight custom-scrollbar"
+                                                    />
+                                                    {content && (
+                                                         <div className="absolute bottom-1 right-1 opacity-20">
+                                                            <PencilIcon className="w-3 h-3 text-white" />
+                                                         </div>
+                                                    )}
+                                                </div>
+                                            )}
+                                            {selectedTopicId && !content && (
+                                                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-cyan-400 rounded pointer-events-none"></div>
+                                            )}
                                         </td>
                                     );
-                                }
-
-                                const topicColor = content ? getTopicColor(content) : null;
-                                
-                                return (
-                                    <td
-                                        key={day.id}
-                                        onClick={() => handleCellClick(day.id, time)}
-                                        className={`p-1 border border-gray-700 h-16 min-w-[100px] relative group transition-colors hover:bg-gray-700/30 cursor-pointer`}
-                                    >
-                                        {content ? (
-                                            <div 
-                                                className="w-full h-full rounded p-1 flex flex-col justify-between overflow-hidden"
-                                                style={{ backgroundColor: topicColor ? `${topicColor}44` : '#0ea5e944', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
-                                            >
-                                                <span className="text-[10px] md:text-xs font-medium text-white line-clamp-2 leading-tight">
-                                                    {getTopicName(content)}
-                                                </span>
-                                                <button
-                                                    onClick={(e) => handleClearCell(e, day.id, time)}
-                                                    className="absolute top-0 right-0 p-0.5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300"
-                                                    title="Remover tópico"
-                                                >
-                                                    <TrashIcon className="h-3 w-3" />
-                                                </button>
-                                            </div>
-                                        ) : (
-                                            selectedTopicId && (
-                                                <div className="w-full h-full opacity-0 group-hover:opacity-20 bg-cyan-400 rounded"></div>
-                                            )
-                                        )}
-                                    </td>
-                                );
-                            })}
+                                })}
+                            </tr>
+                        ))}
+                        <tr className="bg-gray-800/30">
+                            <td className="p-2 border-r border-gray-700">
+                                <button 
+                                    onClick={onAddTime}
+                                    className="w-full flex items-center justify-center gap-1 text-cyan-400 hover:text-cyan-300 py-1 transition-all"
+                                    title="Adicionar novo horário"
+                                >
+                                    <PlusIcon className="h-4 w-4" />
+                                    <span className="text-[10px] uppercase font-bold tracking-wider">Novo</span>
+                                </button>
+                            </td>
+                            {DAYS.map(day => <td key={day.id} className="p-2 border-gray-700"></td>)}
                         </tr>
-                    ))}
-                    <tr className="bg-gray-800/30">
-                        <td className="p-2 border-r border-gray-700">
-                            <button 
-                                onClick={onAddTime}
-                                className="w-full flex items-center justify-center gap-1 text-cyan-400 hover:text-cyan-300 py-1"
-                                title="Adicionar novo horário"
-                            >
-                                <PlusIcon className="h-4 w-4" />
-                                <span className="text-[10px] uppercase font-bold">Novo</span>
-                            </button>
-                        </td>
-                        {DAYS.map(day => <td key={day.id} className="p-2 border-gray-700"></td>)}
-                    </tr>
-                </tbody>
-            </table>
+                    </tbody>
+                </table>
+            </div>
         </div>
     );
 };

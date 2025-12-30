@@ -1,8 +1,8 @@
-
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon, SaveIcon } from '../Icons';
+// Added ArrowRightIcon and CalendarIcon to resolve 'Cannot find name' errors.
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon, SaveIcon, Cog6ToothIcon, BellIcon, FireIcon, ArrowRightIcon, CalendarIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
@@ -13,7 +13,6 @@ export const StudentScheduler: React.FC<{
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newPlanName, setNewPlanName] = useState('');
-    const [newPlanType, setNewPlanType] = useState<'standard' | 'custom'>('standard');
     const [isSaving, setIsSaving] = useState(false);
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
@@ -56,7 +55,12 @@ export const StudentScheduler: React.FC<{
         const newPlan: StudyPlanItem = {
             id: `plan-${Date.now()}`,
             name: newPlanName,
-            type: newPlanType,
+            type: 'standard',
+            settings: {
+                recurrence: 'weekly',
+                notifications: true,
+                intensity: 'moderate'
+            },
             weeklyRoutine: {}
         };
         const updatedPlan: StudyPlan = {
@@ -75,17 +79,8 @@ export const StudentScheduler: React.FC<{
         if (!confirmDeleteId) return;
         const updatedPlans = plans.filter(p => p.id !== confirmDeleteId);
         let activeId = fullStudyPlan.activePlanId;
-        
-        if (activeId === confirmDeleteId) {
-            activeId = updatedPlans.length > 0 ? updatedPlans[0].id : "";
-        }
-        
-        const updatedPlan: StudyPlan = {
-            ...fullStudyPlan,
-            plans: updatedPlans,
-            activePlanId: activeId || ""
-        };
-
+        if (activeId === confirmDeleteId) activeId = updatedPlans.length > 0 ? updatedPlans[0].id : "";
+        const updatedPlan: StudyPlan = { ...fullStudyPlan, plans: updatedPlans, activePlanId: activeId || "" };
         await onSaveFullPlan(updatedPlan);
         setToastMessage("Planejamento excluído.");
         setConfirmDeleteId(null);
@@ -93,7 +88,7 @@ export const StudentScheduler: React.FC<{
 
     const handleSetActive = async (id: string) => {
         await onSaveFullPlan({ ...fullStudyPlan, activePlanId: id });
-        setToastMessage("Planejamento ativado!");
+        setToastMessage("Este agora é seu plano principal!");
     };
 
     const handleManualSave = async () => {
@@ -105,6 +100,17 @@ export const StudentScheduler: React.FC<{
             setIsSaving(false);
         }
     }
+
+    const updatePlanSettings = (field: string, value: any) => {
+        if (!editingPlan) return;
+        const newPlans = plans.map(p => {
+            if (p.id === editingPlanId) {
+                return { ...p, settings: { ...p.settings, [field]: value } };
+            }
+            return p;
+        });
+        onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
+    };
 
     const updatePlanRoutine = async (day: number, time: string, content: string | null) => {
         if (!editingPlan) return;
@@ -141,7 +147,6 @@ export const StudentScheduler: React.FC<{
 
     const removeTimeSlot = async (time: string) => {
         if (!editingPlan) return;
-        // Simplificado para remover direto, ou poderia adicionar outro confirm modal específico para linha
         const newPlans = plans.map(p => {
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
@@ -153,10 +158,6 @@ export const StudentScheduler: React.FC<{
         onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
     };
 
-    const closeModal = useCallback(() => {
-        setIsCreateModalOpen(false);
-    }, []);
-
     const topicsForSelectedSubject = useMemo(() => {
         if (!selectedSubjectId) return [];
         return subjects.find(s => s.id === selectedSubjectId)?.topics || [];
@@ -166,59 +167,108 @@ export const StudentScheduler: React.FC<{
         return (
             <div className="flex flex-col md:flex-row gap-8 h-[calc(100vh-220px)] animate-fade-in">
                 {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
-                {editingPlan.type === 'standard' && (
-                    <aside className="w-full md:w-80 flex-shrink-0">
-                        <Card className="p-6 flex flex-col h-full bg-gray-800/50 border-gray-700">
-                            <h3 className="font-bold text-white mb-4">Temas da Plataforma</h3>
-                            <select
-                                value={selectedSubjectId}
-                                onChange={e => setSelectedSubjectId(e.target.value)}
-                                className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white mb-4 text-sm"
-                            >
-                                {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                            </select>
-                            <div className="flex-grow overflow-y-auto pr-2 space-y-1">
-                                {topicsForSelectedSubject.map(topic => (
-                                    <React.Fragment key={topic.id}>
+                
+                <aside className="w-full md:w-80 flex-shrink-0 flex flex-col gap-4 overflow-hidden">
+                    <Card className="p-6 flex flex-col flex-grow bg-gray-800/50 border-gray-700 overflow-hidden">
+                        <div className="flex items-center gap-2 mb-4">
+                            <BookOpenIcon className="h-5 w-5 text-cyan-400" />
+                            <h3 className="font-bold text-white">Temas da Disciplina</h3>
+                        </div>
+                        <select
+                            value={selectedSubjectId}
+                            onChange={e => setSelectedSubjectId(e.target.value)}
+                            className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white mb-4 text-sm focus:ring-1 focus:ring-cyan-500"
+                        >
+                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+                        </select>
+                        <div className="flex-grow overflow-y-auto pr-2 space-y-1 custom-scrollbar">
+                            {topicsForSelectedSubject.map(topic => (
+                                <React.Fragment key={topic.id}>
+                                    <div
+                                        onClick={() => setSelectedTopicId(prev => prev === topic.id ? null : topic.id)}
+                                        className={`p-2 rounded cursor-pointer transition-all text-xs font-semibold ${selectedTopicId === topic.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/40 translate-x-1' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                    >
+                                        {topic.name}
+                                    </div>
+                                    {topic.subtopics.map(st => (
                                         <div
-                                            onClick={() => setSelectedTopicId(prev => prev === topic.id ? null : topic.id)}
-                                            className={`p-2 rounded cursor-pointer transition-colors text-xs font-semibold ${selectedTopicId === topic.id ? 'bg-cyan-600 text-white ring-2 ring-cyan-400' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
+                                            key={st.id}
+                                            onClick={() => setSelectedTopicId(prev => prev === st.id ? null : st.id)}
+                                            className={`p-2 ml-3 rounded cursor-pointer transition-all text-[10px] ${selectedTopicId === st.id ? 'bg-cyan-700 text-white shadow-lg shadow-cyan-900/40 translate-x-1' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
                                         >
-                                            {topic.name}
+                                            {st.name}
                                         </div>
-                                        {topic.subtopics.map(st => (
-                                            <div
-                                                key={st.id}
-                                                onClick={() => setSelectedTopicId(prev => prev === st.id ? null : st.id)}
-                                                className={`p-2 ml-3 rounded cursor-pointer transition-colors text-[10px] ${selectedTopicId === st.id ? 'bg-cyan-700 text-white ring-2 ring-cyan-400' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                                            >
-                                                {st.name}
-                                            </div>
-                                        ))}
-                                    </React.Fragment>
-                                ))}
+                                    ))}
+                                </React.Fragment>
+                            ))}
+                        </div>
+                    </Card>
+
+                    <Card className="p-4 bg-gray-800/80 border-gray-700">
+                        <div className="flex items-center gap-2 mb-3">
+                            <Cog6ToothIcon className="h-4 w-4 text-purple-400" />
+                            <h4 className="text-sm font-bold text-white">Configurações</h4>
+                        </div>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="text-[10px] uppercase font-bold text-gray-500 mb-1 block">Tipo de Recorrência</label>
+                                <div className="flex bg-gray-900 rounded-lg p-1">
+                                    <button 
+                                        onClick={() => updatePlanSettings('recurrence', 'weekly')}
+                                        className={`flex-1 py-1 text-[10px] rounded transition-colors ${editingPlan.settings?.recurrence === 'weekly' ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        Repetir Semanal
+                                    </button>
+                                    <button 
+                                        onClick={() => updatePlanSettings('recurrence', 'once')}
+                                        className={`flex-1 py-1 text-[10px] rounded transition-colors ${editingPlan.settings?.recurrence === 'once' ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
+                                    >
+                                        Semana Única
+                                    </button>
+                                </div>
                             </div>
-                        </Card>
-                    </aside>
-                )}
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] uppercase font-bold text-gray-500">Notificações</span>
+                                <button 
+                                    onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
+                                    className={`w-8 h-4 rounded-full relative transition-colors ${editingPlan.settings?.notifications ? 'bg-green-600' : 'bg-gray-600'}`}
+                                >
+                                    <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-4.5' : 'left-0.5'}`} />
+                                </button>
+                            </div>
+                        </div>
+                    </Card>
+                </aside>
 
                 <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-                    <div className="flex justify-between items-center">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
                         <div>
-                            <button onClick={() => setEditingPlanId(null)} className="text-cyan-400 text-sm hover:underline">← Galeria</button>
-                            <h2 className="text-xl font-bold text-white mt-1">{editingPlan.name} <span className="text-xs font-normal text-gray-500">({editingPlan.type === 'standard' ? 'Padrão' : 'Personalizado'})</span></h2>
+                            <button onClick={() => setEditingPlanId(null)} className="text-cyan-400 text-xs hover:underline flex items-center gap-1">
+                                <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Galeria
+                            </button>
+                            <h2 className="text-2xl font-bold text-white mt-1 flex items-center gap-2">
+                                {editingPlan.name} 
+                                <span className="text-[10px] font-normal px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
+                                    {editingPlan.settings?.recurrence === 'weekly' ? 'Recorrente' : 'Fixo'}
+                                </span>
+                            </h2>
                         </div>
                         <div className="flex gap-2">
-                             <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 border-none shadow-emerald-900/20">
-                                {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Planejamento</>}
-                             </Button>
                              {fullStudyPlan.activePlanId !== editingPlan.id && (
-                                 <Button onClick={() => handleSetActive(editingPlan.id)} className="text-xs py-2 px-4 bg-indigo-600 hover:bg-indigo-500 border-none">Ativar no Dashboard</Button>
+                                 <Button 
+                                    onClick={() => handleSetActive(editingPlan.id)} 
+                                    className="text-xs py-2.5 px-5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg shadow-orange-900/20 font-bold"
+                                 >
+                                    <FireIcon className="h-4 w-4 mr-2" /> Ativar Planejamento
+                                 </Button>
                              )}
+                             <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 border-none">
+                                {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Tudo</>}
+                             </Button>
                         </div>
                     </div>
                     <Card className="flex-grow p-4 overflow-hidden flex flex-col bg-gray-800/30 border-gray-700">
-                        <div className="flex-grow overflow-y-auto">
+                        <div className="flex-grow overflow-y-auto custom-scrollbar">
                             <WeeklyStudyGrid 
                                 weeklyRoutine={editingPlan.weeklyRoutine}
                                 onUpdateRoutine={updatePlanRoutine}
@@ -228,7 +278,6 @@ export const StudentScheduler: React.FC<{
                                 selectedTopicId={selectedTopicId}
                                 getTopicName={getTopicName}
                                 getTopicColor={getTopicColor}
-                                mode={editingPlan.type}
                             />
                         </div>
                     </Card>
@@ -252,29 +301,29 @@ export const StudentScheduler: React.FC<{
             />
 
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white">Cronogramas de Estudo</h2>
+                <h2 className="text-3xl font-bold text-white tracking-tight">Cronogramas de Estudo</h2>
                 {plans.length > 0 && (
                     <Button onClick={() => setIsCreateModalOpen(true)}>
-                        <PlusIcon className="h-5 w-5 mr-2" /> Novo Planejamento
+                        <PlusIcon className="h-5 w-5 mr-2" /> Novo Cronograma
                     </Button>
                 )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {plans.map(plan => (
-                    <Card key={plan.id} className={`p-6 flex flex-col border-2 transition-all ${fullStudyPlan.activePlanId === plan.id ? 'border-cyan-500 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/40'}`}>
+                    <Card key={plan.id} className={`p-6 flex flex-col border-2 transition-all group ${fullStudyPlan.activePlanId === plan.id ? 'border-cyan-500 bg-cyan-900/10' : 'border-gray-700 bg-gray-800/40 hover:border-gray-600'}`}>
                         <div className="flex justify-between items-start mb-4">
                             <div className="flex-grow">
                                 <div className="flex items-center gap-2">
-                                    <h3 className="text-xl font-bold text-white">{plan.name}</h3>
+                                    <h3 className="text-xl font-bold text-white group-hover:text-cyan-400 transition-colors">{plan.name}</h3>
                                     {fullStudyPlan.activePlanId === plan.id && (
-                                        <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center">
+                                        <span className="bg-cyan-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center animate-pulse">
                                             <CheckCircleIcon className="h-3 w-3 mr-1" /> ATIVO
                                         </span>
                                     )}
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1 uppercase tracking-wider font-semibold">
-                                    Tipo: {plan.type === 'standard' ? 'Padrão (Semanal)' : 'Personalizado (Diário)'}
+                                <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-wider font-bold">
+                                    {plan.settings?.recurrence === 'weekly' ? 'Repete Semanalmente' : 'Válido para esta semana'}
                                 </p>
                             </div>
                             <button onClick={() => setConfirmDeleteId(plan.id)} className="text-gray-500 hover:text-red-400 p-1">
@@ -282,64 +331,48 @@ export const StudentScheduler: React.FC<{
                             </button>
                         </div>
                         
-                        <div className="mt-auto flex gap-2">
+                        <div className="mt-auto flex gap-2 pt-4">
                             <Button onClick={() => setEditingPlanId(plan.id)} className="flex-1 text-sm py-2 bg-gray-700 hover:bg-gray-600 border-none">
-                                <PencilIcon className="h-4 w-4 mr-2" /> Editar
+                                <PencilIcon className="h-4 w-4 mr-2" /> Configurar
                             </Button>
                             {fullStudyPlan.activePlanId !== plan.id && (
-                                <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-indigo-600 hover:bg-indigo-500 border-none">
-                                    Selecionar
+                                <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none font-bold">
+                                    Ativar
                                 </Button>
                             )}
                         </div>
                     </Card>
                 ))}
                 {plans.length === 0 && (
-                    <Card className="col-span-full p-12 flex flex-col items-center justify-center text-center bg-gray-800/20 border-dashed border-gray-700">
-                        <ListBulletIcon className="h-16 w-16 text-gray-600 mb-4" />
-                        <h3 className="text-xl font-bold text-gray-400">Nenhum cronograma criado</h3>
-                        <p className="text-gray-500 mt-2 max-w-sm">Crie seu primeiro planejamento para organizar seus estudos semanais ou diários.</p>
-                        <Button onClick={() => setIsCreateModalOpen(true)} className="mt-6">Criar Agora</Button>
+                    <Card className="col-span-full p-16 flex flex-col items-center justify-center text-center bg-gray-800/20 border-dashed border-2 border-gray-700/50 rounded-2xl">
+                        <div className="bg-gray-800 p-6 rounded-full mb-6">
+                            <CalendarIcon className="h-16 w-16 text-gray-600" />
+                        </div>
+                        <h3 className="text-2xl font-bold text-gray-300">Organize sua Aprovação</h3>
+                        <p className="text-gray-500 mt-2 max-w-sm">Crie seu primeiro planejamento personalizado para gerenciar seus horários de estudo de forma eficiente.</p>
+                        <Button onClick={() => setIsCreateModalOpen(true)} className="mt-8 scale-110">Criar Agora</Button>
                     </Card>
                 )}
             </div>
 
-            <Modal isOpen={isCreateModalOpen} onClose={closeModal} title="Novo Planejamento">
-                <div className="space-y-6 p-2">
+            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Novo Cronograma">
+                <div className="space-y-6">
                     <div>
-                        <label htmlFor="plan-name-input" className="block text-sm font-medium text-gray-400 mb-1">Nome do Planejamento</label>
+                        <label htmlFor="plan-name-input" className="block text-sm font-medium text-gray-400 mb-2">Qual o nome do seu planejamento?</label>
                         <input 
                             id="plan-name-input"
                             type="text" 
                             value={newPlanName} 
                             onChange={e => setNewPlanName(e.target.value)}
-                            placeholder="Ex: Concurso Bombeiros 2025"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                            placeholder="Ex: Pós-Edital PF 2025"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-all"
                             autoFocus
                         />
                     </div>
-                    <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-3">Tipo de Planejamento</label>
-                        <div className="grid grid-cols-2 gap-4">
-                            <button 
-                                onClick={() => setNewPlanType('standard')}
-                                className={`p-4 rounded-xl border-2 text-left transition-all ${newPlanType === 'standard' ? 'border-cyan-500 bg-cyan-900/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'}`}
-                            >
-                                <BookOpenIcon className="h-8 w-8 text-cyan-400 mb-2" />
-                                <p className="font-bold text-white text-sm">Padrão</p>
-                                <p className="text-[10px] text-gray-400 mt-1">Utilize as disciplinas e tópicos da plataforma.</p>
-                            </button>
-                            <button 
-                                onClick={() => setNewPlanType('custom')}
-                                className={`p-4 rounded-xl border-2 text-left transition-all ${newPlanType === 'custom' ? 'border-cyan-500 bg-cyan-900/20' : 'border-gray-700 bg-gray-800 hover:border-gray-600'}`}
-                            >
-                                <PencilIcon className="h-8 w-8 text-purple-400 mb-2" />
-                                <p className="font-bold text-white text-sm">Personalizado</p>
-                                <p className="text-[10px] text-gray-400 mt-1">Digite manualmente seu conteúdo por horário.</p>
-                            </button>
-                        </div>
+                    <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
+                        <p className="text-xs text-gray-400 italic">Ao criar, você poderá misturar conteúdos da plataforma com suas próprias anotações de estudo.</p>
                     </div>
-                    <Button onClick={handleCreatePlan} disabled={!newPlanName.trim()} className="w-full py-4 mt-4">Criar Planejamento</Button>
+                    <Button onClick={handleCreatePlan} disabled={!newPlanName.trim()} className="w-full py-4 text-lg font-bold">Gerar Planejamento</Button>
                 </div>
             </Modal>
         </div>

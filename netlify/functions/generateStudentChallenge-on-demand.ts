@@ -1,4 +1,3 @@
-
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -16,7 +15,7 @@ import { StudentProgress, Subject, Course, Question, Topic, SubTopic, QuestionAt
  *
  * SOLUÇÃO APLICADA:
  * 1. Adição do `thinkingConfig: { thinkingBudget: 0 }`. Esta configuração instrui o modelo 'gemini-2.5-flash' a
- *    desativar seu processo de "pensamento" (um passo interno para melhorar a qualidade da resposta) e gerar a
+ *    desativar seu processo de "pensamento" (un passo interno para melhorar a qualidade da resposta) e gerar a
  *    resposta o mais rápido possível. Isso é ideal para tarefas que exigem baixa latência.
  *
  * CUIDADO AO MODIFICAR: A remoção do `thinkingConfig` ou o aumento da complexidade do prompt pode reintroduzir
@@ -46,8 +45,8 @@ try {
   console.error('FATAL: Firebase admin initialization failed:', e.message);
 }
 
-// --- Gemini API Initialization ---
-const ai = new GoogleGenAI({apiKey: process.env.VITE_GEMINI_API_KEY});
+// --- Gemini API Initialization following guidelines ---
+const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
 
 // --- Helper Functions ---
 async function retryWithBackoff<T>( apiCall: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 1000): Promise<T> {
@@ -260,7 +259,7 @@ async function generateReviewChallenge(studentProgress: StudentProgress, allEnro
             } else break;
         }
     }
-    // FIX: Safely slice the result to ensure it respects the question count.
+    // Correctly slicing to questionCount
     const finalStandardQuestions = shuffleArray(prioritizedQuestions);
     return finalStandardQuestions.slice(0, questionCount);
 }
@@ -338,6 +337,7 @@ ${errorFocusPrompt}`;
             config: { 
                 responseMimeType: 'application/json', 
                 responseSchema: portugueseQuestionSchema,
+                // Using thinkingBudget: 0 to optimize for speed and avoid Netlify timeout
                 thinkingConfig: { thinkingBudget: 0 }
             }
         }));

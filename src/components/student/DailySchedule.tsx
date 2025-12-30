@@ -2,7 +2,7 @@
 import React from 'react';
 import { StudyPlan, Subject, StudentProgress } from '../../types';
 import { Card, Button } from '../ui';
-import { CalendarIcon, PencilIcon } from '../Icons';
+import { CalendarIcon, PencilIcon, BookOpenIcon } from '../Icons';
 import { getBrasiliaDate } from '../../utils';
 
 export const DailySchedule: React.FC<{
@@ -14,8 +14,6 @@ export const DailySchedule: React.FC<{
 }> = ({ fullStudyPlan, subjects, studentProgress, onNavigateToTopic, onToggleTopicCompletion }) => {
     
     const activePlan = (fullStudyPlan.plans || []).find(p => p.id === fullStudyPlan.activePlanId);
-    
-    // Day of week from Brasília time (0-6)
     const now = getBrasiliaDate();
     const todayIndex = now.getUTCDay();
 
@@ -64,12 +62,16 @@ export const DailySchedule: React.FC<{
                     </h3>
                     <p className="text-xs text-cyan-400/70 ml-9 uppercase font-bold tracking-widest mt-1">Hoje: {now.toLocaleDateString('pt-BR', { weekday: 'long' })}</p>
                 </div>
+                {activePlan.settings?.recurrence === 'weekly' && (
+                    <span className="text-[10px] bg-cyan-900/50 text-cyan-300 px-2 py-1 rounded-md border border-cyan-500/30">Plano Semanal</span>
+                )}
             </div>
 
             <ul className="space-y-4">
                 {sortedTimes.map(time => {
                     const content = todayItems[time];
-                    const topicInfo = activePlan.type === 'standard' ? getTopicInfo(content) : null;
+                    const isTopicId = content.startsWith('t') || content.startsWith('st');
+                    const topicInfo = isTopicId ? getTopicInfo(content) : null;
                     const isCompleted = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
                     
                     return (
@@ -79,10 +81,13 @@ export const DailySchedule: React.FC<{
                                  {time}
                              </div>
                              <div className="min-w-0">
-                                {activePlan.type === 'standard' && topicInfo ? (
+                                {topicInfo ? (
                                     <>
-                                        <p className={`font-bold truncate ${isCompleted ? 'line-through text-gray-500' : 'text-gray-100'}`}>{topicInfo.name}</p>
-                                        <p className="text-[10px] text-gray-500 uppercase font-bold">{topicInfo.subjectName}</p>
+                                        <div className="flex items-center gap-1.5 mb-0.5">
+                                            <BookOpenIcon className="h-3 w-3 text-cyan-500" />
+                                            <p className={`font-bold truncate text-sm ${isCompleted ? 'line-through text-gray-500' : 'text-gray-100'}`}>{topicInfo.name}</p>
+                                        </div>
+                                        <p className="text-[10px] text-gray-500 uppercase font-bold ml-4.5">{topicInfo.subjectName}</p>
                                     </>
                                 ) : (
                                     <div className="flex items-center gap-2">
@@ -93,19 +98,25 @@ export const DailySchedule: React.FC<{
                              </div>
                            </div>
                            
-                           {activePlan.type === 'standard' && topicInfo && (
-                               <div className="flex items-center gap-2 ml-4">
-                                    <button 
-                                        onClick={() => onToggleTopicCompletion(topicInfo.subjectId, content, !isCompleted)}
-                                        className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors ${isCompleted ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-500 border border-gray-600 hover:border-cyan-500'}`}
-                                    >
-                                        <CheckIcon className="h-4 w-4" />
-                                    </button>
+                           <div className="flex items-center gap-2 ml-4">
+                               {topicInfo && (
+                                   <button 
+                                       onClick={() => onToggleTopicCompletion(topicInfo.subjectId, content, !isCompleted)}
+                                       className={`h-8 w-8 rounded-full flex items-center justify-center transition-colors ${isCompleted ? 'bg-green-500 text-white' : 'bg-gray-700 text-gray-500 border border-gray-600 hover:border-cyan-500'}`}
+                                   >
+                                       <CheckIcon className="h-4 w-4" />
+                                   </button>
+                               )}
+                               {topicInfo ? (
                                     <Button onClick={() => onNavigateToTopic(content)} className="h-8 py-0 px-3 text-xs bg-cyan-600/20 text-cyan-400 border border-cyan-500/30 hover:bg-cyan-600 hover:text-white">
-                                        Abrir
+                                        Estudar
                                     </Button>
-                               </div>
-                           )}
+                               ) : (
+                                   <div className="w-8 h-8 rounded-full flex items-center justify-center bg-gray-700/50 border border-gray-600 opacity-20">
+                                       <PencilIcon className="h-3 w-3" />
+                                   </div>
+                               )}
+                           </div>
                         </li>
                     );
                 })}
