@@ -1,3 +1,4 @@
+
 import React from 'react';
 import {
     User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado
@@ -29,6 +30,7 @@ interface StudentViewRouterProps {
     allStudentProgress: { [studentId: string]: StudentProgress };
     enrolledCourses: Course[];
     studyPlan: StudyPlan['plan'];
+    weeklyRoutine: StudyPlan['weeklyRoutine'];
     messages: TeacherMessage[];
     teacherProfiles: User[];
     selectedCourse: Course | null;
@@ -56,7 +58,7 @@ interface StudentViewRouterProps {
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
-    onSavePlan: (plan: StudyPlan['plan']) => Promise<void>;
+    onSavePlan: (plan: StudyPlan['plan'], weeklyRoutine: StudyPlan['weeklyRoutine']) => Promise<void>;
     onStartReview: (session: ReviewSession) => void;
     onGenerateSmartReview: () => void;
     onGenerateSrsReview: (questions: Question[]) => void;
@@ -166,7 +168,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             if (!props.selectedTopic || !props.selectedSubject) return null;
             return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} />;
         case 'schedule':
-            return <StudentScheduler studyPlan={props.studyPlan} subjects={props.allSubjects} studentProgress={props.studentProgress} onSavePlan={props.onSavePlan} enrolledCourses={props.enrolledCourses} />;
+            return <StudentScheduler studyPlan={props.studyPlan} weeklyRoutine={props.weeklyRoutine} subjects={props.allSubjects} studentProgress={props.studentProgress} onSavePlan={props.onSavePlan} enrolledCourses={props.enrolledCourses} />;
         case 'performance':
             return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
         case 'reviews':

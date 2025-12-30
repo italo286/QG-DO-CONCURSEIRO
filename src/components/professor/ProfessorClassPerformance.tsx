@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import * as FirebaseService from '../../services/firebaseService';
@@ -36,12 +37,12 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         );
 
         // FIX: Added filters and checks to safely handle potentially incomplete progress data.
+        // Also added explicit type 'any' to 'p' in filter to resolve 'Property progressByTopic does not exist on type unknown' error.
         const allAttempts: QuestionAttempt[] = Object.values(allProgress)
-            // FIX: Added a filter to ensure progress objects are valid and contain progressByTopic before processing.
-            .filter((p): p is StudentProgress => !!p?.progressByTopic)
+            .filter((p: any): p is StudentProgress => !!p?.progressByTopic)
             .flatMap(p => Object.values(p.progressByTopic))
             .flatMap(subjectProgress => subjectProgress ? Object.values(subjectProgress) : [])
-            .flatMap(topicProgress => topicProgress?.lastAttempt ?? []);
+            .flatMap(topicProgress => (topicProgress as any)?.lastAttempt ?? []);
 
         try {
             const result = await GeminiService.analyzeStudentDifficulties(allQuestionsWithContext, allAttempts);
@@ -57,7 +58,6 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
         
         return students.map(student => {
             // FIX: The error suggests 'progress' is 'unknown'. This type guard safely checks for the existence and structure of the progress object.
-            // By typing as `any`, we bypass the compile-time error, and the runtime check below ensures safety.
             const progress: any = allProgress[student.id];
             // FIX: Added a check for `progress.progressByTopic` to safely handle incomplete progress data and resolve the type error.
             if (!progress || !progress.progressByTopic) return { name: student.name || student.username, score: 0, studentId: student.id };
@@ -68,7 +68,7 @@ export const ProfessorClassPerformance: React.FC<{ subjects: Subject[]; students
             subjects.forEach(subject => {
                 const subjectProgress = progress.progressByTopic[subject.id];
                 if (subjectProgress) {
-                     Object.values(subjectProgress).forEach((topicProgress: { score: number; completed: boolean; lastAttempt: QuestionAttempt[] }) => {
+                     Object.values(subjectProgress).forEach((topicProgress: any) => {
                         // A topic with a score of 0 should be included in the average calculation.
                         // The existence of topicProgress implies an attempt has been made.
                         totalScore += topicProgress.score;

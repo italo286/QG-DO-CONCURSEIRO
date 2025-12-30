@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, StudentProgress, TeacherMessage, StudyPlan, Course } from '../types';
@@ -10,6 +11,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
     const [isLoading, setIsLoading] = useState(true);
     const [studentProgress, setStudentProgress] = useState<StudentProgress | null>(null);
     const [studyPlan, setStudyPlan] = useState<StudyPlan['plan']>({});
+    const [weeklyRoutine, setWeeklyRoutine] = useState<StudyPlan['weeklyRoutine']>({});
     const [messages, setMessages] = useState<TeacherMessage[]>([]);
     const [teacherProfiles, setTeacherProfiles] = useState<User[]>([]);
 
@@ -75,7 +77,10 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
                 setIsLoading(false);
             }
         }));
-        unsubs.push(FirebaseService.listenToStudyPlanForStudent(user.id, (plan: StudyPlan) => setStudyPlan(plan.plan)));
+        unsubs.push(FirebaseService.listenToStudyPlanForStudent(user.id, (plan: StudyPlan) => {
+            setStudyPlan(plan.plan);
+            setWeeklyRoutine(plan.weeklyRoutine || {});
+        }));
 
         return () => unsubs.forEach((unsub: () => void) => unsub());
 
@@ -90,6 +95,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         studentProgress,
         setStudentProgress,
         studyPlan,
+        weeklyRoutine,
         messages,
         teacherProfiles,
     };

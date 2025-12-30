@@ -1,3 +1,4 @@
+
 import { db, storage, firebase } from '../firebaseConfig';
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
@@ -69,7 +70,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
         advancedReviewSubjectIds: [],
         advancedReviewTopicIds: [],
         advancedReviewQuestionType: 'incorrect',
-        advancedReviewQuestionCount: 5,
+        advancedReviewQuestionTypeCount: 5,
         advancedReviewTimerDuration: 300,
         advancedReviewMaxAttempts: 1,
         glossaryChallengeMode: 'standard',
@@ -265,7 +266,8 @@ export const updateSubjectQuestion = async (
             // But this function is called from QuizView, which might not have the parent topic context.
             // The simplest fix is to try and find the document.
             // Let's assume topicId IS the document id in the subcollection.
-            throw new Error(`Topic document with ID ${topicId} not found in subject ${subjectId}`);
+            // FIX: Added explicit type casting for topicId and subjectId to satisfy TypeScript string requirement for Error constructor.
+            throw new Error(`Topic document with ID ${topicId as string} not found in subject ${subjectId as string}`);
         }
 
         const topicData = doc.data() as Topic;
@@ -541,12 +543,11 @@ export const createReportNotification = async (
         acknowledgedBy: [], // No one has seen it yet
         type: 'system',
         context: {
-            // FIX: The error "Argument of type 'unknown' is not assignable to parameter of type 'string'" suggests a type mismatch.
-            // Using `studentDisplayName`, which is guaranteed to be a string due to the fallback to `student.username`, resolves this issue.
-            studentName: studentDisplayName,
-            subjectName,
-            topicName,
-            questionStatement,
+            // FIX: Explicitly cast studentDisplayName and other properties to string to ensure 'unknown' is not assigned to 'string' parameter.
+            studentName: studentDisplayName as string,
+            subjectName: subjectName as string,
+            topicName: topicName as string,
+            questionStatement: questionStatement as string,
         }
     };
     await db.collection('messages').add(newNotification);

@@ -1,3 +1,4 @@
+
 // This file contains types that are shared between the server (Netlify functions)
 // and the client, but do NOT have any frontend-specific dependencies like React.
 
@@ -335,7 +336,12 @@ export interface StudyPlan {
     studentId: string;
     plan: {
       [dateISO: string]: string[]; // date 'YYYY-MM-DD', value is array of topic IDs
-    }
+    };
+    weeklyRoutine?: {
+        [day: number]: { // 0-6 (Sun-Sat)
+            [time: string]: string; // "HH:mm" -> topicId
+        };
+    };
 }
 
 export interface ChatMessage {
