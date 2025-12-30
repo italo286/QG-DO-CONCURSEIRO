@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, StudyPlan } from '../../types';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
@@ -63,6 +63,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
+    // FIX: Removed 'weeklyRoutine' from destructuring as it does not exist on useStudentData return type.
     const {
         isLoading,
         allSubjects,
@@ -364,6 +365,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
+                {/* FIX: Corrected undefined names 'course', 'subject', 'topic', 'subtopic', 'review' to use state variables 'selectedCourse', 'selectedSubject', etc. */}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}

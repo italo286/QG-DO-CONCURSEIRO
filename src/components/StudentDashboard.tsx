@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
 import * as FirebaseService from '../services/firebaseService';
@@ -36,6 +36,7 @@ interface StudentDashboardProps {
     onToggleStudentView?: () => void;
 }
 
+// FIX: Added React import above to resolve 'Cannot find namespace React'
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -365,6 +366,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
+                {/* FIX: Corrected undefined names 'course', 'subject', 'topic', 'subtopic', 'review' to use state variables 'selectedCourse', 'selectedSubject', etc. */}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
@@ -382,7 +384,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onOpenNewMessageModal={() => setIsNewMessageModalOpen(true)}
-                    // FIX: Spread studyPlan and explicitly set required properties to satisfy StudyPlan interface.
                     onSaveFullPlan={async (fullPlan) => { await FirebaseService.saveStudyPlanForStudent(fullPlan); }}
                     onStartReview={onStartReview}
                     onGenerateSmartReview={async () => {

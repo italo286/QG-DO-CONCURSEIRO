@@ -1,22 +1,19 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { StudyPlan, StudyPlanItem, Subject, StudentProgress, Course } from '../../types';
-import { Card, Button, Spinner, Modal } from '../ui';
+import { StudyPlan, StudyPlanItem, Subject, Course } from '../../types';
+import { Card, Button, Modal } from '../ui';
 import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
     fullStudyPlan: StudyPlan;
     subjects: Subject[];
-    studentProgress: StudentProgress | null;
     onSaveFullPlan: (fullPlan: StudyPlan) => Promise<void>;
-    enrolledCourses: Course[];
-}> = ({ fullStudyPlan, subjects, studentProgress, onSaveFullPlan, enrolledCourses }) => {
+}> = ({ fullStudyPlan, subjects, onSaveFullPlan }) => {
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newPlanName, setNewPlanName] = useState('');
     const [newPlanType, setNewPlanType] = useState<'standard' | 'custom'>('standard');
-    const [isSaving, setIsSaving] = useState(false);
 
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);

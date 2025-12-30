@@ -35,7 +35,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
 
     useEffect(() => {
         if (selectedStudentId && allStudyPlans[selectedStudentId]) {
-            setEditedPlan(allStudyPlans[selectedStudentId].plan);
+            setEditedPlan(allStudyPlans[selectedStudentId].plan || {});
         } else if (selectedStudentId) {
             setEditedPlan({});
         } else {
@@ -59,7 +59,6 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
             return;
         }
         setIsSaving(true);
-        // FIX: Added missing 'plans' property by spreading current student plan to satisfy StudyPlan interface.
         await FirebaseService.saveStudyPlanForStudent({
             ...(allStudyPlans[selectedStudentId] || { plans: [] }),
             studentId: selectedStudentId,
@@ -70,7 +69,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
     };
     
     const addTopicToDate = (topicId: string, dateISO: string) => {
-        if (!topicId || editedPlan === null) return;
+        if (!topicId || !editedPlan) return;
         const topicsForDay = editedPlan[dateISO] || [];
         if (!topicsForDay.includes(topicId)) {
             const newPlan = { ...editedPlan };
@@ -91,7 +90,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
     };
 
     const removeTopicFromPlan = (dateISO: string, topicId: string) => {
-        if (editedPlan === null) return;
+        if (!editedPlan) return;
         const updatedTopics = (editedPlan[dateISO] || []).filter(id => id !== topicId);
         const newPlan = { ...editedPlan, [dateISO]: updatedTopics };
         setEditedPlan(newPlan);
@@ -204,7 +203,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
                         <div className="flex flex-row gap-4 flex-grow">
                             {weekDates.map((date) => {
                                 const dateISO = getLocalDateISOString(date);
-                                const topicsForDay = editedPlan?.[dateISO] || [];
+                                const topicsForDay = editedPlan ? (editedPlan[dateISO] || []) : [];
                                 return (
                                     <div
                                         key={dateISO}

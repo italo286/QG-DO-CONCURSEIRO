@@ -2,7 +2,7 @@
 import React from 'react';
 import { StudyPlan, Subject, StudentProgress } from '../../types';
 import { Card, Button } from '../ui';
-import { CalendarIcon, ArrowRightIcon, PencilIcon } from '../Icons';
+import { CalendarIcon, PencilIcon } from '../Icons';
 import { getBrasiliaDate } from '../../utils';
 
 export const DailySchedule: React.FC<{
