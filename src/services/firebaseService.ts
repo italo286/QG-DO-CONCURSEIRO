@@ -683,7 +683,16 @@ export const deleteMessageForUser = async (messageId: string, userId: string): P
 // --- Study Plan ---
 export const saveStudyPlanForStudent = async (plan: StudyPlan): Promise<void> => {
     const planRef = db.collection('studyPlans').doc(plan.studentId);
-    await planRef.set(plan);
+    
+    // Firestore não aceita valores 'undefined'. Precisamos limpar o objeto antes de salvar.
+    const sanitizedPlan = JSON.parse(JSON.stringify(plan));
+    
+    // Garantir que activePlanId nunca seja undefined se presente
+    if (sanitizedPlan.activePlanId === undefined) {
+        sanitizedPlan.activePlanId = ""; // Ou simplesmente não incluir a chave
+    }
+    
+    await planRef.set(sanitizedPlan);
 };
 
 export const listenToStudyPlanForStudent = (studentId: string, callback: (plan: StudyPlan) => void): Unsubscribe => {

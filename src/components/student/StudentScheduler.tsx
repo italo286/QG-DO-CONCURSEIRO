@@ -69,15 +69,22 @@ export const StudentScheduler: React.FC<{
 
     const handleDeletePlan = async (id: string) => {
         if (!window.confirm('Excluir este planejamento permanentemente?')) return;
+        
         const updatedPlans = plans.filter(p => p.id !== id);
         let activeId = fullStudyPlan.activePlanId;
-        if (activeId === id) activeId = updatedPlans[0]?.id || undefined;
         
-        await onSaveFullPlan({
+        // Se o plano que está sendo excluído for o ativo, seleciona o próximo disponível ou limpa
+        if (activeId === id) {
+            activeId = updatedPlans.length > 0 ? updatedPlans[0].id : "";
+        }
+        
+        const updatedPlan: StudyPlan = {
             ...fullStudyPlan,
             plans: updatedPlans,
-            activePlanId: activeId
-        });
+            activePlanId: activeId || ""
+        };
+
+        await onSaveFullPlan(updatedPlan);
     };
 
     const handleSetActive = async (id: string) => {
