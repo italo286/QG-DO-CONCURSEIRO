@@ -1,8 +1,9 @@
+
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
 
 // Initializing the Gemini API using process.env.API_KEY as per guidelines.
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
@@ -365,7 +366,7 @@ export const generateQuestionsFromPdf = async (
     };
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: { parts: [textPart, pdfPart] },
         config: {
             responseMimeType: "application/json",
@@ -416,7 +417,7 @@ export const generateQuestionsFromText = async (
         const prompt = `Com base no seguinte texto, gere um array JSON de ${questionCount} questões de múltipla escolha. Cada questão deve ter: enunciado, 5 alternativas ('options'), resposta correta ('correctAnswer'), uma justificativa geral para a resposta correta ('justification') ${justificationPromptPart} Siga estritamente o schema JSON fornecido.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -489,7 +490,7 @@ export const generateCustomQuizQuestions = async (params: {
         }
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: contents,
             config: {
                 responseMimeType: "application/json",
@@ -548,7 +549,7 @@ export const extractQuestionsFromTecPdf = async (
         };
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: [textPart, pdfPart] },
             config: {
                 responseMimeType: "application/json",
@@ -597,7 +598,7 @@ export const extractQuestionsFromTecText = async (
         const prompt = `Analise este texto do TEC Concursos. Para cada questão, extraia: 1) o enunciado, 2) as 5 alternativas, 3) a alternativa correta (Gabarito). Gere também uma 'justification' principal para a alternativa correta baseada no 'Comentário do Professor'. ${justificationPromptPart} Preserve formatação com Markdown. Formate a saída como um array de objetos JSON, seguindo estritamente o schema.\n\nTexto: """${text}"""`;
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -678,7 +679,7 @@ export const generateSmartReview = async (
         };
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: [textPart] },
             config: {
                 responseMimeType: "application/json",
@@ -704,7 +705,7 @@ export const generateTopicsFromText = async (
         };
 
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: [textPart] },
             config: {
                 responseMimeType: "application/json",
@@ -746,7 +747,7 @@ export const generateFlashcardsFromPdf = async (
     };
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: { parts: [textPart, pdfPart] },
         config: {
             responseMimeType: "application/json",
@@ -791,7 +792,7 @@ export const analyzeStudentDifficulties = async (
         const prompt = `Como um tutor especialista em concursos, analise o seguinte conjunto de erros cometidos por uma turma de alunos. Identifique os padrões de dificuldade, os tópicos mais problemáticos e os tipos de erro mais comuns (ex: erro de interpretação, confusão entre conceitos, falta de atenção). Forneça um resumo conciso e acionável para o professor, com sugestões de como abordar esses pontos fracos. Formate a resposta em markdown. Dados dos erros: ${JSON.stringify(dataForAnalysis)}`;
         
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
         }));
 
@@ -806,16 +807,16 @@ export const analyzeStudentDifficulties = async (
 export const getAiExplanationForText = async (text: string): Promise<string> => {
     const prompt = `Explique o seguinte texto de forma clara e didática, como se fosse para um aluno de concurso que está vendo o assunto pela primeira vez. Use analogias e exemplos simples, se possível. Formate a resposta em markdown. Texto: "${text}"`;
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt
     }));
-    return response.text?.trim() ?? "Não foi possível gerar a explicação.";
+    return response.text?.trim() ?? "Não foi possível gerar la explicação.";
 };
 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
     const prompt = `Resuma o seguinte texto em pontos-chave (bullet points), focando nos conceitos mais importantes para memorização em um concurso. Formate a resposta em markdown. Texto: "${text}"`;
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt
     }));
     return response.text?.trim() ?? "Não foi possível gerar o resumo.";
@@ -831,7 +832,7 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
     };
      
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
@@ -864,7 +865,7 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
 export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat => {
     const systemInstruction = `Você é um tutor de IA amigável e especialista na disciplina de "${subject.name}". Seu foco é ajudar o aluno a entender o tópico específico de "${topic.name}". Seja conciso, didático e incentive o aprendizado. Não responda sobre outros tópicos ou assuntos.`;
     return ai.chats.create({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         config: {
             systemInstruction: systemInstruction,
         },
@@ -875,7 +876,7 @@ export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions:
     const prompt = `Analise a lista de questões que um aluno errou. Para cada questão, crie um flashcard que ajude a solidificar o conhecimento correto. A frente do flashcard deve ser uma pergunta direta ou um termo-chave, e o verso deve ser a resposta ou definição concisa. Foque no "porquê" da resposta correta. Retorne um array de objetos JSON de flashcards, seguindo estritamente o schema fornecido. Questões erradas: ${JSON.stringify(incorrectQuestions)}`;
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -890,7 +891,7 @@ export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions:
 export const generateQuizFeedback = async (questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
     const prompt = `Você é um tutor de IA. Analise o desempenho do aluno neste quiz. Forneça um feedback construtivo e motivacional. Identifique os padrões de erro (se houver) e dê dicas de estudo personalizadas com base nas questões erradas. Formate a resposta em markdown. Dados do Quiz: Questões: ${JSON.stringify(questions)}, Respostas do Aluno: ${JSON.stringify(attempts)}`;
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
     }));
     return response.text?.trim() ?? "Não foi possível gerar o feedback.";
@@ -901,7 +902,7 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
   const textPart = { text: "Analise o conteúdo deste edital de concurso público e extraia as informações estruturadas conforme o schema JSON fornecido. Preencha todos os campos da forma mais completa e precisa possível." };
   
   const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3-flash-preview',
     contents: { parts: [textPart, pdfPart] },
     config: {
       responseMimeType: "application/json",
@@ -924,7 +925,7 @@ export const analyzeEditalFromUrl = async (_url: string): Promise<EditalInfo> =>
 export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuestions: Question[]): Promise<string> => {
     const prompt = `Como um tutor de IA, analise as seguintes questões que um aluno errou. Crie um resumo conciso dos principais tópicos e conceitos que o aluno precisa revisar, com base nessas questões. Formate a resposta em markdown. Questões erradas: ${JSON.stringify(incorrectQuestions.map(q => ({ statement: q.statement, justification: q.justification })))}`;
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
     }));
     return response.text?.trim() ?? "Não foi possível gerar o resumo no momento.";
@@ -952,7 +953,7 @@ export const generateJustificationsForQuestion = async (
     });
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -1009,7 +1010,7 @@ export const generateGameFromPdf = async (
     
     try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: { parts: [{text: prompt}, pdfPart] },
             config: {
                 responseMimeType: "application/json",
@@ -1062,7 +1063,7 @@ export const generateGameFromText = async (
     
     try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -1083,7 +1084,7 @@ export const generateAllGamesFromText = async (text: string): Promise<Omit<MiniG
     
     try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: {
                 responseMimeType: "application/json",
@@ -1171,7 +1172,7 @@ export const generateAdaptiveStudyPlan = async (
     `;
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: "application/json",
@@ -1187,7 +1188,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     const textPart = { text: "Analise este documento PDF e extraia os termos chave e suas definições para criar um glossário. Formate a saída como um array JSON, seguindo estritamente o schema." };
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: { parts: [textPart, pdfPart] },
         config: {
             responseMimeType: "application/json",
@@ -1228,7 +1229,7 @@ export const generatePortugueseChallenge = async (
     `;
     
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
             responseMimeType: 'application/json',
@@ -1264,7 +1265,7 @@ export const analyzeTopicFrequencies = async (
     topics: { id: string, name: string }[]
 ): Promise<{ [id: string]: 'alta' | 'media' | 'baixa' | 'nenhuma' }> => {
     const prompt = `
-        Analise o seguinte texto, que contém estatísticas de frequência de tópicos em provas de concurso.
+        Analisar o seguinte texto, que contém estatísticas de frequência de tópicos em provas de concurso.
         Com base nesse texto, classifique cada um dos tópicos da lista fornecida como 'alta', 'media', 'baixa' ou 'nenhuma' frequência.
         
         Texto para análise:
@@ -1278,10 +1279,10 @@ export const analyzeTopicFrequencies = async (
     `;
 
     const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
-            responseMimeType: 'application/json',
+            responseMimeType: "application/json",
             responseSchema: frequencyAnalysisSchema
         }
     }));

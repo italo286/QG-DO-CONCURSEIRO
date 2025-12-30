@@ -1,3 +1,4 @@
+
 import { Handler, HandlerEvent } from '@netlify/functions';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI, GenerateContentResponse, Type } from "@google/genai";
@@ -14,7 +15,7 @@ import { StudentProgress, Subject, Course, Question, Topic, SubTopic, QuestionAt
  * 1. Simplificação do prompt e do schema JSON para reduzir a carga cognitiva da IA. (Não foi suficiente)
  *
  * SOLUÇÃO APLICADA:
- * 1. Adição do `thinkingConfig: { thinkingBudget: 0 }`. Esta configuração instrui o modelo 'gemini-2.5-flash' a
+ * 1. Adição do `thinkingConfig: { thinkingBudget: 0 }`. Esta configuração instrui o modelo 'gemini-3-flash-preview' a
  *    desativar seu processo de "pensamento" (un passo interno para melhorar a qualidade da resposta) e gerar a
  *    resposta o mais rápido possível. Isso é ideal para tarefas que exigem baixa latência.
  *
@@ -46,7 +47,7 @@ try {
 }
 
 // --- Gemini API Initialization following guidelines ---
-const ai = new GoogleGenAI({apiKey: process.env.API_KEY!});
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 // --- Helper Functions ---
 async function retryWithBackoff<T>( apiCall: () => Promise<T>, maxRetries: number = 3, initialDelay: number = 1000): Promise<T> {
@@ -332,7 +333,7 @@ ${errorFocusPrompt}`;
 
     try {
         const response: GenerateContentResponse = await retryWithBackoff(() => ai.models.generateContent({
-            model: 'gemini-2.5-flash',
+            model: 'gemini-3-flash-preview',
             contents: prompt,
             config: { 
                 responseMimeType: 'application/json', 
