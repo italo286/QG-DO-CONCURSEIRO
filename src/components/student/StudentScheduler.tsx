@@ -97,13 +97,51 @@ export const StudentScheduler: React.FC<{
 
     const updateWeeklyRoutine = (day: number, time: string, topicId: string | null) => {
         if (editedWeekly === null) return;
-        const newWeekly = { ...editedWeekly };
+        const newWeekly = JSON.parse(JSON.stringify(editedWeekly));
         if (!newWeekly[day]) newWeekly[day] = {};
         
         if (topicId) {
             newWeekly[day][time] = topicId;
         } else {
             delete newWeekly[day][time];
+        }
+        setEditedWeekly(newWeekly);
+    };
+
+    const renameTimeSlot = (oldTime: string, newTime: string) => {
+        if (editedWeekly === null) return;
+        const newWeekly = JSON.parse(JSON.stringify(editedWeekly));
+        
+        // Percorrer todos os dias e renomear a chave do horário
+        for (let day = 0; day <= 6; day++) {
+            if (newWeekly[day] && newWeekly[day][oldTime]) {
+                newWeekly[day][newTime] = newWeekly[day][oldTime];
+                delete newWeekly[day][oldTime];
+            }
+        }
+        setEditedWeekly(newWeekly);
+    };
+
+    const removeTimeSlot = (time: string) => {
+        if (editedWeekly === null) return;
+        if (!window.confirm(`Deseja remover o horário ${time} de todos os dias da grade?`)) return;
+        
+        const newWeekly = JSON.parse(JSON.stringify(editedWeekly));
+        for (let day = 0; day <= 6; day++) {
+            if (newWeekly[day]) {
+                delete newWeekly[day][time];
+            }
+        }
+        setEditedWeekly(newWeekly);
+    };
+
+    const addTimeSlot = () => {
+        if (editedWeekly === null) return;
+        const newTime = "12:00"; // Default
+        const newWeekly = JSON.parse(JSON.stringify(editedWeekly));
+        // Apenas para garantir que o objeto de dias exista
+        for (let day = 0; day <= 6; day++) {
+            if (!newWeekly[day]) newWeekly[day] = {};
         }
         setEditedWeekly(newWeekly);
     };
@@ -280,11 +318,14 @@ export const StudentScheduler: React.FC<{
                         </>
                     ) : (
                         <div className="flex flex-col h-full">
-                            <p className="text-sm text-gray-400 mb-4">Selecione um tópico na lista à esquerda e clique nos horários desejados na grade abaixo para montar sua rotina semanal.</p>
+                            <p className="text-sm text-gray-400 mb-4">Personalize seus horários abaixo. Você pode alterar a hora/minuto clicando no tempo e adicionar novas linhas com o botão "Novo".</p>
                             <div className="flex-grow overflow-y-auto">
                                 <WeeklyStudyGrid 
                                     weeklyRoutine={editedWeekly || {}}
                                     onUpdateRoutine={updateWeeklyRoutine}
+                                    onRenameTime={renameTimeSlot}
+                                    onRemoveTime={removeTimeSlot}
+                                    onAddTime={addTimeSlot}
                                     selectedTopicId={selectedTopicId}
                                     getTopicName={getTopicName}
                                     getTopicColor={getTopicColor}
