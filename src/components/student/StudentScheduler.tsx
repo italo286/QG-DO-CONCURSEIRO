@@ -1,8 +1,8 @@
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon, BookOpenIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
@@ -21,17 +21,26 @@ export const StudentScheduler: React.FC<{
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [pickerTarget, setPickerTarget] = useState<{ day: number, time: string } | null>(null);
     const [pickerSearch, setPickerSearch] = useState('');
+    const [selectedSubjectForPicker, setSelectedSubjectForPicker] = useState<string | null>(null);
 
     const plans = fullStudyPlan.plans || [];
     const editingPlan = plans.find(p => p.id === editingPlanId);
 
+    // Reset picker state when modal opens/closes
+    useEffect(() => {
+        if (!isPickerOpen) {
+            setSelectedSubjectForPicker(null);
+            setPickerSearch('');
+        }
+    }, [isPickerOpen]);
+
     const allTopicsAndSubtopics = useMemo(() => {
-        const items: {id: string, name: string, subjectName: string, color?: string}[] = [];
+        const items: {id: string, name: string, subjectId: string, subjectName: string, color?: string}[] = [];
         subjects.forEach(s => {
             s.topics.forEach(t => {
-                items.push({ id: t.id, name: t.name, subjectName: s.name, color: t.color });
+                items.push({ id: t.id, name: t.name, subjectId: s.id, subjectName: s.name, color: t.color });
                 t.subtopics.forEach(st => {
-                    items.push({ id: st.id, name: st.name, subjectName: `${s.name} > ${t.name}`, color: st.color });
+                    items.push({ id: st.id, name: st.name, subjectId: s.id, subjectName: `${s.name} > ${t.name}`, color: st.color });
                 })
             })
         });
@@ -39,13 +48,18 @@ export const StudentScheduler: React.FC<{
     }, [subjects]);
 
     const filteredPickerItems = useMemo(() => {
-        if (!pickerSearch.trim()) return allTopicsAndSubtopics;
+        let items = allTopicsAndSubtopics;
+        
+        if (selectedSubjectForPicker) {
+            items = items.filter(item => item.subjectId === selectedSubjectForPicker);
+        }
+
+        if (!pickerSearch.trim()) return items;
         const search = pickerSearch.toLowerCase();
-        return allTopicsAndSubtopics.filter(item => 
-            item.name.toLowerCase().includes(search) || 
-            item.subjectName.toLowerCase().includes(search)
+        return items.filter(item => 
+            item.name.toLowerCase().includes(search)
         );
-    }, [allTopicsAndSubtopics, pickerSearch]);
+    }, [allTopicsAndSubtopics, pickerSearch, selectedSubjectForPicker]);
 
     const getTopicName = (topicId: string) => {
         return allTopicsAndSubtopics.find(t => t.id === topicId)?.name || 'Tópico inválido';
@@ -187,7 +201,6 @@ export const StudentScheduler: React.FC<{
 
     const handleOpenPicker = (day: number, time: string) => {
         setPickerTarget({ day, time });
-        setPickerSearch('');
         setIsPickerOpen(true);
     };
 
@@ -267,45 +280,93 @@ export const StudentScheduler: React.FC<{
                     </div>
                 </Card>
 
-                {/* Modal Global de Picker */}
-                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Conteúdo" size="xl">
-                    <div className="space-y-4">
-                        <div className="relative">
-                            <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
-                            <input 
-                                type="text"
-                                value={pickerSearch}
-                                onChange={e => setPickerSearch(e.target.value)}
-                                placeholder="Pesquisar matéria ou assunto..."
-                                className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
-                                autoFocus
-                            />
-                        </div>
-                        <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
-                            {filteredPickerItems.map(item => (
-                                <button
-                                    key={item.id}
-                                    onClick={() => handlePickTopic(item.id)}
-                                    className="w-full text-left p-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all group"
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <div>
-                                            <p className="text-[10px] uppercase font-bold text-cyan-500/70 mb-0.5">{item.subjectName}</p>
-                                            <p className="font-bold text-white group-hover:text-cyan-400 transition-colors">{item.name}</p>
-                                        </div>
+                {/* Modal Global de Picker - Estilo Redesenhado */}
+                <Modal 
+                    isOpen={isPickerOpen} 
+                    onClose={() => setIsPickerOpen(false)} 
+                    title={selectedSubjectForPicker ? "Escolher Conteúdo" : "Selecione a Disciplina"} 
+                    size="2xl"
+                >
+                    <div className="space-y-6">
+                        {!selectedSubjectForPicker ? (
+                            /* Passo 1: Seleção de Disciplina */
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
+                                {subjects.map(subject => (
+                                    <button
+                                        key={subject.id}
+                                        onClick={() => setSelectedSubjectForPicker(subject.id)}
+                                        className="text-left p-4 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all flex items-center gap-4 group"
+                                    >
                                         <div 
-                                            className="w-3 h-3 rounded-full shadow-sm" 
-                                            style={{ backgroundColor: item.color || '#0ea5e9' }}
+                                            className="w-3 h-8 rounded-full shadow-sm flex-shrink-0" 
+                                            style={{ backgroundColor: subject.color || '#4B5563' }}
                                         />
+                                        <div className="min-w-0">
+                                            <p className="font-bold text-white group-hover:text-cyan-400 transition-colors truncate">{subject.name}</p>
+                                            <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{subject.topics.length} Tópicos</p>
+                                        </div>
+                                    </button>
+                                ))}
+                                {subjects.length === 0 && (
+                                    <div className="col-span-full text-center py-12 text-gray-500 italic">
+                                        Nenhuma disciplina disponível.
                                     </div>
-                                </button>
-                            ))}
-                            {filteredPickerItems.length === 0 && (
-                                <div className="text-center py-8 text-gray-500 italic">
-                                    Nenhum tópico encontrado para "{pickerSearch}"
+                                )}
+                            </div>
+                        ) : (
+                            /* Passo 2: Seleção de Tópico */
+                            <div className="space-y-4 animate-fade-in">
+                                <div className="flex items-center justify-between gap-4">
+                                    <button 
+                                        onClick={() => setSelectedSubjectForPicker(null)}
+                                        className="text-cyan-400 text-xs font-bold flex items-center gap-1 hover:underline"
+                                    >
+                                        <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Disciplinas
+                                    </button>
+                                    <span className="text-[10px] bg-gray-700 text-gray-400 px-2 py-1 rounded font-bold uppercase">
+                                        {subjects.find(s => s.id === selectedSubjectForPicker)?.name}
+                                    </span>
                                 </div>
-                            )}
-                        </div>
+
+                                <div className="relative">
+                                    <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
+                                    <input 
+                                        type="text"
+                                        value={pickerSearch}
+                                        onChange={e => setPickerSearch(e.target.value)}
+                                        placeholder="Filtrar nesta disciplina..."
+                                        className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
+                                        autoFocus
+                                    />
+                                </div>
+
+                                <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                                    {filteredPickerItems.map(item => (
+                                        <button
+                                            key={item.id}
+                                            onClick={() => handlePickTopic(item.id)}
+                                            className="w-full text-left p-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all group"
+                                        >
+                                            <div className="flex items-center justify-between">
+                                                <div className="min-w-0 pr-4">
+                                                    <p className="text-[9px] uppercase font-bold text-cyan-500/70 mb-0.5 truncate">{item.subjectName}</p>
+                                                    <p className="font-bold text-white group-hover:text-cyan-400 transition-colors text-sm truncate">{item.name}</p>
+                                                </div>
+                                                <div 
+                                                    className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" 
+                                                    style={{ backgroundColor: item.color || '#0ea5e9' }}
+                                                />
+                                            </div>
+                                        </button>
+                                    ))}
+                                    {filteredPickerItems.length === 0 && (
+                                        <div className="text-center py-8 text-gray-500 italic">
+                                            Nenhum tópico encontrado para "{pickerSearch}"
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </Modal>
             </div>
