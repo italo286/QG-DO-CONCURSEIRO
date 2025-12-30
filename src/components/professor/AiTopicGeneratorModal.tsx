@@ -123,7 +123,7 @@ export const AiTopicGeneratorModal: React.FC<{
             setGeneratedTopics(topics.map(t => ({ 
                 ...t, 
                 selected: true,
-                subtopics: t.subtopics.map(st => ({ ...st, selected: true }))
+                subtopics: t.subtopics.map((st: any) => ({ ...st, selected: true }))
             })));
         } catch (e: any) {
             setError(e.message);
@@ -135,7 +135,6 @@ export const AiTopicGeneratorModal: React.FC<{
     const handleTopicSelection = (index: number, selected: boolean) => {
         const newTopics = [...generatedTopics];
         newTopics[index].selected = selected;
-        // Fix: Explicitly typed 'st' as any (or could be GeneratedTopic['subtopics'][0])
         newTopics[index].subtopics.forEach((st: any) => st.selected = selected);
         setGeneratedTopics(newTopics);
     };
@@ -167,8 +166,8 @@ export const AiTopicGeneratorModal: React.FC<{
                 name: t.name,
                 description: t.description,
                 subtopics: t.subtopics
-                    .filter((st: any) => st.selected) // Explicitly typed 'st'
-                    .map((st: any) => ({ name: st.name, description: st.description })) // Explicitly typed 'st'
+                    .filter((st: any) => st.selected)
+                    .map((st: any) => ({ name: st.name, description: st.description }))
             }));
         onSave(selectedTopicsToSave);
     };
