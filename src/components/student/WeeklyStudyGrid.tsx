@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon, StarIcon, CalendarIcon, XCircleIcon } from '../Icons';
+import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon, CalendarIcon, XCircleIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
     weeklyRoutine: { [day: number]: { [time: string]: string } };

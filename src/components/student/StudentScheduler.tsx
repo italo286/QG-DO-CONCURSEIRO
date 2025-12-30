@@ -2,7 +2,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon, BookOpenIcon, DownloadIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, GeminiIcon, BellIcon, CycleIcon, DownloadIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
