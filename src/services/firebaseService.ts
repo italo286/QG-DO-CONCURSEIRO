@@ -1,4 +1,3 @@
-
 import { db, storage, firebase } from '../firebaseConfig';
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
@@ -70,7 +69,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
         advancedReviewSubjectIds: [],
         advancedReviewTopicIds: [],
         advancedReviewQuestionType: 'incorrect',
-        advancedReviewQuestionTypeCount: 5,
+        advancedReviewQuestionCount: 5,
         advancedReviewTimerDuration: 300,
         advancedReviewMaxAttempts: 1,
         glossaryChallengeMode: 'standard',
@@ -224,7 +223,8 @@ export const updateSubject = async (subject: Subject): Promise<void> => {
 
     // Get existing topics to determine which ones to delete
     const existingTopicsSnapshot = await topicsRef.get();
-    const existingTopicIds = new Set(existingTopicsSnapshot.docs.map(doc => doc.id));
+    // FIX: Explicitly cast doc.id to string to ensure existingTopicIds is Set<string> and avoid 'unknown' errors on line 232.
+    const existingTopicIds = new Set(existingTopicsSnapshot.docs.map(doc => doc.id as string));
     const newTopicIds = new Set(topics.map(t => t.id));
 
     // Delete topics that are no longer in the subject

@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { Subject, Topic, SubTopic } from '../../types';
 import { TrashIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
