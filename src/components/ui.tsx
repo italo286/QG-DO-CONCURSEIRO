@@ -1,6 +1,6 @@
 
 import React, { useEffect, useRef, useId, useState } from 'react';
-/* Added CheckCircleIcon to fix missing import error on line 228 */
+import { createPortal } from 'react-dom';
 import { XCircleIcon, ExclamationTriangleIcon, CheckCircleIcon } from './Icons';
 
 export const Spinner: React.FC = () => (
@@ -93,12 +93,15 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
             };
 
             document.addEventListener('keydown', handleKeyDown);
+            // Bloquear scroll do body quando o modal estiver aberto
+            document.body.style.overflow = 'hidden';
+            
             return () => {
                 document.removeEventListener('keydown', handleKeyDown);
+                document.body.style.overflow = 'unset';
             };
         }
     }, [isOpen]);
-
 
     if (!isOpen) return null;
 
@@ -110,18 +113,36 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
         '4xl': 'max-w-4xl'
     };
 
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 overflow-y-auto" onClick={onClose}>
-            <div ref={modalRef} className={`bg-gray-800 rounded-xl shadow-2xl w-full ${sizeClasses[size]} border border-gray-700 my-auto`} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby={modalTitleId}>
-                <div className="p-6 border-b border-gray-700 flex justify-between items-center">
+    // Usando React Portal para renderizar fora da estrutura de painéis
+    return createPortal(
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
+            {/* Backdrop com desfoque e escurecimento */}
+            <div 
+                className="absolute inset-0 bg-black/80 backdrop-blur-md animate-fade-in" 
+                onClick={onClose}
+                aria-hidden="true"
+            />
+            
+            {/* Conteúdo do Modal */}
+            <div 
+                ref={modalRef} 
+                className={`relative bg-gray-800 rounded-2xl shadow-[0_0_50px_rgba(0,0,0,0.5)] w-full ${sizeClasses[size]} border border-gray-700 overflow-hidden animate-fade-in`}
+                role="dialog" 
+                aria-modal="true" 
+                aria-labelledby={modalTitleId}
+            >
+                <div className="p-6 border-b border-gray-700 flex justify-between items-center bg-gray-800/50">
                     <h2 id={modalTitleId} className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">{title}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none" aria-label="Fechar modal">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white transition-colors p-1" aria-label="Fechar modal">
+                        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+                    </button>
                 </div>
-                <div className="p-6 max-h-[80vh] overflow-y-auto">
+                <div className="p-6 max-h-[85vh] overflow-y-auto custom-scrollbar">
                     {children}
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
@@ -137,9 +158,10 @@ export const ConfirmModal: React.FC<{
 }> = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar', variant = 'primary' }) => {
     if (!isOpen) return null;
 
-    return (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={onClose}>
-            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 animate-fade-in" onClick={e => e.stopPropagation()}>
+    return createPortal(
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
+            <div className="relative bg-gray-800 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 animate-fade-in">
                 <div className="p-6">
                     <div className="flex items-center gap-4 mb-4">
                         <div className={`p-2 rounded-full ${variant === 'danger' ? 'bg-red-900/30 text-red-400' : 'bg-cyan-900/30 text-cyan-400'}`}>
@@ -168,7 +190,8 @@ export const ConfirmModal: React.FC<{
                     </div>
                 </div>
             </div>
-        </div>
+        </div>,
+        document.body
     );
 };
 
@@ -224,12 +247,13 @@ export const Toast: React.FC<{ message: string, onDismiss: () => void, variant?:
         info: 'bg-cyan-500 shadow-cyan-900/20'
     };
 
-    return (
-        <div role="alert" aria-live="assertive" className={`fixed bottom-8 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-8 flex items-center gap-3 py-3 px-6 rounded-xl shadow-2xl text-white font-semibold z-[300] animate-fade-in ${colors[variant]}`}>
+    return createPortal(
+        <div role="alert" aria-live="assertive" className={`fixed bottom-8 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-8 flex items-center gap-3 py-3 px-6 rounded-xl shadow-2xl text-white font-semibold z-[10001] animate-fade-in ${colors[variant]}`}>
             {variant === 'success' && <CheckCircleIcon className="h-5 w-5" />}
             {variant === 'error' && <XCircleIcon className="h-5 w-5" />}
             {message}
-        </div>
+        </div>,
+        document.body
     );
 };
 
