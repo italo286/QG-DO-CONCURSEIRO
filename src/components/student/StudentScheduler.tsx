@@ -137,7 +137,6 @@ export const StudentScheduler: React.FC<{
 
     const addTimeSlot = () => {
         if (editedWeekly === null) return;
-        const newTime = "12:00"; // Default
         const newWeekly = JSON.parse(JSON.stringify(editedWeekly));
         // Apenas para garantir que o objeto de dias exista
         for (let day = 0; day <= 6; day++) {
