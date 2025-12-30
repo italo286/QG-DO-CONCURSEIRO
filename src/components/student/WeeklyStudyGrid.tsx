@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon } from '../Icons';
+import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon, StarIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
     weeklyRoutine: { [day: number]: { [time: string]: string } };
@@ -8,6 +8,7 @@ interface WeeklyStudyGridProps {
     onRenameTime: (oldTime: string, newTime: string) => void;
     onRemoveTime: (time: string) => void;
     onAddTime: () => void;
+    onOpenPicker: (day: number, time: string) => void;
     selectedTopicId: string | null;
     getTopicName: (id: string) => string;
     getTopicColor: (id: string) => string | undefined;
@@ -29,6 +30,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     onRenameTime,
     onRemoveTime,
     onAddTime,
+    onOpenPicker,
     selectedTopicId,
     getTopicName,
     getTopicColor,
@@ -60,7 +62,10 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                     <svg className="w-3 h-3 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 </div>
                 <p className="text-xs text-blue-100 leading-relaxed">
-                    <span className="font-bold">Dica:</span> Selecione um tópico na barra lateral e clique em um horário para agendá-lo rapidamente. Se preferir algo personalizado, basta clicar e digitar o conteúdo desejado diretamente na célula.
+                    <span className="font-bold">Como Adicionar Matérias:</span> 
+                    1. Selecione um tópico na barra lateral e clique na célula. 
+                    2. Ou clique no ícone <BookOpenIcon className="inline-block w-3 h-3 mx-0.5 text-cyan-400" /> dentro de uma célula vazia para buscar por nome.
+                    3. Você também pode digitar anotações livres diretamente nas células.
                 </p>
             </div>
 
@@ -89,7 +94,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                                     onRenameTime(time, e.target.value);
                                                 }
                                             }}
-                                            className="bg-transparent border-none focus:ring-0 text-white w-full text-xs md:text-sm p-0 text-center"
+                                            className="bg-transparent border-none focus:ring-0 text-white w-full text-xs md:text-sm p-0 text-center font-bold"
                                         />
                                         <button 
                                             onClick={() => onRemoveTime(time)}
@@ -114,23 +119,28 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                         >
                                             {isTopicId ? (
                                                 <div 
-                                                    className="w-full h-full rounded p-1.5 flex flex-col justify-between overflow-hidden shadow-inner"
+                                                    className="w-full h-full rounded p-1.5 flex flex-col justify-between overflow-hidden shadow-inner animate-fade-in"
                                                     style={{ backgroundColor: topicColor ? `${topicColor}22` : '#0ea5e922', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
                                                 >
-                                                    <div className="flex items-center gap-1 mb-1">
-                                                        <BookOpenIcon className="w-3 h-3 text-white/50" />
-                                                        <span className="text-[9px] uppercase font-bold text-white/40 tracking-tighter">Tópico</span>
+                                                    <div className="flex items-center justify-between gap-1 mb-1">
+                                                        <div className="flex items-center gap-1">
+                                                            <BookOpenIcon className="w-3 h-3 text-white/50" />
+                                                            <span className="text-[8px] uppercase font-bold text-white/40 tracking-tighter">Estudo</span>
+                                                        </div>
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onUpdateRoutine(day.id, time, null); }}
+                                                            className="p-0.5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                                                            title="Remover conteúdo"
+                                                        >
+                                                            <TrashIcon className="h-2.5 w-2.5" />
+                                                        </button>
                                                     </div>
-                                                    <span className="text-[10px] md:text-xs font-bold text-white line-clamp-2 leading-tight">
+                                                    <span className="text-[10px] md:text-[11px] font-bold text-white line-clamp-2 leading-tight">
                                                         {topicName || 'Carregando...'}
                                                     </span>
-                                                    <button
-                                                        onClick={(e) => { e.stopPropagation(); onUpdateRoutine(day.id, time, null); }}
-                                                        className="absolute top-1 right-1 p-0.5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
-                                                        title="Remover conteúdo"
-                                                    >
-                                                        <TrashIcon className="h-3 w-3" />
-                                                    </button>
+                                                    <div className="flex justify-end opacity-20">
+                                                        <StarIcon className="w-2 h-2 text-white" />
+                                                    </div>
                                                 </div>
                                             ) : (
                                                 <div className="w-full h-full relative">
@@ -139,17 +149,29 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                                         onChange={(e) => handleTextChange(day.id, time, e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         placeholder="..."
-                                                        className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500/50 text-[11px] text-gray-200 resize-none p-1 font-medium leading-tight custom-scrollbar"
+                                                        className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500/30 text-[11px] text-gray-300 resize-none p-1 font-medium leading-tight custom-scrollbar"
                                                     />
+                                                    
+                                                    {/* Botão de Picker Rápido em Células Vazias */}
+                                                    {!content && !selectedTopicId && (
+                                                        <button
+                                                            onClick={(e) => { e.stopPropagation(); onOpenPicker(day.id, time); }}
+                                                            className="absolute bottom-1 right-1 p-1 rounded-md bg-gray-800 text-cyan-500 opacity-0 group-hover:opacity-100 hover:bg-cyan-600 hover:text-white transition-all shadow-lg border border-gray-700"
+                                                            title="Buscar Tópico do Curso"
+                                                        >
+                                                            <BookOpenIcon className="w-3 h-3" />
+                                                        </button>
+                                                    )}
+
                                                     {content && (
-                                                         <div className="absolute bottom-1 right-1 opacity-20">
-                                                            <PencilIcon className="w-3 h-3 text-white" />
+                                                         <div className="absolute bottom-1 right-1 opacity-20 pointer-events-none">
+                                                            <PencilIcon className="w-2.5 h-2.5 text-white" />
                                                          </div>
                                                     )}
                                                 </div>
                                             )}
                                             {selectedTopicId && !content && (
-                                                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-cyan-400 rounded pointer-events-none"></div>
+                                                <div className="absolute inset-0 opacity-0 group-hover:opacity-20 bg-cyan-400 rounded pointer-events-none transition-opacity"></div>
                                             )}
                                         </td>
                                     );

@@ -2,8 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-// Removed useCallback, ListBulletIcon, and BellIcon to resolve TS6133 errors
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, Cog6ToothIcon, FireIcon, ArrowRightIcon, CalendarIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, Cog6ToothIcon, FireIcon, ArrowRightIcon, CalendarIcon, GeminiIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
@@ -21,6 +20,11 @@ export const StudentScheduler: React.FC<{
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
 
+    // Topic Picker Modal State
+    const [isPickerOpen, setIsPickerOpen] = useState(false);
+    const [pickerTarget, setPickerTarget] = useState<{ day: number, time: string } | null>(null);
+    const [pickerSearch, setPickerSearch] = useState('');
+
     const plans = fullStudyPlan.plans || [];
     const editingPlan = plans.find(p => p.id === editingPlanId);
 
@@ -31,17 +35,26 @@ export const StudentScheduler: React.FC<{
     }, [subjects, selectedSubjectId]);
 
     const allTopicsAndSubtopics = useMemo(() => {
-        const items: {id: string, name: string, color?: string}[] = [];
+        const items: {id: string, name: string, subjectName: string, color?: string}[] = [];
         subjects.forEach(s => {
             s.topics.forEach(t => {
-                items.push({ id: t.id, name: t.name, color: t.color });
+                items.push({ id: t.id, name: t.name, subjectName: s.name, color: t.color });
                 t.subtopics.forEach(st => {
-                    items.push({ id: st.id, name: `${t.name} / ${st.name}`, color: st.color });
+                    items.push({ id: st.id, name: st.name, subjectName: `${s.name} > ${t.name}`, color: st.color });
                 })
             })
         });
         return items;
     }, [subjects]);
+
+    const filteredPickerItems = useMemo(() => {
+        if (!pickerSearch.trim()) return allTopicsAndSubtopics;
+        const search = pickerSearch.toLowerCase();
+        return allTopicsAndSubtopics.filter(item => 
+            item.name.toLowerCase().includes(search) || 
+            item.subjectName.toLowerCase().includes(search)
+        );
+    }, [allTopicsAndSubtopics, pickerSearch]);
 
     const getTopicName = (topicId: string) => {
         return allTopicsAndSubtopics.find(t => t.id === topicId)?.name || 'Tópico inválido';
@@ -157,6 +170,20 @@ export const StudentScheduler: React.FC<{
             return p;
         });
         onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
+    };
+
+    const handleOpenPicker = (day: number, time: string) => {
+        setPickerTarget({ day, time });
+        setPickerSearch('');
+        setIsPickerOpen(true);
+    };
+
+    const handlePickTopic = (topicId: string) => {
+        if (pickerTarget) {
+            updatePlanRoutine(pickerTarget.day, pickerTarget.time, topicId);
+            setIsPickerOpen(false);
+            setPickerTarget(null);
+        }
     };
 
     const topicsForSelectedSubject = useMemo(() => {
@@ -276,6 +303,7 @@ export const StudentScheduler: React.FC<{
                                 onRenameTime={renameTimeSlot}
                                 onRemoveTime={removeTimeSlot}
                                 onAddTime={() => {}}
+                                onOpenPicker={handleOpenPicker}
                                 selectedTopicId={selectedTopicId}
                                 getTopicName={getTopicName}
                                 getTopicColor={getTopicColor}
@@ -283,6 +311,47 @@ export const StudentScheduler: React.FC<{
                         </div>
                     </Card>
                 </div>
+
+                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Disciplina/Tópico" size="xl">
+                    <div className="space-y-4">
+                        <div className="relative">
+                            <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
+                            <input 
+                                type="text"
+                                value={pickerSearch}
+                                onChange={e => setPickerSearch(e.target.value)}
+                                placeholder="Pesquisar por matéria ou assunto..."
+                                className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
+                                autoFocus
+                            />
+                        </div>
+                        <div className="max-h-[50vh] overflow-y-auto pr-2 space-y-2 custom-scrollbar">
+                            {filteredPickerItems.map(item => (
+                                <button
+                                    key={item.id}
+                                    onClick={() => handlePickTopic(item.id)}
+                                    className="w-full text-left p-3 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all group"
+                                >
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <p className="text-[10px] uppercase font-bold text-cyan-500/70 mb-0.5">{item.subjectName}</p>
+                                            <p className="font-bold text-white group-hover:text-cyan-400 transition-colors">{item.name}</p>
+                                        </div>
+                                        <div 
+                                            className="w-3 h-3 rounded-full shadow-sm" 
+                                            style={{ backgroundColor: item.color || '#0ea5e9' }}
+                                        />
+                                    </div>
+                                </button>
+                            ))}
+                            {filteredPickerItems.length === 0 && (
+                                <div className="text-center py-8 text-gray-500">
+                                    Nenhum tópico encontrado para "{pickerSearch}"
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </Modal>
             </div>
         );
     }
