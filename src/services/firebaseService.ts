@@ -1,3 +1,4 @@
+
 import { db, storage, firebase } from '../firebaseConfig';
 import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, ReviewSession, MessageReply, Topic, Question, Simulado } from '../types';
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
@@ -223,12 +224,12 @@ export const updateSubject = async (subject: Subject): Promise<void> => {
 
     // Get existing topics to determine which ones to delete
     const existingTopicsSnapshot = await topicsRef.get();
-    // FIX: Explicitly cast doc.id to string to ensure existingTopicIds is Set<string> and avoid 'unknown' errors on line 232.
-    const existingTopicIds = new Set(existingTopicsSnapshot.docs.map(doc => doc.id as string));
-    const newTopicIds = new Set(topics.map(t => t.id));
+    // FIX: Explicitly specify Set<string> to ensure topicId is inferred correctly and avoid 'unknown' errors on line 239.
+    const existingTopicIds = new Set<string>(existingTopicsSnapshot.docs.map(doc => doc.id as string));
+    const newTopicIds = new Set<string>(topics.map(t => t.id));
 
     // Delete topics that are no longer in the subject
-    existingTopicIds.forEach(topicId => {
+    existingTopicIds.forEach((topicId: string) => {
         if (!newTopicIds.has(topicId)) {
             batch.delete(topicsRef.doc(topicId));
         }
