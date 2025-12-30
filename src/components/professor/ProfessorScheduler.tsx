@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useMemo } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { User, Subject, StudyPlan } from '../../types';
@@ -58,7 +59,9 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
             return;
         }
         setIsSaving(true);
+        // FIX: Added missing 'plans' property by spreading current student plan to satisfy StudyPlan interface.
         await FirebaseService.saveStudyPlanForStudent({
+            ...(allStudyPlans[selectedStudentId] || { plans: [] }),
             studentId: selectedStudentId,
             plan: editedPlan,
         });

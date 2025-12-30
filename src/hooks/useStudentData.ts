@@ -10,8 +10,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
     const [enrolledCourses, setEnrolledCourses] = useState<Course[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [studentProgress, setStudentProgress] = useState<StudentProgress | null>(null);
-    const [studyPlan, setStudyPlan] = useState<StudyPlan['plan']>({});
-    const [weeklyRoutine, setWeeklyRoutine] = useState<StudyPlan['weeklyRoutine']>({});
+    const [studyPlan, setStudyPlan] = useState<StudyPlan>({ studentId: user.id, plans: [] });
     const [messages, setMessages] = useState<TeacherMessage[]>([]);
     const [teacherProfiles, setTeacherProfiles] = useState<User[]>([]);
 
@@ -78,8 +77,7 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
             }
         }));
         unsubs.push(FirebaseService.listenToStudyPlanForStudent(user.id, (plan: StudyPlan) => {
-            setStudyPlan(plan.plan);
-            setWeeklyRoutine(plan.weeklyRoutine || {});
+            setStudyPlan(plan);
         }));
 
         return () => unsubs.forEach((unsub: () => void) => unsub());
@@ -95,7 +93,6 @@ export const useStudentData = (user: User, isPreview?: boolean) => {
         studentProgress,
         setStudentProgress,
         studyPlan,
-        weeklyRoutine,
         messages,
         teacherProfiles,
     };

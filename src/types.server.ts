@@ -29,7 +29,6 @@ export interface Question {
   topicName?: string;
   errorCategory?: string; // For adaptive Portuguese challenges
   isTec?: boolean;
-  // FIX: Added optional properties to hold context for questions in cross-topic quizzes like daily challenges.
   subjectId?: string;
   topicId?: string;
 }
@@ -331,15 +330,28 @@ export interface TeacherMessage {
     };
 }
 
+export interface StudyPlanItem {
+  id: string;
+  name: string;
+  type: 'standard' | 'custom';
+  weeklyRoutine: {
+      [day: number]: { // 0-6 (Sun-Sat)
+          [time: string]: string; // topicId for standard, manual text for custom
+      };
+  };
+}
 
 export interface StudyPlan {
     studentId: string;
-    plan: {
-      [dateISO: string]: string[]; // date 'YYYY-MM-DD', value is array of topic IDs
+    activePlanId?: string;
+    plans: StudyPlanItem[];
+    // Legacy support for migration
+    plan?: {
+      [dateISO: string]: string[];
     };
     weeklyRoutine?: {
-        [day: number]: { // 0-6 (Sun-Sat)
-            [time: string]: string; // "HH:mm" -> topicId
+        [day: number]: {
+            [time: string]: string;
         };
     };
 }

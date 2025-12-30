@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
 import * as FirebaseService from '../services/firebaseService';
@@ -63,6 +63,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
 
+    // FIX: Removed 'weeklyRoutine' from destructuring as it does not exist on useStudentData return type.
     const {
         isLoading,
         allSubjects,
@@ -72,7 +73,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         studentProgress,
         setStudentProgress,
         studyPlan,
-        weeklyRoutine,
         messages,
         teacherProfiles
     } = useStudentData(user, isPreview);
@@ -366,7 +366,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
-                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} studyPlan={studyPlan} weeklyRoutine={weeklyRoutine} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
@@ -382,7 +382,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     onOpenNewMessageModal={() => setIsNewMessageModalOpen(true)}
-                    onSavePlan={async (plan, routine) => { await FirebaseService.saveStudyPlanForStudent({ studentId: user.id, plan, weeklyRoutine: routine }); }}
+                    // FIX: Spread studyPlan and explicitly set required properties to satisfy StudyPlan interface.
+                    onSaveFullPlan={async (fullPlan) => { await FirebaseService.saveStudyPlanForStudent(fullPlan); }}
                     onStartReview={onStartReview}
                     onGenerateSmartReview={async () => {
                         setIsGeneratingReview(true);

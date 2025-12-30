@@ -4,13 +4,14 @@ import { TrashIcon, PlusIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
     weeklyRoutine: { [day: number]: { [time: string]: string } };
-    onUpdateRoutine: (day: number, time: string, topicId: string | null) => void;
+    onUpdateRoutine: (day: number, time: string, content: string | null) => void;
     onRenameTime: (oldTime: string, newTime: string) => void;
     onRemoveTime: (time: string) => void;
     onAddTime: () => void;
     selectedTopicId: string | null;
     getTopicName: (id: string) => string;
     getTopicColor: (id: string) => string | undefined;
+    mode: 'standard' | 'custom';
 }
 
 const DAYS = [
@@ -32,6 +33,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     selectedTopicId,
     getTopicName,
     getTopicColor,
+    mode
 }) => {
     // Coletar todos os horários únicos definidos em todos os dias
     const allTimes = React.useMemo(() => {
@@ -49,7 +51,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     }, [weeklyRoutine]);
 
     const handleCellClick = (dayId: number, time: string) => {
-        if (selectedTopicId) {
+        if (mode === 'standard' && selectedTopicId) {
             onUpdateRoutine(dayId, time, selectedTopicId);
         }
     };
@@ -57,6 +59,10 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     const handleClearCell = (e: React.MouseEvent, dayId: number, time: string) => {
         e.stopPropagation();
         onUpdateRoutine(dayId, time, null);
+    };
+
+    const handleTextChange = (dayId: number, time: string, text: string) => {
+        onUpdateRoutine(dayId, time, text || null);
     };
 
     return (
@@ -97,22 +103,36 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                 </div>
                             </td>
                             {DAYS.map((day) => {
-                                const topicId = weeklyRoutine[day.id]?.[time];
-                                const topicColor = topicId ? getTopicColor(topicId) : null;
+                                const content = weeklyRoutine[day.id]?.[time];
+                                
+                                if (mode === 'custom') {
+                                    return (
+                                        <td key={day.id} className="p-1 border border-gray-700 h-16 min-w-[100px]">
+                                            <textarea
+                                                value={content || ''}
+                                                onChange={(e) => handleTextChange(day.id, time, e.target.value)}
+                                                placeholder="..."
+                                                className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500 text-xs text-gray-200 resize-none p-1"
+                                            />
+                                        </td>
+                                    );
+                                }
+
+                                const topicColor = content ? getTopicColor(content) : null;
                                 
                                 return (
                                     <td
                                         key={day.id}
                                         onClick={() => handleCellClick(day.id, time)}
-                                        className={`p-1 border border-gray-700 h-16 min-w-[80px] relative group transition-colors hover:bg-gray-700/30 cursor-pointer`}
+                                        className={`p-1 border border-gray-700 h-16 min-w-[100px] relative group transition-colors hover:bg-gray-700/30 cursor-pointer`}
                                     >
-                                        {topicId ? (
+                                        {content ? (
                                             <div 
                                                 className="w-full h-full rounded p-1 flex flex-col justify-between overflow-hidden"
                                                 style={{ backgroundColor: topicColor ? `${topicColor}44` : '#0ea5e944', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
                                             >
                                                 <span className="text-[10px] md:text-xs font-medium text-white line-clamp-2 leading-tight">
-                                                    {getTopicName(topicId)}
+                                                    {getTopicName(content)}
                                                 </span>
                                                 <button
                                                     onClick={(e) => handleClearCell(e, day.id, time)}

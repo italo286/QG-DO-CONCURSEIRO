@@ -1,5 +1,6 @@
+
 import React, { useMemo } from 'react';
-import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge } from '../../../types';
+import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge, Question } from '../../../types';
 import { Card, Button } from '../../ui';
 import { BellIcon, BookOpenIcon } from '../../Icons';
 import { StudentFocusPanel } from '../StudentFocusPanel';
@@ -12,12 +13,12 @@ interface DashboardHomeProps {
     enrolledCourses: Course[];
     studentProgress: StudentProgress;
     currentUser: User;
-    studyPlan: StudyPlan['plan'];
+    fullStudyPlan: StudyPlan;
     allSubjects: Subject[];
     teacherProfiles: User[];
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
-    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese') => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<Question>, type: 'review' | 'glossary' | 'portuguese') => void;
     onGenerateAllChallenges: () => void;
     isGeneratingAllChallenges: boolean;
     onNavigateToTopic: (topicId: string) => void;
@@ -30,7 +31,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     enrolledCourses,
     studentProgress,
     currentUser,
-    studyPlan,
+    fullStudyPlan,
     allSubjects,
     teacherProfiles,
     onAcknowledgeMessage,
@@ -78,7 +79,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-8">
-                {studentProgress && <DailySchedule studyPlan={studyPlan} subjects={allSubjects} studentProgress={studentProgress} onNavigateToTopic={onNavigateToTopic} onToggleTopicCompletion={onToggleTopicCompletion} />}
+                {studentProgress && <DailySchedule fullStudyPlan={fullStudyPlan} subjects={allSubjects} studentProgress={studentProgress} onNavigateToTopic={onNavigateToTopic} onToggleTopicCompletion={onToggleTopicCompletion} />}
                 
                 <DailyChallenges 
                     studentProgress={studentProgress}

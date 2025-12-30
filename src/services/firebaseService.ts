@@ -692,7 +692,8 @@ export const listenToStudyPlanForStudent = (studentId: string, callback: (plan: 
         if(doc.exists) {
             callback(doc.data() as StudyPlan);
         } else {
-            callback({ studentId, plan: {} });
+            // FIX: Added missing 'plans' property to satisfy StudyPlan type requirement.
+            callback({ studentId, plans: [] });
         }
     });
 };

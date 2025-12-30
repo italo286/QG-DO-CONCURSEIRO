@@ -29,8 +29,7 @@ interface StudentViewRouterProps {
     allStudents: User[];
     allStudentProgress: { [studentId: string]: StudentProgress };
     enrolledCourses: Course[];
-    studyPlan: StudyPlan['plan'];
-    weeklyRoutine: StudyPlan['weeklyRoutine'];
+    fullStudyPlan: StudyPlan;
     messages: TeacherMessage[];
     teacherProfiles: User[];
     selectedCourse: Course | null;
@@ -58,7 +57,7 @@ interface StudentViewRouterProps {
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
-    onSavePlan: (plan: StudyPlan['plan'], weeklyRoutine: StudyPlan['weeklyRoutine']) => Promise<void>;
+    onSaveFullPlan: (fullPlan: StudyPlan) => Promise<void>;
     onStartReview: (session: ReviewSession) => void;
     onGenerateSmartReview: () => void;
     onGenerateSrsReview: (questions: Question[]) => void;
@@ -168,7 +167,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             if (!props.selectedTopic || !props.selectedSubject) return null;
             return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} />;
         case 'schedule':
-            return <StudentScheduler studyPlan={props.studyPlan} weeklyRoutine={props.weeklyRoutine} subjects={props.allSubjects} studentProgress={props.studentProgress} onSavePlan={props.onSavePlan} enrolledCourses={props.enrolledCourses} />;
+            return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} studentProgress={props.studentProgress} onSaveFullPlan={props.onSaveFullPlan} enrolledCourses={props.enrolledCourses} />;
         case 'performance':
             return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
         case 'reviews':
