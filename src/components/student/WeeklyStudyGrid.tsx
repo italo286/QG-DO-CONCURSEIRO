@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon, StarIcon } from '../Icons';
+// Added CalendarIcon to the imports to fix the "Cannot find name 'CalendarIcon'" error.
+import { TrashIcon, PlusIcon, PencilIcon, BookOpenIcon, StarIcon, CalendarIcon } from '../Icons';
 
 interface WeeklyStudyGridProps {
     weeklyRoutine: { [day: number]: { [time: string]: string } };
@@ -37,8 +38,6 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
 }) => {
     const allTimes = React.useMemo(() => {
         const timesSet = new Set<string>();
-        const defaultHours = Array.from({ length: 14 }).map((_, i) => `${(i + 7).toString().padStart(2, '0')}:00`);
-        defaultHours.forEach(t => timesSet.add(t));
         Object.values(weeklyRoutine).forEach(dayRoutine => {
             Object.keys(dayRoutine).forEach(time => timesSet.add(time));
         });
@@ -52,7 +51,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     };
 
     const handleTextChange = (dayId: number, time: string, text: string) => {
-        onUpdateRoutine(dayId, time, text || null);
+        onUpdateRoutine(dayId, time, text || "");
     };
 
     return (
@@ -61,7 +60,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
             <div className="bg-cyan-500/10 border-l-4 border-cyan-500 px-3 py-1.5 flex items-center justify-between text-[10px] text-cyan-200">
                 <div className="flex items-center gap-2">
                     <BookOpenIcon className="w-3.5 h-3.5 text-cyan-400" />
-                    <span>Dica: Clique no ícone de livro nas células vazias para adicionar tópicos do curso.</span>
+                    <span>Dica: Clique no botão "+" abaixo para adicionar faixas horárias ao seu dia.</span>
                 </div>
                 <span className="opacity-40 uppercase font-bold hidden sm:inline">Cronograma Inteligente</span>
             </div>
@@ -183,6 +182,15 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                     </tbody>
                 </table>
             </div>
+             {allTimes.length === 0 && (
+                <div className="text-center py-12 text-gray-500 border border-dashed border-gray-700 rounded-xl mt-4">
+                    <CalendarIcon className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                    <p className="text-sm">Seu cronograma está vazio.</p>
+                    <button onClick={onAddTime} className="text-cyan-400 text-xs font-bold mt-2 hover:underline">
+                        Adicionar meu primeiro horário
+                    </button>
+                </div>
+            )}
         </div>
     );
 };

@@ -123,7 +123,7 @@ export const StudentScheduler: React.FC<{
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
                 if (!routine[day]) routine[day] = {};
-                if (content) routine[day][time] = content;
+                if (content !== null) routine[day][time] = content;
                 else delete routine[day][time];
                 return { ...p, weeklyRoutine: routine };
             }
@@ -132,13 +132,33 @@ export const StudentScheduler: React.FC<{
         onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
     };
 
+    const addTimeSlot = () => {
+        if (!editingPlan) return;
+        
+        const currentTimes = new Set<string>();
+        Object.values(editingPlan.weeklyRoutine).forEach(day => {
+            Object.keys(day).forEach(t => currentTimes.add(t));
+        });
+
+        let nextTime = "08:00";
+        if (currentTimes.size > 0) {
+            const sorted = Array.from(currentTimes).sort();
+            const last = sorted[sorted.length - 1];
+            const [h, m] = last.split(':').map(Number);
+            nextTime = `${(h + 1).toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`;
+        }
+
+        // Adiciona um placeholder vazio na segunda-feira para a linha aparecer
+        updatePlanRoutine(1, nextTime, "");
+    };
+
     const renameTimeSlot = async (oldTime: string, newTime: string) => {
         if (!editingPlan) return;
         const newPlans = plans.map(p => {
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
                 for (let d = 0; d <= 6; d++) {
-                    if (routine[d]?.[oldTime]) {
+                    if (routine[d] && routine[d].hasOwnProperty(oldTime)) {
                         routine[d][newTime] = routine[d][oldTime];
                         delete routine[d][oldTime];
                     }
@@ -155,7 +175,9 @@ export const StudentScheduler: React.FC<{
         const newPlans = plans.map(p => {
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
-                for (let d = 0; d <= 6; d++) delete routine[d]?.[time];
+                for (let d = 0; d <= 6; d++) {
+                    if (routine[d]) delete routine[d][time];
+                }
                 return { ...p, weeklyRoutine: routine };
             }
             return p;
@@ -236,7 +258,7 @@ export const StudentScheduler: React.FC<{
                             onUpdateRoutine={updatePlanRoutine}
                             onRenameTime={renameTimeSlot}
                             onRemoveTime={removeTimeSlot}
-                            onAddTime={() => {}}
+                            onAddTime={addTimeSlot}
                             onOpenPicker={handleOpenPicker}
                             selectedTopicId={null}
                             getTopicName={getTopicName}
