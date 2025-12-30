@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+
+import React, { useState, useEffect, useMemo } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-// Added ArrowRightIcon and CalendarIcon to resolve 'Cannot find name' errors.
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon, SaveIcon, Cog6ToothIcon, BellIcon, FireIcon, ArrowRightIcon, CalendarIcon } from '../Icons';
+// Removed useCallback, ListBulletIcon, and BellIcon to resolve TS6133 errors
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, Cog6ToothIcon, FireIcon, ArrowRightIcon, CalendarIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{

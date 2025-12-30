@@ -542,6 +542,9 @@ export const createReportNotification = async (
         message,
         timestamp,
         acknowledgedBy: [], // No one has seen it yet
+        replies: [], // Added missing mandatory property to fix TS2739
+        lastReplyTimestamp: timestamp, // Added missing mandatory property to fix TS2739
+        deletedBy: [], // Added missing mandatory property to fix TS2739
         type: 'system',
         context: {
             // FIX: Explicitly cast studentDisplayName and other properties to string to ensure 'unknown' is not assigned to 'string' parameter.

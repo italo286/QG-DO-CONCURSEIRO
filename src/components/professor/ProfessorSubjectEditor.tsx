@@ -167,20 +167,26 @@ export const ProfessorSubjectEditor: React.FC<{
                 id: topicId,
                 fullPdfs: [],
                 summaryPdfs: [],
+                raioXPdfs: [],
                 videoUrls: [],
                 questions: [],
+                tecQuestions: [],
                 miniGames: [],
                 flashcards: [],
+                glossary: [],
                 subtopics: t.subtopics.map((st, j) => ({
                     name: st.name,
                     description: st.description,
                     id: `st${timestamp}${i}${j}`,
                     fullPdfs: [],
                     summaryPdfs: [],
+                    raioXPdfs: [],
                     videoUrls: [],
                     questions: [],
+                    tecQuestions: [],
                     miniGames: [],
                     flashcards: [],
+                    glossary: []
                 }))
             };
         });
