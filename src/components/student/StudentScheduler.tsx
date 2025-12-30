@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, FireIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
