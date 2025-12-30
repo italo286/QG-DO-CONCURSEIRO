@@ -84,7 +84,7 @@ const EditableSubtopicItem: React.FC<{
                  <label htmlFor={`${baseId}-subtopic-name-${topicIndex}-${subtopicIndex}`} className="sr-only">Nome do subtópico</label>
                  <input id={`${baseId}-subtopic-name-${topicIndex}-${subtopicIndex}`} type="text" value={localName} onChange={e => setLocalName(e.target.value)} onBlur={() => onUpdate(topicIndex, subtopicIndex, 'name', localName)} className="block w-full bg-gray-600 border border-gray-500 rounded-md py-1 px-2 text-white text-xs font-semibold"/>
                   <label htmlFor={`${baseId}-subtopic-desc-${topicIndex}-${subtopicIndex}`} className="sr-only">Descrição do subtópico</label>
-                 <textarea id={`${baseId}-subtopic-desc-${topicIndex}-${subtopicIndex}`} value={localDescription} onChange={e => setLocalDescription(e.target.value)} onBlur={() => onUpdate(topicIndex, subtopicIndex, 'description', localDescription)} rows={1} className="block w-full bg-gray-600 border border-gray-500 rounded-md py-1 px-2 text-white text-xs"/>
+                 <textarea id={`${baseId}-subtopic-desc-${topicIndex}-${subtopicIndex}`} value={localDescription} onChange={e => setLocalDescription(e.target.value)} onBlur={() => onUpdate(topicIndex, subtopicIndex, 'description', localDescription)} rows={1} className="block w-full bg-gray-700 border border-gray-600 rounded-md py-1 px-2 text-white text-xs"/>
              </div>
         </div>
     );
@@ -135,7 +135,7 @@ export const AiTopicGeneratorModal: React.FC<{
     const handleTopicSelection = (index: number, selected: boolean) => {
         const newTopics = [...generatedTopics];
         newTopics[index].selected = selected;
-        // Fix: Added explicit type for 'st' to resolve TS7006
+        // Fix: Explicitly typed 'st' as any (or could be GeneratedTopic['subtopics'][0])
         newTopics[index].subtopics.forEach((st: any) => st.selected = selected);
         setGeneratedTopics(newTopics);
     };
@@ -167,8 +167,8 @@ export const AiTopicGeneratorModal: React.FC<{
                 name: t.name,
                 description: t.description,
                 subtopics: t.subtopics
-                    .filter(st => st.selected)
-                    .map(st => ({ name: st.name, description: st.description }))
+                    .filter((st: any) => st.selected) // Explicitly typed 'st'
+                    .map((st: any) => ({ name: st.name, description: st.description })) // Explicitly typed 'st'
             }));
         onSave(selectedTopicsToSave);
     };

@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
-import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, GlossaryTerm, MiniGame } from '../types';
+import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, GlossaryTerm } from '../types';
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
