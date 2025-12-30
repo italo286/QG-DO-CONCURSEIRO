@@ -56,24 +56,23 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     };
 
     return (
-        <div className="space-y-4">
-            <div className="bg-blue-900/20 border border-blue-500/20 p-4 rounded-xl flex items-center gap-4">
-                <div className="bg-blue-500/20 p-2 rounded-lg">
-                    <BookOpenIcon className="w-5 h-5 text-blue-400" />
+        <div className="space-y-3">
+            {/* Banner de Dicas Minimalista */}
+            <div className="bg-cyan-500/10 border-l-4 border-cyan-500 px-3 py-1.5 flex items-center justify-between text-[10px] text-cyan-200">
+                <div className="flex items-center gap-2">
+                    <BookOpenIcon className="w-3.5 h-3.5 text-cyan-400" />
+                    <span>Dica: Clique no ícone de livro nas células vazias para adicionar tópicos do curso.</span>
                 </div>
-                <p className="text-xs text-blue-200 leading-relaxed font-medium">
-                    <span className="font-bold text-white block mb-0.5">Dica de Produtividade:</span> 
-                    Clique no ícone de livro <BookOpenIcon className="inline-block w-3 h-3 mx-0.5 text-cyan-400" /> nas células vazias para agendar conteúdos do curso ou digite livremente suas anotações.
-                </p>
+                <span className="opacity-40 uppercase font-bold hidden sm:inline">Cronograma Inteligente</span>
             </div>
 
-            <div className="overflow-x-auto rounded-2xl border border-gray-700 bg-gray-900/30">
-                <table className="w-full text-xs md:text-sm border-collapse min-w-[800px]">
+            <div className="overflow-x-auto rounded-xl border border-gray-800 bg-gray-950/40">
+                <table className="w-full text-xs border-collapse min-w-[800px]">
                     <thead>
-                        <tr className="bg-gray-800/80">
-                            <th className="p-3 border-r border-b border-gray-700 w-24 text-gray-400 font-mono">HORA</th>
+                        <tr className="bg-gray-900/80">
+                            <th className="p-2 border-r border-b border-gray-800 w-24 text-gray-500 font-mono text-[9px] uppercase tracking-widest">HORA</th>
                             {DAYS.map((day) => (
-                                <th key={day.id} className="p-3 border-b border-gray-700 text-gray-300 font-bold uppercase tracking-widest text-[10px]">
+                                <th key={day.id} className="p-2 border-b border-gray-800 text-gray-300 font-bold uppercase tracking-widest text-[10px]">
                                     {day.label}
                                 </th>
                             ))}
@@ -81,8 +80,8 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                     </thead>
                     <tbody>
                         {allTimes.map((time) => (
-                            <tr key={time} className="group/row border-b border-gray-800 last:border-0">
-                                <td className="p-1 text-center font-mono border-r border-gray-700 bg-gray-800/10 relative">
+                            <tr key={time} className="group/row border-b border-gray-800/50 last:border-0">
+                                <td className="p-1 text-center font-mono border-r border-gray-800 bg-gray-900/20 relative">
                                     <div className="flex items-center justify-between gap-1 px-1">
                                         <input 
                                             type="time" 
@@ -92,11 +91,11 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                                     onRenameTime(time, e.target.value);
                                                 }
                                             }}
-                                            className="bg-transparent border-none focus:ring-0 text-white w-full text-xs p-0 text-center font-bold opacity-50 group-hover/row:opacity-100 transition-opacity"
+                                            className="bg-transparent border-none focus:ring-0 text-white w-full text-[11px] p-0 text-center font-bold opacity-60 group-hover/row:opacity-100 transition-opacity"
                                         />
                                         <button 
                                             onClick={() => onRemoveTime(time)}
-                                            className="opacity-0 group-hover/row:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
+                                            className="opacity-0 group-hover/row:opacity-100 text-red-500 hover:text-red-400 transition-opacity"
                                             title="Remover linha"
                                         >
                                             <TrashIcon className="h-3 w-3" />
@@ -113,27 +112,27 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                         <td
                                             key={day.id}
                                             onClick={() => handleCellAction(day.id, time)}
-                                            className="p-1 border-r border-gray-800 last:border-0 h-20 min-w-[110px] relative group transition-colors hover:bg-gray-800/40"
+                                            className="p-1 border-r border-gray-800/50 last:border-0 h-16 min-w-[110px] relative group transition-colors hover:bg-gray-800/20"
                                         >
                                             {isTopicId ? (
                                                 <div 
-                                                    className="w-full h-full rounded-lg p-2 flex flex-col justify-between overflow-hidden shadow-inner animate-fade-in relative"
-                                                    style={{ backgroundColor: topicColor ? `${topicColor}15` : '#0ea5e915', borderLeft: `4px solid ${topicColor || '#0ea5e9'}` }}
+                                                    className="w-full h-full rounded-md p-1.5 flex flex-col justify-between overflow-hidden shadow-inner animate-fade-in relative"
+                                                    style={{ backgroundColor: topicColor ? `${topicColor}10` : '#0ea5e910', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
                                                 >
-                                                    <div className="flex items-center justify-between gap-1 mb-1">
-                                                        <span className="text-[8px] uppercase font-black text-white/30 tracking-tighter">ESTUDO</span>
+                                                    <div className="flex items-center justify-between gap-1 mb-0.5">
+                                                        <span className="text-[7px] uppercase font-black text-white/20 tracking-tighter">ESTUDO</span>
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); onUpdateRoutine(day.id, time, null); }}
-                                                            className="p-0.5 opacity-0 group-hover:opacity-100 text-red-400 hover:text-red-300 transition-opacity"
-                                                            title="Remover conteúdo"
+                                                            className="p-0.5 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-400 transition-opacity"
+                                                            title="Remover"
                                                         >
                                                             <TrashIcon className="h-2.5 w-2.5" />
                                                         </button>
                                                     </div>
-                                                    <span className="text-[10px] md:text-[11px] font-bold text-white line-clamp-2 leading-tight">
+                                                    <span className="text-[10px] font-bold text-gray-100 line-clamp-2 leading-tight">
                                                         {topicName || 'Tópico Removido'}
                                                     </span>
-                                                    <div className="flex justify-end opacity-10">
+                                                    <div className="flex justify-end opacity-5">
                                                         <StarIcon className="w-2 h-2 text-white" />
                                                     </div>
                                                 </div>
@@ -144,21 +143,21 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                                         onChange={(e) => handleTextChange(day.id, time, e.target.value)}
                                                         onClick={(e) => e.stopPropagation()}
                                                         placeholder="..."
-                                                        className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500/20 text-[10px] md:text-[11px] text-gray-400 placeholder-gray-700 resize-none p-2 font-medium leading-tight custom-scrollbar"
+                                                        className="w-full h-full bg-transparent border-none focus:ring-1 focus:ring-cyan-500/10 text-[10px] text-gray-400 placeholder-gray-800 resize-none p-1 font-medium leading-tight custom-scrollbar"
                                                     />
                                                     
                                                     {!content && (
                                                         <button
                                                             onClick={(e) => { e.stopPropagation(); onOpenPicker(day.id, time); }}
-                                                            className="absolute bottom-2 right-2 p-1.5 rounded-lg bg-gray-800 text-cyan-500 opacity-0 group-hover:opacity-100 hover:bg-cyan-600 hover:text-white transition-all shadow-xl border border-gray-700"
-                                                            title="Adicionar Conteúdo do Curso"
+                                                            className="absolute bottom-1 right-1 p-1 rounded bg-gray-800 text-cyan-400 opacity-0 group-hover:opacity-100 hover:bg-cyan-600 hover:text-white transition-all shadow-md border border-gray-700"
+                                                            title="Buscar Conteúdo"
                                                         >
-                                                            <BookOpenIcon className="w-3 h-3" />
+                                                            <BookOpenIcon className="w-2.5 h-2.5" />
                                                         </button>
                                                     )}
 
                                                     {content && (
-                                                         <div className="absolute bottom-2 right-2 opacity-10 pointer-events-none">
+                                                         <div className="absolute bottom-1 right-1 opacity-5 pointer-events-none">
                                                             <PencilIcon className="w-2 h-2 text-white" />
                                                          </div>
                                                     )}
@@ -169,17 +168,17 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                 })}
                             </tr>
                         ))}
-                        <tr className="bg-gray-800/10">
-                            <td className="p-2 border-r border-gray-700">
+                        <tr className="bg-gray-900/20">
+                            <td className="p-1 border-r border-gray-800">
                                 <button 
                                     onClick={onAddTime}
-                                    className="w-full flex items-center justify-center gap-1 text-cyan-500/60 hover:text-cyan-400 py-1 transition-all"
-                                    title="Adicionar novo horário"
+                                    className="w-full flex items-center justify-center gap-1 text-cyan-500/40 hover:text-cyan-400 py-1.5 transition-all"
+                                    title="Adicionar Horário"
                                 >
-                                    <PlusIcon className="h-4 w-4" />
+                                    <PlusIcon className="h-3.5 w-3.5" />
                                 </button>
                             </td>
-                            {DAYS.map(day => <td key={day.id} className="p-2 border-r border-gray-800 last:border-0"></td>)}
+                            {DAYS.map(day => <td key={day.id} className="p-1 border-r border-gray-800/30 last:border-0"></td>)}
                         </tr>
                     </tbody>
                 </table>

@@ -179,55 +179,57 @@ export const StudentScheduler: React.FC<{
 
     if (editingPlan) {
         return (
-            <div className="flex flex-col gap-6 h-[calc(100vh-180px)] animate-fade-in">
+            <div className="flex flex-col gap-4 h-[calc(100vh-130px)] animate-fade-in">
                 {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
                 
-                {/* Header Integrado com Configurações */}
-                <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 bg-gray-800/40 p-6 rounded-2xl border border-gray-700/50">
-                    <div className="space-y-1">
-                        <button onClick={() => setEditingPlanId(null)} className="text-cyan-400 text-xs hover:underline flex items-center gap-1 mb-2">
-                            <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Galeria
+                {/* Header Integrado e Compacto */}
+                <div className="flex flex-col md:flex-row justify-between md:items-center gap-4 bg-gray-800/60 p-4 rounded-xl border border-gray-700/50 shadow-lg">
+                    <div className="flex items-center gap-4">
+                        <button onClick={() => setEditingPlanId(null)} className="p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-cyan-400 transition-colors shadow-sm border border-gray-600">
+                            <ArrowRightIcon className="h-5 w-5 rotate-180" />
                         </button>
-                        <h2 className="text-3xl font-bold text-white flex items-center gap-3">
-                            {editingPlan.name}
-                        </h2>
-                        <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">Editor de Cronograma de Estudos</p>
+                        <div>
+                            <h2 className="text-xl font-bold text-white flex items-center gap-3">
+                                {editingPlan.name}
+                                <span className="hidden sm:inline text-[10px] bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 px-2 py-0.5 rounded-full uppercase tracking-tighter">Editor</span>
+                            </h2>
+                        </div>
                     </div>
 
-                    <div className="flex flex-wrap items-center gap-4 bg-gray-900/50 p-2 rounded-xl border border-gray-700/50">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-4">
                         {/* Recorrência */}
-                        <div className="flex items-center gap-2 px-3 border-r border-gray-700">
+                        <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
                             <CycleIcon className="h-4 w-4 text-cyan-400" />
                             <select 
                                 value={editingPlan.settings?.recurrence}
                                 onChange={(e) => updatePlanSettings('recurrence', e.target.value)}
-                                className="bg-transparent text-xs font-bold text-gray-300 focus:outline-none cursor-pointer"
+                                className="bg-transparent text-xs font-bold text-gray-300 focus:outline-none cursor-pointer appearance-none pr-1"
                             >
                                 <option value="weekly">Semanal</option>
-                                <option value="once">Semana Única</option>
+                                <option value="once">Única</option>
                             </select>
                         </div>
 
                         {/* Notificações */}
-                        <div className="flex items-center gap-3 px-3">
+                        <div className="flex items-center gap-3 px-3 py-1.5 bg-gray-900/60 rounded-lg border border-gray-700/50">
                             <BellIcon className={`h-4 w-4 ${editingPlan.settings?.notifications ? 'text-emerald-400' : 'text-gray-500'}`} />
                             <button 
                                 onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
-                                className={`w-10 h-5 rounded-full relative transition-all ${editingPlan.settings?.notifications ? 'bg-emerald-600' : 'bg-gray-700'}`}
+                                className={`w-8 h-4 rounded-full relative transition-all ${editingPlan.settings?.notifications ? 'bg-emerald-600' : 'bg-gray-700'}`}
                             >
-                                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-6' : 'left-1'}`} />
+                                <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-4.5' : 'left-0.5'}`} />
                             </button>
                         </div>
 
                         {/* Salvar */}
-                        <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 border-none shadow-lg shadow-emerald-900/20">
-                            {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Alterações</>}
+                        <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-6 bg-emerald-600 hover:bg-emerald-500 border-none shadow-lg shadow-emerald-900/20 font-bold">
+                            {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar</>}
                         </Button>
                     </div>
                 </div>
 
-                {/* Grid Full Width */}
-                <Card className="flex-grow p-4 overflow-hidden flex flex-col bg-gray-800/20 border-gray-700/50">
+                {/* Grid Full Width - Ocupa o máximo de espaço */}
+                <Card className="flex-grow p-1 overflow-hidden flex flex-col bg-gray-900/20 border-gray-800">
                     <div className="flex-grow overflow-y-auto custom-scrollbar">
                         <WeeklyStudyGrid 
                             weeklyRoutine={editingPlan.weeklyRoutine}
@@ -244,7 +246,7 @@ export const StudentScheduler: React.FC<{
                 </Card>
 
                 {/* Modal Global de Picker */}
-                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Conteúdo para este Horário" size="xl">
+                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Conteúdo" size="xl">
                     <div className="space-y-4">
                         <div className="relative">
                             <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
