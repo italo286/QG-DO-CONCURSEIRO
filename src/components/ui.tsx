@@ -25,7 +25,8 @@ export const Button: React.FC<{
         disabled={disabled}
         title={title}
         style={style}
-        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white ${!style?.backgroundColor ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600' : 'hover:brightness-110'} focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+        // FIX: Using type assertion to any to avoid "Property 'backgroundColor' does not exist on type 'CSSProperties'" error.
+        className={`inline-flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-sm text-white ${!(style as any)?.backgroundColor ? 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600' : 'hover:brightness-110'} focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
     >
         {children}
     </button>

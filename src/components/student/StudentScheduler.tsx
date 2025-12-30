@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, Cog6ToothIcon, FireIcon, ArrowRightIcon, CalendarIcon, GeminiIcon } from '../Icons';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, SaveIcon, FireIcon, ArrowRightIcon, CalendarIcon, GeminiIcon, BellIcon, CycleIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
@@ -17,9 +17,6 @@ export const StudentScheduler: React.FC<{
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-    const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
-    const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
-
     // Topic Picker Modal State
     const [isPickerOpen, setIsPickerOpen] = useState(false);
     const [pickerTarget, setPickerTarget] = useState<{ day: number, time: string } | null>(null);
@@ -27,12 +24,6 @@ export const StudentScheduler: React.FC<{
 
     const plans = fullStudyPlan.plans || [];
     const editingPlan = plans.find(p => p.id === editingPlanId);
-
-    useEffect(() => {
-        if (subjects.length > 0 && !selectedSubjectId) {
-            setSelectedSubjectId(subjects[0].id);
-        }
-    }, [subjects, selectedSubjectId]);
 
     const allTopicsAndSubtopics = useMemo(() => {
         const items: {id: string, name: string, subjectName: string, color?: string}[] = [];
@@ -186,133 +177,74 @@ export const StudentScheduler: React.FC<{
         }
     };
 
-    const topicsForSelectedSubject = useMemo(() => {
-        if (!selectedSubjectId) return [];
-        return subjects.find(s => s.id === selectedSubjectId)?.topics || [];
-    }, [selectedSubjectId, subjects]);
-
     if (editingPlan) {
         return (
-            <div className="flex flex-col md:flex-row gap-8 h-[calc(100vh-220px)] animate-fade-in">
+            <div className="flex flex-col gap-6 h-[calc(100vh-180px)] animate-fade-in">
                 {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
                 
-                <aside className="w-full md:w-80 flex-shrink-0 flex flex-col gap-4 overflow-hidden">
-                    <Card className="p-6 flex flex-col flex-grow bg-gray-800/50 border-gray-700 overflow-hidden">
-                        <div className="flex items-center gap-2 mb-4">
-                            <BookOpenIcon className="h-5 w-5 text-cyan-400" />
-                            <h3 className="font-bold text-white">Temas da Disciplina</h3>
-                        </div>
-                        <select
-                            value={selectedSubjectId}
-                            onChange={e => setSelectedSubjectId(e.target.value)}
-                            className="w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white mb-4 text-sm focus:ring-1 focus:ring-cyan-500"
-                        >
-                            {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-                        </select>
-                        <div className="flex-grow overflow-y-auto pr-2 space-y-1 custom-scrollbar">
-                            {topicsForSelectedSubject.map(topic => (
-                                <React.Fragment key={topic.id}>
-                                    <div
-                                        onClick={() => setSelectedTopicId(prev => prev === topic.id ? null : topic.id)}
-                                        className={`p-2 rounded cursor-pointer transition-all text-xs font-semibold ${selectedTopicId === topic.id ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-900/40 translate-x-1' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'}`}
-                                    >
-                                        {topic.name}
-                                    </div>
-                                    {topic.subtopics.map(st => (
-                                        <div
-                                            key={st.id}
-                                            onClick={() => setSelectedTopicId(prev => prev === st.id ? null : st.id)}
-                                            className={`p-2 ml-3 rounded cursor-pointer transition-all text-[10px] ${selectedTopicId === st.id ? 'bg-cyan-700 text-white shadow-lg shadow-cyan-900/40 translate-x-1' : 'bg-gray-800 text-gray-400 hover:bg-gray-700'}`}
-                                        >
-                                            {st.name}
-                                        </div>
-                                    ))}
-                                </React.Fragment>
-                            ))}
-                        </div>
-                    </Card>
-
-                    <Card className="p-4 bg-gray-800/80 border-gray-700">
-                        <div className="flex items-center gap-2 mb-3">
-                            <Cog6ToothIcon className="h-4 w-4 text-purple-400" />
-                            <h4 className="text-sm font-bold text-white">Configurações</h4>
-                        </div>
-                        <div className="space-y-4">
-                            <div>
-                                <label className="text-[10px] uppercase font-bold text-gray-500 mb-1 block">Tipo de Recorrência</label>
-                                <div className="flex bg-gray-900 rounded-lg p-1">
-                                    <button 
-                                        onClick={() => updatePlanSettings('recurrence', 'weekly')}
-                                        className={`flex-1 py-1 text-[10px] rounded transition-colors ${editingPlan.settings?.recurrence === 'weekly' ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                                    >
-                                        Repetir Semanal
-                                    </button>
-                                    <button 
-                                        onClick={() => updatePlanSettings('recurrence', 'once')}
-                                        className={`flex-1 py-1 text-[10px] rounded transition-colors ${editingPlan.settings?.recurrence === 'once' ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:text-gray-300'}`}
-                                    >
-                                        Semana Única
-                                    </button>
-                                </div>
-                            </div>
-                            <div className="flex items-center justify-between">
-                                <span className="text-[10px] uppercase font-bold text-gray-500">Notificações</span>
-                                <button 
-                                    onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
-                                    className={`w-8 h-4 rounded-full relative transition-colors ${editingPlan.settings?.notifications ? 'bg-green-600' : 'bg-gray-600'}`}
-                                >
-                                    <div className={`absolute top-0.5 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-4.5' : 'left-0.5'}`} />
-                                </button>
-                            </div>
-                        </div>
-                    </Card>
-                </aside>
-
-                <div className="flex-1 flex flex-col gap-4 overflow-hidden">
-                    <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4">
-                        <div>
-                            <button onClick={() => setEditingPlanId(null)} className="text-cyan-400 text-xs hover:underline flex items-center gap-1">
-                                <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Galeria
-                            </button>
-                            <h2 className="text-2xl font-bold text-white mt-1 flex items-center gap-2">
-                                {editingPlan.name} 
-                                <span className="text-[10px] font-normal px-2 py-0.5 bg-gray-700 rounded-full text-gray-400">
-                                    {editingPlan.settings?.recurrence === 'weekly' ? 'Recorrente' : 'Fixo'}
-                                </span>
-                            </h2>
-                        </div>
-                        <div className="flex gap-2">
-                             {fullStudyPlan.activePlanId !== editingPlan.id && (
-                                 <Button 
-                                    onClick={() => handleSetActive(editingPlan.id)} 
-                                    className="text-xs py-2.5 px-5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 border-none shadow-lg shadow-orange-900/20 font-bold"
-                                 >
-                                    <FireIcon className="h-4 w-4 mr-2" /> Ativar Planejamento
-                                 </Button>
-                             )}
-                             <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2.5 px-5 bg-emerald-600 hover:bg-emerald-500 border-none">
-                                {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Tudo</>}
-                             </Button>
-                        </div>
+                {/* Header Integrado com Configurações */}
+                <div className="flex flex-col md:flex-row justify-between md:items-end gap-6 bg-gray-800/40 p-6 rounded-2xl border border-gray-700/50">
+                    <div className="space-y-1">
+                        <button onClick={() => setEditingPlanId(null)} className="text-cyan-400 text-xs hover:underline flex items-center gap-1 mb-2">
+                            <ArrowRightIcon className="h-3 w-3 rotate-180" /> Voltar para Galeria
+                        </button>
+                        <h2 className="text-3xl font-bold text-white flex items-center gap-3">
+                            {editingPlan.name}
+                        </h2>
+                        <p className="text-gray-500 text-xs font-medium uppercase tracking-widest">Editor de Cronograma de Estudos</p>
                     </div>
-                    <Card className="flex-grow p-4 overflow-hidden flex flex-col bg-gray-800/30 border-gray-700">
-                        <div className="flex-grow overflow-y-auto custom-scrollbar">
-                            <WeeklyStudyGrid 
-                                weeklyRoutine={editingPlan.weeklyRoutine}
-                                onUpdateRoutine={updatePlanRoutine}
-                                onRenameTime={renameTimeSlot}
-                                onRemoveTime={removeTimeSlot}
-                                onAddTime={() => {}}
-                                onOpenPicker={handleOpenPicker}
-                                selectedTopicId={selectedTopicId}
-                                getTopicName={getTopicName}
-                                getTopicColor={getTopicColor}
-                            />
+
+                    <div className="flex flex-wrap items-center gap-4 bg-gray-900/50 p-2 rounded-xl border border-gray-700/50">
+                        {/* Recorrência */}
+                        <div className="flex items-center gap-2 px-3 border-r border-gray-700">
+                            <CycleIcon className="h-4 w-4 text-cyan-400" />
+                            <select 
+                                value={editingPlan.settings?.recurrence}
+                                onChange={(e) => updatePlanSettings('recurrence', e.target.value)}
+                                className="bg-transparent text-xs font-bold text-gray-300 focus:outline-none cursor-pointer"
+                            >
+                                <option value="weekly">Semanal</option>
+                                <option value="once">Semana Única</option>
+                            </select>
                         </div>
-                    </Card>
+
+                        {/* Notificações */}
+                        <div className="flex items-center gap-3 px-3">
+                            <BellIcon className={`h-4 w-4 ${editingPlan.settings?.notifications ? 'text-emerald-400' : 'text-gray-500'}`} />
+                            <button 
+                                onClick={() => updatePlanSettings('notifications', !editingPlan.settings?.notifications)}
+                                className={`w-10 h-5 rounded-full relative transition-all ${editingPlan.settings?.notifications ? 'bg-emerald-600' : 'bg-gray-700'}`}
+                            >
+                                <div className={`absolute top-1 w-3 h-3 bg-white rounded-full transition-all ${editingPlan.settings?.notifications ? 'left-6' : 'left-1'}`} />
+                            </button>
+                        </div>
+
+                        {/* Salvar */}
+                        <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 border-none shadow-lg shadow-emerald-900/20">
+                            {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Alterações</>}
+                        </Button>
+                    </div>
                 </div>
 
-                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Disciplina/Tópico" size="xl">
+                {/* Grid Full Width */}
+                <Card className="flex-grow p-4 overflow-hidden flex flex-col bg-gray-800/20 border-gray-700/50">
+                    <div className="flex-grow overflow-y-auto custom-scrollbar">
+                        <WeeklyStudyGrid 
+                            weeklyRoutine={editingPlan.weeklyRoutine}
+                            onUpdateRoutine={updatePlanRoutine}
+                            onRenameTime={renameTimeSlot}
+                            onRemoveTime={removeTimeSlot}
+                            onAddTime={() => {}}
+                            onOpenPicker={handleOpenPicker}
+                            selectedTopicId={null}
+                            getTopicName={getTopicName}
+                            getTopicColor={getTopicColor}
+                        />
+                    </div>
+                </Card>
+
+                {/* Modal Global de Picker */}
+                <Modal isOpen={isPickerOpen} onClose={() => setIsPickerOpen(false)} title="Escolher Conteúdo para este Horário" size="xl">
                     <div className="space-y-4">
                         <div className="relative">
                             <GeminiIcon className="absolute left-3 top-3 h-5 w-5 text-cyan-400" />
@@ -320,7 +252,7 @@ export const StudentScheduler: React.FC<{
                                 type="text"
                                 value={pickerSearch}
                                 onChange={e => setPickerSearch(e.target.value)}
-                                placeholder="Pesquisar por matéria ou assunto..."
+                                placeholder="Pesquisar matéria ou assunto..."
                                 className="w-full bg-gray-700 border border-gray-600 rounded-xl py-3 pl-11 pr-4 text-white focus:ring-2 focus:ring-cyan-500 outline-none transition-all"
                                 autoFocus
                             />
@@ -345,7 +277,7 @@ export const StudentScheduler: React.FC<{
                                 </button>
                             ))}
                             {filteredPickerItems.length === 0 && (
-                                <div className="text-center py-8 text-gray-500">
+                                <div className="text-center py-8 text-gray-500 italic">
                                     Nenhum tópico encontrado para "{pickerSearch}"
                                 </div>
                             )}
@@ -371,12 +303,10 @@ export const StudentScheduler: React.FC<{
             />
 
             <div className="flex justify-between items-center">
-                <h2 className="text-3xl font-bold text-white tracking-tight">Cronogramas de Estudo</h2>
-                {plans.length > 0 && (
-                    <Button onClick={() => setIsCreateModalOpen(true)}>
-                        <PlusIcon className="h-5 w-5 mr-2" /> Novo Cronograma
-                    </Button>
-                )}
+                <h2 className="text-3xl font-bold text-white tracking-tight">Meus Cronogramas</h2>
+                <Button onClick={() => setIsCreateModalOpen(true)}>
+                    <PlusIcon className="h-5 w-5 mr-2" /> Novo Cronograma
+                </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -438,9 +368,6 @@ export const StudentScheduler: React.FC<{
                             className="w-full bg-gray-700 border border-gray-600 rounded-xl p-4 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none transition-all"
                             autoFocus
                         />
-                    </div>
-                    <div className="bg-gray-900/50 p-4 rounded-xl border border-gray-700">
-                        <p className="text-xs text-gray-400 italic">Ao criar, você poderá misturar conteúdos da plataforma com suas próprias anotações de estudo.</p>
                     </div>
                     <Button onClick={handleCreatePlan} disabled={!newPlanName.trim()} className="w-full py-4 text-lg font-bold">Gerar Planejamento</Button>
                 </div>
