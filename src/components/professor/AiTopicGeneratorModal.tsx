@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useId } from 'react';
 import * as GeminiService from '../../services/geminiService';
 import { Modal, Button, Spinner } from '../ui';
@@ -134,7 +135,8 @@ export const AiTopicGeneratorModal: React.FC<{
     const handleTopicSelection = (index: number, selected: boolean) => {
         const newTopics = [...generatedTopics];
         newTopics[index].selected = selected;
-        newTopics[index].subtopics.forEach(st => st.selected = selected);
+        // Fix: Added explicit type for 'st' to resolve TS7006
+        newTopics[index].subtopics.forEach((st: any) => st.selected = selected);
         setGeneratedTopics(newTopics);
     };
 

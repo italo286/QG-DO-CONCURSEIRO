@@ -1,6 +1,6 @@
 
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
-import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, MemoryGameData, AssociationGameData, OrderGameData, IntruderGameData, CategorizeGameData, StudyPlan, GlossaryTerm, MiniGame } from '../types';
+import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, GlossaryTerm, MiniGame } from '../types';
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
@@ -32,20 +32,6 @@ async function retryWithBackoff<T>(
     }
     throw new Error('Max retries reached for API call.');
 }
-
-const shuffleArray = <T>(array: T[]): T[] => {
-    if (!array) return [];
-    const newArray = [...array];
-    for (let i = newArray.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-    }
-    return newArray;
-};
-
-const stripOptionPrefix = (option: string): string => {
-    return option.replace(/^[A-Ea-e][.)]\s*/, '').trim();
-};
 
 const questionSchema = {
     type: Type.ARRAY,
@@ -87,11 +73,10 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
     }
 }
 
-export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount: number = 20, generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
+export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount: number = 20, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no PDF. Siga o schema.`;
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: prompt }, pdfPart] },
@@ -100,10 +85,9 @@ export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount:
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const generateQuestionsFromText = async (text: string, questionCount: number = 20, generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
+export const generateQuestionsFromText = async (text: string, questionCount: number = 20, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no texto: ${text}. Siga o schema.`;
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: prompt,
@@ -114,7 +98,6 @@ export const generateQuestionsFromText = async (text: string, questionCount: num
 
 export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Gere questões customizadas. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}.`,
@@ -123,10 +106,9 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const extractQuestionsFromTecPdf = async (pdfBase64: string, generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
+export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: "Extraia questões deste PDF do TEC Concursos." }, pdfPart] },
@@ -135,9 +117,8 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, generateJust
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const extractQuestionsFromTecText = async (text: string, generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
+export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Extraia questões deste texto do TEC: ${text}`,
@@ -146,9 +127,8 @@ export const extractQuestionsFromTecText = async (text: string, generateJustific
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const generateSmartReview = async (progress: StudentProgress, allSubjects: Subject[]): Promise<Question[]> => {
+export const generateSmartReview = async (progress: StudentProgress, _allSubjects: Subject[]): Promise<Question[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Crie uma revisão baseada no progresso: ${JSON.stringify(progress)}`,
@@ -159,7 +139,6 @@ export const generateSmartReview = async (progress: StudentProgress, allSubjects
 
 export const generateTopicsFromText = async (text: string): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Extraia tópicos e subtópicos deste texto: ${text}`,
@@ -171,7 +150,6 @@ export const generateTopicsFromText = async (text: string): Promise<any[]> => {
 export const generateFlashcardsFromPdf = async (pdfBase64: string): Promise<Omit<Flashcard, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: "Gere flashcards deste PDF." }, pdfPart] },
@@ -180,9 +158,8 @@ export const generateFlashcardsFromPdf = async (pdfBase64: string): Promise<Omit
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const analyzeStudentDifficulties = async (questions: any[], attempts: QuestionAttempt[]): Promise<string> => {
+export const analyzeStudentDifficulties = async (_questions: any[], attempts: QuestionAttempt[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analise as dificuldades baseadas nas tentativas: ${JSON.stringify(attempts)}`,
@@ -192,7 +169,6 @@ export const analyzeStudentDifficulties = async (questions: any[], attempts: Que
 
 export const getAiExplanationForText = async (text: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Explique: ${text}`,
@@ -202,7 +178,6 @@ export const getAiExplanationForText = async (text: string): Promise<string> => 
 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Resuma: ${text}`,
@@ -212,7 +187,6 @@ export const getAiSummaryForText = async (text: string): Promise<string> => {
 
 export const getAiQuestionForText = async (text: string): Promise<Omit<Question, 'id'>> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Crie uma questão sobre: ${text}`,
@@ -229,20 +203,18 @@ export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat 
     });
 };
 
-export const generateFlashcardsFromIncorrectAnswers = async (incorrectQuestions: Question[]): Promise<Omit<Flashcard, 'id'>[]> => {
+export const generateFlashcardsFromIncorrectAnswers = async (_incorrectQuestions: Question[]): Promise<Omit<Flashcard, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Gere flashcards das questões erradas: ${JSON.stringify(incorrectQuestions)}`,
+        contents: `Gere flashcards das questões erradas.`,
         config: { responseMimeType: "application/json" }
     }));
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const generateQuizFeedback = async (questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
+export const generateQuizFeedback = async (_questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Feedback do quiz: ${JSON.stringify(attempts)}`,
@@ -253,7 +225,6 @@ export const generateQuizFeedback = async (questions: Question[], attempts: Ques
 export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInfo> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: "Analise este edital." }, pdfPart] },
@@ -262,19 +233,17 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
     return parseJsonResponse(response.text ?? '', 'object');
 };
 
-export const generateReviewSummaryForIncorrectQuestions = async (incorrectQuestions: Question[]): Promise<string> => {
+export const generateReviewSummaryForIncorrectQuestions = async (_incorrectQuestions: Question[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
-        contents: `Resumo de revisão para erros: ${JSON.stringify(incorrectQuestions)}`,
+        contents: `Resumo de revisão para erros.`,
     }));
     return response.text ?? '';
 };
 
 export const generateJustificationsForQuestion = async (question: any): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Justifique as alternativas da questão: ${JSON.stringify(question)}`,
@@ -286,7 +255,6 @@ export const generateJustificationsForQuestion = async (question: any): Promise<
 export const generateGameFromPdf = async (pdfBase64: string, gameType: MiniGameType): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: `Gere dados para o jogo ${gameType} baseado no PDF.` }, pdfPart] },
@@ -297,7 +265,6 @@ export const generateGameFromPdf = async (pdfBase64: string, gameType: MiniGameT
 
 export const generateGameFromText = async (text: string, gameType: MiniGameType): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Gere jogo ${gameType} do texto: ${text}`,
@@ -308,7 +275,6 @@ export const generateGameFromText = async (text: string, gameType: MiniGameType)
 
 export const generateAllGamesFromText = async (text: string): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Gere todos os jogos possíveis do texto: ${text}`,
@@ -317,9 +283,8 @@ export const generateAllGamesFromText = async (text: string): Promise<any[]> => 
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const generateAdaptiveStudyPlan = async (subjects: Subject[], progress: StudentProgress, days: number = 7): Promise<any> => {
+export const generateAdaptiveStudyPlan = async (_subjects: Subject[], _progress: StudentProgress, days: number = 7): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Crie plano adaptativo de ${days} dias baseado no progresso.`,
@@ -331,7 +296,6 @@ export const generateAdaptiveStudyPlan = async (subjects: Subject[], progress: S
 export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<GlossaryTerm[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: { parts: [{ text: "Gere um glossário deste PDF." }, pdfPart] },
@@ -340,9 +304,8 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
-export const generatePortugueseChallenge = async (questionCount: number, errorStats?: any): Promise<any[]> => {
+export const generatePortugueseChallenge = async (questionCount: number, _errorStats?: any): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Gere ${questionCount} desafios de português.`,
@@ -353,7 +316,6 @@ export const generatePortugueseChallenge = async (questionCount: number, errorSt
 
 export const analyzeTopicFrequencies = async (analysisText: string, topics: any[]): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    // FIX: Added explicit GenerateContentResponse generic type to retryWithBackoff call to resolve 'unknown' property access errors.
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
         contents: `Analise a frequência de cobrança destes tópicos: ${JSON.stringify(topics)} baseado no texto: ${analysisText}`,
