@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { StudyPlan, StudyPlanItem, Subject, Course } from '../../types';
+import { StudyPlan, StudyPlanItem, Subject } from '../../types';
 import { Card, Button, Modal } from '../ui';
 import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';

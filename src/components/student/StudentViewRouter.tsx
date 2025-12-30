@@ -167,7 +167,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             if (!props.selectedTopic || !props.selectedSubject) return null;
             return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} />;
         case 'schedule':
-            return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} studentProgress={props.studentProgress} onSaveFullPlan={props.onSaveFullPlan} enrolledCourses={props.enrolledCourses} />;
+            return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} onSaveFullPlan={props.onSaveFullPlan} />;
         case 'performance':
             return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
         case 'reviews':
