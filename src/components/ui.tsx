@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useId, useState } from 'react';
-import { XCircleIcon } from './Icons';
+/* Added CheckCircleIcon to fix missing import error on line 228 */
+import { XCircleIcon, ExclamationTriangleIcon, CheckCircleIcon } from './Icons';
 
 export const Spinner: React.FC = () => (
     <div role="status" className="inline-flex justify-center items-center">
@@ -58,7 +59,6 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
     const lastFocusableElementRef = useRef<HTMLElement | null>(null);
     const modalTitleId = useId();
 
-    // Controle de foco apenas na abertura
     useEffect(() => {
         if (isOpen) {
             const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
@@ -68,7 +68,6 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
                 firstFocusableElementRef.current = focusableElements[0];
                 lastFocusableElementRef.current = focusableElements[focusableElements.length - 1];
                 
-                // Só foca automaticamente se o foco atual não estiver dentro do modal
                 if (!modalRef.current?.contains(document.activeElement)) {
                     firstFocusableElementRef.current.focus();
                 }
@@ -98,7 +97,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
                 document.removeEventListener('keydown', handleKeyDown);
             };
         }
-    }, [isOpen]); // Removido onClose da dependência para evitar re-focar ao digitar
+    }, [isOpen]);
 
 
     if (!isOpen) return null;
@@ -126,6 +125,53 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
     );
 };
 
+export const ConfirmModal: React.FC<{
+    isOpen: boolean;
+    onClose: () => void;
+    onConfirm: () => void;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
+    variant?: 'danger' | 'primary';
+}> = ({ isOpen, onClose, onConfirm, title, message, confirmLabel = 'Confirmar', cancelLabel = 'Cancelar', variant = 'primary' }) => {
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[200] p-4" onClick={onClose}>
+            <div className="bg-gray-800 rounded-xl shadow-2xl w-full max-w-md border border-gray-700 animate-fade-in" onClick={e => e.stopPropagation()}>
+                <div className="p-6">
+                    <div className="flex items-center gap-4 mb-4">
+                        <div className={`p-2 rounded-full ${variant === 'danger' ? 'bg-red-900/30 text-red-400' : 'bg-cyan-900/30 text-cyan-400'}`}>
+                            <ExclamationTriangleIcon className="h-6 w-6" />
+                        </div>
+                        <h2 className="text-xl font-bold text-white">{title}</h2>
+                    </div>
+                    <p className="text-gray-300 mb-6">{message}</p>
+                    <div className="flex justify-end gap-3">
+                        <button 
+                            onClick={onClose}
+                            className="px-4 py-2 rounded-lg text-gray-400 hover:text-white hover:bg-gray-700 transition-colors"
+                        >
+                            {cancelLabel}
+                        </button>
+                        <button 
+                            onClick={() => { onConfirm(); onClose(); }}
+                            className={`px-4 py-2 rounded-lg font-semibold text-white shadow-lg transition-all active:scale-95 ${
+                                variant === 'danger' 
+                                ? 'bg-red-600 hover:bg-red-500 shadow-red-900/20' 
+                                : 'bg-cyan-600 hover:bg-cyan-500 shadow-cyan-900/20'
+                            }`}
+                        >
+                            {confirmLabel}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
 export const EmbedHtml: React.FC<{ html: string; className?: string }> = ({ html, className }) => {
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -133,11 +179,9 @@ export const EmbedHtml: React.FC<{ html: string; className?: string }> = ({ html
     const container = containerRef.current;
     if (!container) return;
 
-    // Clear previous content
     container.innerHTML = '';
 
     if (html) {
-      // Use a temporary element to parse the HTML string
       const tempDiv = document.createElement('div');
       tempDiv.innerHTML = html;
       
@@ -148,18 +192,15 @@ export const EmbedHtml: React.FC<{ html: string; className?: string }> = ({ html
           const script = document.createElement('script');
           const oldScript = node as HTMLScriptElement;
           
-          // Copy attributes
           for (let i = 0; i < oldScript.attributes.length; i++) {
             const attr = oldScript.attributes[i];
             script.setAttribute(attr.name, attr.value);
           }
           
-          // Copy inner text
           script.text = oldScript.text;
           
           container.appendChild(script);
         } else {
-          // For other nodes (like iframes, divs, etc.), just clone and append them
           container.appendChild(node.cloneNode(true));
         }
       });
@@ -169,16 +210,24 @@ export const EmbedHtml: React.FC<{ html: string; className?: string }> = ({ html
   return <div ref={containerRef} className={`${className} w-full h-full`}></div>;
 };
 
-export const Toast: React.FC<{ message: string, onDismiss: () => void }> = ({ message, onDismiss }) => {
+export const Toast: React.FC<{ message: string, onDismiss: () => void, variant?: 'success' | 'error' | 'info' }> = ({ message, onDismiss, variant = 'success' }) => {
     useEffect(() => {
         const timer = setTimeout(() => {
             onDismiss();
-        }, 3000);
+        }, 4000);
         return () => clearTimeout(timer);
     }, [onDismiss]);
 
+    const colors = {
+        success: 'bg-emerald-500 shadow-emerald-900/20',
+        error: 'bg-red-500 shadow-red-900/20',
+        info: 'bg-cyan-500 shadow-cyan-900/20'
+    };
+
     return (
-        <div role="alert" aria-live="assertive" className="fixed bottom-5 right-5 bg-green-500 text-white py-2 px-4 rounded-lg shadow-lg z-50">
+        <div role="alert" aria-live="assertive" className={`fixed bottom-8 left-1/2 -translate-x-1/2 md:translate-x-0 md:left-auto md:right-8 flex items-center gap-3 py-3 px-6 rounded-xl shadow-2xl text-white font-semibold z-[300] animate-fade-in ${colors[variant]}`}>
+            {variant === 'success' && <CheckCircleIcon className="h-5 w-5" />}
+            {variant === 'error' && <XCircleIcon className="h-5 w-5" />}
             {message}
         </div>
     );
@@ -229,18 +278,18 @@ export const CountdownTimer: React.FC<{ targetDate: string }> = ({ targetDate })
 };
 
 export const COLORS = [
-  '#ef4444', // red-500
-  '#f97316', // orange-500
-  '#eab308', // yellow-500
-  '#84cc16', // lime-500
-  '#22c55e', // green-500
-  '#14b8a6', // teal-500
-  '#0ea5e9', // sky-500
-  '#3b82f6', // blue-500
-  '#6366f1', // indigo-500
-  '#8b5cf6', // violet-500
-  '#d946ef', // fuchsia-500
-  '#ec4899', // pink-500
+  '#ef4444', 
+  '#f97316', 
+  '#eab308', 
+  '#84cc16', 
+  '#22c55e', 
+  '#14b8a6', 
+  '#0ea5e9', 
+  '#3b82f6', 
+  '#6366f1', 
+  '#8b5cf6', 
+  '#d946ef', 
+  '#ec4899', 
 ];
 
 export const ColorPalettePicker: React.FC<{

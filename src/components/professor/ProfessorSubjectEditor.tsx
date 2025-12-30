@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect, useCallback, DragEvent, TouchEvent } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { Subject, Topic, SubTopic } from '../../types';
-import { Card, Button, Spinner, ColorPalettePicker } from '../ui';
+import { Card, Button, Spinner, ColorPalettePicker, ConfirmModal } from '../ui';
 import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
@@ -67,6 +68,10 @@ export const ProfessorSubjectEditor: React.FC<{
     const [isAiTopicModalOpen, setIsAiTopicModalOpen] = useState(false);
     const [draggedTopicIndex, setDraggedTopicIndex] = useState<number | null>(null);
     const [draggedSubtopicInfo, setDraggedSubtopicInfo] = useState<{ parentIndex: number; subtopicIndex: number } | null>(null);
+
+    const [confirmDeleteSubject, setConfirmDeleteSubject] = useState(false);
+    const [confirmDeleteTopicData, setConfirmDeleteTopicData] = useState<{ id: string, name: string } | null>(null);
+    const [confirmDeleteSubtopicData, setConfirmDeleteSubtopicData] = useState<{ id: string, name: string, parent: Topic } | null>(null);
     
     useEffect(() => {
         setCurrentSubject(subject);
@@ -77,7 +82,7 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const updateSubjectStateAndDb = useCallback(async (updatedSubject: Subject) => {
         setIsSaving(true);
-        setCurrentSubject(updatedSubject); // Optimistic UI update
+        setCurrentSubject(updatedSubject); 
         await FirebaseService.updateSubject(updatedSubject);
         setIsSaving(false);
     }, []);
@@ -91,13 +96,12 @@ export const ProfessorSubjectEditor: React.FC<{
         }
     };
     
-    const handleDeleteSubject = async () => {
-        if(window.confirm("Tem certeza que deseja apagar esta disciplina? Ela será removida de todos os cursos. Esta ação não pode ser desfeita.")){
-            setIsSaving(true);
-            await FirebaseService.deleteSubject(subject.id);
-            setIsSaving(false);
-            onBack();
-        }
+    const executeDeleteSubject = async () => {
+        setIsSaving(true);
+        await FirebaseService.deleteSubject(subject.id);
+        setIsSaving(false);
+        setToastMessage("Disciplina excluída.");
+        onBack();
     }
     
     const handleOpenTopicModal = (topic: Topic | null) => {
@@ -117,10 +121,10 @@ export const ProfessorSubjectEditor: React.FC<{
 
         if (isEditing) {
             updatedTopics = currentSubject.topics.map(t => t.id === topicToSave.id ? topicToSave : t);
-            setToastMessage("Tópico atualizado com sucesso!");
+            setToastMessage("Tópico atualizado!");
         } else {
             updatedTopics = [...currentSubject.topics, topicToSave];
-             setToastMessage("Tópico criado com sucesso!");
+             setToastMessage("Tópico criado!");
         }
         
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
@@ -184,25 +188,25 @@ export const ProfessorSubjectEditor: React.FC<{
         const updatedTopics = [...currentSubject.topics, ...newTopics];
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         setIsAiTopicModalOpen(false);
-        setToastMessage(`${newTopics.length} tópicos foram adicionados com sucesso!`);
+        setToastMessage(`${newTopics.length} tópicos foram adicionados!`);
     }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
     
-    const handleDeleteTopic = useCallback((topicId: string, topicName: string) => {
-        if(window.confirm(`Tem certeza que deseja apagar o tópico "${topicName}" e todos os seus subtópicos e jogos?`)){
-            const updatedTopics = currentSubject.topics.filter(t => t.id !== topicId);
-            updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
-        }
-    }, [currentSubject, updateSubjectStateAndDb]);
+    const executeDeleteTopic = () => {
+        if (!confirmDeleteTopicData) return;
+        const updatedTopics = currentSubject.topics.filter(t => t.id !== confirmDeleteTopicData.id);
+        updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
+        setToastMessage("Tópico removido.");
+    };
 
-    const handleDeleteSubTopic = useCallback((subTopicId: string, subTopicName: string, parentTopic: Topic) => {
-         if(window.confirm(`Tem certeza que deseja apagar o subtópico "${subTopicName}" e todos os seus jogos?`)){
-            const updatedSubtopics = parentTopic.subtopics.filter(st => st.id !== subTopicId);
-            const updatedParentTopic = { ...parentTopic, subtopics: updatedSubtopics };
-            const updatedTopics = currentSubject.topics.map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
-            
-            updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
-        }
-    }, [currentSubject, updateSubjectStateAndDb]);
+    const executeDeleteSubtopic = () => {
+         if (!confirmDeleteSubtopicData) return;
+         const { id, parent } = confirmDeleteSubtopicData;
+         const updatedSubtopics = parent.subtopics.filter(st => st.id !== id);
+         const updatedParentTopic = { ...parent, subtopics: updatedSubtopics };
+         const updatedTopics = currentSubject.topics.map(t => t.id === updatedParentTopic.id ? updatedParentTopic : t);
+         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
+         setToastMessage("Subtópico removido.");
+    };
     
     const handleCloseTopicModal = useCallback(() => { setIsTopicModalOpen(false); setEditingTopic(null); }, []);
     const handleCloseSubTopicModal = useCallback(() => { setIsSubTopicModalOpen(false); setEditingSubTopic(null); setParentTopicForSubTopic(null); }, []);
@@ -228,7 +232,7 @@ export const ProfessorSubjectEditor: React.FC<{
         newTopics.splice(dropIndex, 0, draggedItem);
         
         const updatedSubject = { ...currentSubject, topics: newTopics };
-        updateSubjectStateAndDb(updatedSubject); // Save the new order
+        updateSubjectStateAndDb(updatedSubject); 
         setDraggedTopicIndex(null);
     };
 
@@ -236,32 +240,23 @@ export const ProfessorSubjectEditor: React.FC<{
         setDraggedTopicIndex(null);
     };
 
-    // Touch handlers for mobile reordering
     const handleTouchStart = (e: TouchEvent<HTMLElement>, index: number) => {
         setDraggedTopicIndex(index);
         e.currentTarget.classList.add('dragging-touch');
     };
 
-    const handleTouchMove = (_e: TouchEvent<HTMLElement>) => {
-        // This is primarily to allow scrolling prevention if needed,
-        // but the main logic happens on touch end.
-    };
+    const handleTouchMove = (_e: TouchEvent<HTMLElement>) => {};
 
     const handleTouchEnd = (e: TouchEvent<HTMLElement>) => {
         if (draggedTopicIndex === null) return;
-        
-        // Find the element that was being dragged and remove visual feedback
         const draggedElement = document.querySelector('.dragging-touch');
         draggedElement?.classList.remove('dragging-touch');
-        
         const touch = e.changedTouches[0];
         const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-        
         if (!elementUnder) {
             setDraggedTopicIndex(null);
             return;
         }
-
         const dropTarget = elementUnder.closest('[data-topic-index]');
         if (dropTarget) {
             const dropIndex = Number((dropTarget as HTMLElement).dataset.topicIndex);
@@ -269,14 +264,13 @@ export const ProfessorSubjectEditor: React.FC<{
                 handleDrop(dropIndex);
             }
         }
-        setDraggedTopicIndex(null); // Always reset
+        setDraggedTopicIndex(null); 
     };
     
-    // --- NEW SUBTOPIC DRAG HANDLERS ---
     const handleSubtopicDragStart = (e: DragEvent<HTMLDivElement>, parentIndex: number, subtopicIndex: number) => {
         setDraggedSubtopicInfo({ parentIndex, subtopicIndex });
         e.dataTransfer.effectAllowed = 'move';
-        e.stopPropagation(); // Prevent topic drag from firing
+        e.stopPropagation(); 
     };
 
     const handleSubtopicDragOver = (e: DragEvent<HTMLDivElement>) => {
@@ -286,13 +280,11 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const reorderSubtopics = (dragParentIndex: number, dragSubtopicIndex: number, dropParentIndex: number, dropSubtopicIndex: number) => {
         if (dragParentIndex !== dropParentIndex) return;
-
         const newTopics = [...currentSubject.topics];
         const parentTopic = newTopics[dragParentIndex];
         const newSubtopics = [...parentTopic.subtopics];
         const [draggedItem] = newSubtopics.splice(dragSubtopicIndex, 1);
         newSubtopics.splice(dropSubtopicIndex, 0, draggedItem);
-
         parentTopic.subtopics = newSubtopics;
         const updatedSubject = { ...currentSubject, topics: newTopics };
         updateSubjectStateAndDb(updatedSubject);
@@ -303,13 +295,10 @@ export const ProfessorSubjectEditor: React.FC<{
             setDraggedSubtopicInfo(null);
             return;
         }
-
         const { parentIndex, subtopicIndex: dragSubtopicIndex } = draggedSubtopicInfo;
-
         if (dragSubtopicIndex !== dropSubtopicIndex) {
             reorderSubtopics(parentIndex, dragSubtopicIndex, dropParentIndex, dropSubtopicIndex);
         }
-        
         setDraggedSubtopicInfo(null);
     };
 
@@ -318,7 +307,6 @@ export const ProfessorSubjectEditor: React.FC<{
         e.stopPropagation();
     };
     
-    // --- NEW SUBTOPIC TOUCH HANDLERS ---
     const handleSubtopicTouchStart = (e: TouchEvent<HTMLDivElement>, parentIndex: number, subtopicIndex: number) => {
         setDraggedSubtopicInfo({ parentIndex, subtopicIndex });
         e.currentTarget.classList.add('dragging-touch');
@@ -327,23 +315,18 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const handleSubtopicTouchEnd = (e: TouchEvent<HTMLDivElement>) => {
         if (!draggedSubtopicInfo) return;
-        
         const draggedElement = document.querySelector('.dragging-touch');
         draggedElement?.classList.remove('dragging-touch');
-        
         const touch = e.changedTouches[0];
         const elementUnder = document.elementFromPoint(touch.clientX, touch.clientY);
-        
         if (!elementUnder) {
             setDraggedSubtopicInfo(null);
             return;
         }
-
         const dropTarget = elementUnder.closest('[data-subtopic-index]');
         if (dropTarget) {
             const dropParentIndex = Number((dropTarget as HTMLElement).dataset.parentIndex);
             const dropSubtopicIndex = Number((dropTarget as HTMLElement).dataset.subtopicIndex);
-
             if (draggedSubtopicInfo.parentIndex === dropParentIndex && draggedSubtopicInfo.subtopicIndex !== dropSubtopicIndex) {
                 reorderSubtopics(draggedSubtopicInfo.parentIndex, draggedSubtopicInfo.subtopicIndex, dropParentIndex, dropSubtopicIndex);
             }
@@ -375,6 +358,36 @@ export const ProfessorSubjectEditor: React.FC<{
 
     return (
         <div className="max-w-4xl mx-auto">
+            <ConfirmModal 
+                isOpen={confirmDeleteSubject}
+                onClose={() => setConfirmDeleteSubject(false)}
+                onConfirm={executeDeleteSubject}
+                title="Apagar Disciplina"
+                message="Tem certeza que deseja apagar esta disciplina? Ela será removida de todos os cursos. Esta ação não pode ser desfeita."
+                variant="danger"
+                confirmLabel="Apagar permanentemente"
+            />
+
+            <ConfirmModal 
+                isOpen={!!confirmDeleteTopicData}
+                onClose={() => setConfirmDeleteTopicData(null)}
+                onConfirm={executeDeleteTopic}
+                title={`Apagar Tópico: ${confirmDeleteTopicData?.name}`}
+                message="Tem certeza que deseja apagar este tópico e todos os seus subtópicos, questões e jogos associados?"
+                variant="danger"
+                confirmLabel="Apagar tudo"
+            />
+
+            <ConfirmModal 
+                isOpen={!!confirmDeleteSubtopicData}
+                onClose={() => setConfirmDeleteSubtopicData(null)}
+                onConfirm={executeDeleteSubtopic}
+                title={`Apagar Subtópico: ${confirmDeleteSubtopicData?.name}`}
+                message="Tem certeza que deseja apagar este subtópico e todos os seus conteúdos associados?"
+                variant="danger"
+                confirmLabel="Apagar subtópico"
+            />
+
             <Card className="p-6 relative">
                  {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
                  <div className="flex justify-between items-start">
@@ -398,7 +411,7 @@ export const ProfessorSubjectEditor: React.FC<{
                             className="text-2xl font-bold text-white bg-transparent border-b-2 border-transparent focus:border-cyan-500 focus:outline-none" 
                         />
                     </div>
-                    <Button onClick={handleDeleteSubject} className="text-sm py-2 px-4 bg-red-600 hover:bg-red-700" aria-label={`Apagar disciplina ${currentSubject.name}`}>
+                    <Button onClick={() => setConfirmDeleteSubject(true)} className="text-sm py-2 px-4 bg-red-600 hover:bg-red-700" aria-label={`Apagar disciplina ${currentSubject.name}`}>
                         <TrashIcon className="h-4 w-4" />
                     </Button>
                 </div>
@@ -456,7 +469,7 @@ export const ProfessorSubjectEditor: React.FC<{
                                     <div className="flex items-center space-x-2">
                                         <button onClick={(e) => {e.stopPropagation(); handleOpenSubTopicModal(null, topic)}} className="p-1 text-gray-400 hover:text-green-400 text-xs bg-gray-700 rounded-md" aria-label={`Adicionar subtópico em ${topic.name}`}>Adicionar Subtópico</button>
                                         <button onClick={(e) => {e.stopPropagation(); handleOpenTopicModal(topic)}} className="p-2 text-gray-400 hover:text-cyan-400" aria-label={`Editar tópico ${topic.name}`}><PencilIcon className="h-5 w-5"/></button>
-                                        <button onClick={(e) => {e.stopPropagation(); handleDeleteTopic(topic.id, topic.name)}} className="p-2 text-gray-400 hover:text-red-500" aria-label={`Apagar tópico ${topic.name}`}><TrashIcon className="h-5 w-5" /></button>
+                                        <button onClick={(e) => {e.stopPropagation(); setConfirmDeleteTopicData({ id: topic.id, name: topic.name })}} className="p-2 text-gray-400 hover:text-red-500" aria-label={`Apagar tópico ${topic.name}`}><TrashIcon className="h-5 w-5" /></button>
                                         <ChevronDownIcon className="h-5 w-5 transition-transform details-open:rotate-180" aria-hidden="true"/>
                                     </div>
                                 </div>
@@ -492,7 +505,7 @@ export const ProfessorSubjectEditor: React.FC<{
                                                     </div>
                                                     <div className="flex space-x-2">
                                                         <button onClick={() => handleOpenSubTopicModal(subtopic, topic)} className="p-1 text-gray-400 hover:text-cyan-400" aria-label={`Editar subtópico ${subtopic.name}`}><PencilIcon className="h-4 w-4"/></button>
-                                                        <button onClick={() => handleDeleteSubTopic(subtopic.id, subtopic.name, topic)} className="p-1 text-gray-400 hover:text-red-500" aria-label={`Apagar subtópico ${subtopic.name}`}><TrashIcon className="h-4 w-4" /></button>
+                                                        <button onClick={() => setConfirmDeleteSubtopicData({ id: subtopic.id, name: subtopic.name, parent: topic })} className="p-1 text-gray-400 hover:text-red-500" aria-label={`Apagar subtópico ${subtopic.name}`}><TrashIcon className="h-4 w-4" /></button>
                                                     </div>
                                                 </div>
                                                 <MaterialSummary content={subtopic} />

@@ -3,7 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { User, Subject, StudyPlan } from '../../types';
 import { getWeekDates, getLocalDateISOString } from '../../utils';
-import { Card, Button, Spinner } from '../ui';
+import { Card, Button, Spinner, Toast } from '../ui';
 
 export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[] }> = ({ subjects, students }) => {
     const [selectedStudentId, setSelectedStudentId] = useState<string>('');
@@ -15,6 +15,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
     const [editedPlan, setEditedPlan] = useState<StudyPlan['plan'] | null>(null);
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
 
     useEffect(() => {
         setIsLoading(true);
@@ -27,7 +28,6 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
     }, [students]);
     
     useEffect(() => {
-        // Set initial selected subject
         if (subjects.length > 0 && !selectedSubjectId) {
             setSelectedSubjectId(subjects[0].id);
         }
@@ -55,17 +55,22 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
 
     const handleSavePlan = async () => {
         if (!selectedStudentId || editedPlan === null) {
-            alert('Por favor, selecione um aluno.');
+            setToastMessage("Selecione um aluno primeiro.");
             return;
         }
         setIsSaving(true);
-        await FirebaseService.saveStudyPlanForStudent({
-            ...(allStudyPlans[selectedStudentId] || { plans: [] }),
-            studentId: selectedStudentId,
-            plan: editedPlan,
-        });
-        setIsSaving(false);
-        alert('Cronograma salvo com sucesso!');
+        try {
+            await FirebaseService.saveStudyPlanForStudent({
+                ...(allStudyPlans[selectedStudentId] || { plans: [] }),
+                studentId: selectedStudentId,
+                plan: editedPlan,
+            });
+            setToastMessage("Cronograma salvo com sucesso!");
+        } catch (error) {
+            setToastMessage("Erro ao salvar cronograma.");
+        } finally {
+            setIsSaving(false);
+        }
     };
     
     const addTopicToDate = (topicId: string, dateISO: string) => {
@@ -85,7 +90,7 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
     const handleDayClick = (dateISO: string) => {
         if (selectedTopicId) {
             addTopicToDate(selectedTopicId, dateISO);
-            setSelectedTopicId(null); // Deselect after placing
+            setSelectedTopicId(null); 
         }
     };
 
@@ -125,12 +130,13 @@ export const ProfessorScheduler: React.FC<{ subjects: Subject[], students: User[
             className="flex gap-8" 
             style={{ height: 'calc(100vh - 220px)' }}
         >
+            {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
             <aside className="w-96 flex-shrink-0">
                 <Card className="p-6 flex flex-col h-full">
                     <h3 className="text-lg font-bold mb-4 text-white">Clique em um Tópico, depois no dia</h3>
                     {!selectedStudentId && (
-                        <div className="p-3 mb-4 rounded-md bg-yellow-900/50 border border-yellow-700 text-yellow-200 text-sm">
-                            <p>Selecione um aluno para começar a planejar.</p>
+                        <div className="p-3 mb-4 rounded-md bg-yellow-900/50 border border-yellow-700 text-yellow-200 text-sm text-center">
+                            <p>Selecione um aluno para começar.</p>
                         </div>
                     )}
                      <select

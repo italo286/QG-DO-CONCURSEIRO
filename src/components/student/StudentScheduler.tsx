@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
-import { Card, Button, Modal, Spinner } from '../ui';
+import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
 import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon, SaveIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
@@ -15,6 +15,8 @@ export const StudentScheduler: React.FC<{
     const [newPlanName, setNewPlanName] = useState('');
     const [newPlanType, setNewPlanType] = useState<'standard' | 'custom'>('standard');
     const [isSaving, setIsSaving] = useState(false);
+    const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -66,15 +68,15 @@ export const StudentScheduler: React.FC<{
         setIsCreateModalOpen(false);
         setNewPlanName('');
         setEditingPlanId(newPlan.id);
+        setToastMessage("Planejamento criado com sucesso!");
     };
 
-    const handleDeletePlan = async (id: string) => {
-        if (!window.confirm('Excluir este planejamento permanentemente?')) return;
-        
-        const updatedPlans = plans.filter(p => p.id !== id);
+    const executeDeletePlan = async () => {
+        if (!confirmDeleteId) return;
+        const updatedPlans = plans.filter(p => p.id !== confirmDeleteId);
         let activeId = fullStudyPlan.activePlanId;
         
-        if (activeId === id) {
+        if (activeId === confirmDeleteId) {
             activeId = updatedPlans.length > 0 ? updatedPlans[0].id : "";
         }
         
@@ -85,17 +87,20 @@ export const StudentScheduler: React.FC<{
         };
 
         await onSaveFullPlan(updatedPlan);
+        setToastMessage("Planejamento excluído.");
+        setConfirmDeleteId(null);
     };
 
     const handleSetActive = async (id: string) => {
         await onSaveFullPlan({ ...fullStudyPlan, activePlanId: id });
+        setToastMessage("Planejamento ativado!");
     };
 
     const handleManualSave = async () => {
         setIsSaving(true);
         try {
             await onSaveFullPlan(fullStudyPlan);
-            alert('Planejamento salvo com sucesso!');
+            setToastMessage("Alterações salvas com sucesso!");
         } finally {
             setIsSaving(false);
         }
@@ -135,7 +140,8 @@ export const StudentScheduler: React.FC<{
     };
 
     const removeTimeSlot = async (time: string) => {
-        if (!editingPlan || !window.confirm(`Remover horário ${time}?`)) return;
+        if (!editingPlan) return;
+        // Simplificado para remover direto, ou poderia adicionar outro confirm modal específico para linha
         const newPlans = plans.map(p => {
             if (p.id === editingPlanId) {
                 const routine = { ...p.weeklyRoutine };
@@ -159,6 +165,7 @@ export const StudentScheduler: React.FC<{
     if (editingPlan) {
         return (
             <div className="flex flex-col md:flex-row gap-8 h-[calc(100vh-220px)] animate-fade-in">
+                {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
                 {editingPlan.type === 'standard' && (
                     <aside className="w-full md:w-80 flex-shrink-0">
                         <Card className="p-6 flex flex-col h-full bg-gray-800/50 border-gray-700">
@@ -232,6 +239,18 @@ export const StudentScheduler: React.FC<{
 
     return (
         <div className="space-y-8 animate-fade-in">
+            {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+            
+            <ConfirmModal 
+                isOpen={!!confirmDeleteId}
+                onClose={() => setConfirmDeleteId(null)}
+                onConfirm={executeDeletePlan}
+                title="Excluir Planejamento"
+                message="Tem certeza que deseja excluir este planejamento permanentemente? Esta ação não pode ser desfeita."
+                confirmLabel="Excluir"
+                variant="danger"
+            />
+
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-white">Cronogramas de Estudo</h2>
                 {plans.length > 0 && (
@@ -258,7 +277,7 @@ export const StudentScheduler: React.FC<{
                                     Tipo: {plan.type === 'standard' ? 'Padrão (Semanal)' : 'Personalizado (Diário)'}
                                 </p>
                             </div>
-                            <button onClick={() => handleDeletePlan(plan.id)} className="text-gray-500 hover:text-red-400 p-1">
+                            <button onClick={() => setConfirmDeleteId(plan.id)} className="text-gray-500 hover:text-red-400 p-1">
                                 <TrashIcon className="h-5 w-5" />
                             </button>
                         </div>
