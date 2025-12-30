@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { StudyPlan, StudyPlanItem, Subject } from '../../types';
-import { Card, Button, Modal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon } from '../Icons';
+import { Card, Button, Modal, Spinner } from '../ui';
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, BookOpenIcon, ListBulletIcon, SaveIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 
 export const StudentScheduler: React.FC<{
@@ -14,6 +14,7 @@ export const StudentScheduler: React.FC<{
     const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
     const [newPlanName, setNewPlanName] = useState('');
     const [newPlanType, setNewPlanType] = useState<'standard' | 'custom'>('standard');
+    const [isSaving, setIsSaving] = useState(false);
 
     const [selectedSubjectId, setSelectedSubjectId] = useState<string>('');
     const [selectedTopicId, setSelectedTopicId] = useState<string | null>(null);
@@ -73,7 +74,6 @@ export const StudentScheduler: React.FC<{
         const updatedPlans = plans.filter(p => p.id !== id);
         let activeId = fullStudyPlan.activePlanId;
         
-        // Se o plano que está sendo excluído for o ativo, seleciona o próximo disponível ou limpa
         if (activeId === id) {
             activeId = updatedPlans.length > 0 ? updatedPlans[0].id : "";
         }
@@ -90,6 +90,16 @@ export const StudentScheduler: React.FC<{
     const handleSetActive = async (id: string) => {
         await onSaveFullPlan({ ...fullStudyPlan, activePlanId: id });
     };
+
+    const handleManualSave = async () => {
+        setIsSaving(true);
+        try {
+            await onSaveFullPlan(fullStudyPlan);
+            alert('Planejamento salvo com sucesso!');
+        } finally {
+            setIsSaving(false);
+        }
+    }
 
     const updatePlanRoutine = async (day: number, time: string, content: string | null) => {
         if (!editingPlan) return;
@@ -136,6 +146,10 @@ export const StudentScheduler: React.FC<{
         });
         onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
     };
+
+    const closeModal = useCallback(() => {
+        setIsCreateModalOpen(false);
+    }, []);
 
     const topicsForSelectedSubject = useMemo(() => {
         if (!selectedSubjectId) return [];
@@ -188,8 +202,11 @@ export const StudentScheduler: React.FC<{
                             <h2 className="text-xl font-bold text-white mt-1">{editingPlan.name} <span className="text-xs font-normal text-gray-500">({editingPlan.type === 'standard' ? 'Padrão' : 'Personalizado'})</span></h2>
                         </div>
                         <div className="flex gap-2">
+                             <Button onClick={handleManualSave} disabled={isSaving} className="text-xs py-2 px-4 bg-emerald-600 hover:bg-emerald-500 border-none shadow-emerald-900/20">
+                                {isSaving ? <Spinner /> : <><SaveIcon className="h-4 w-4 mr-2" /> Salvar Planejamento</>}
+                             </Button>
                              {fullStudyPlan.activePlanId !== editingPlan.id && (
-                                 <Button onClick={() => handleSetActive(editingPlan.id)} className="text-xs py-1 px-3 bg-indigo-600 hover:bg-indigo-500">Ativar no Dashboard</Button>
+                                 <Button onClick={() => handleSetActive(editingPlan.id)} className="text-xs py-2 px-4 bg-indigo-600 hover:bg-indigo-500 border-none">Ativar no Dashboard</Button>
                              )}
                         </div>
                     </div>
@@ -217,9 +234,11 @@ export const StudentScheduler: React.FC<{
         <div className="space-y-8 animate-fade-in">
             <div className="flex justify-between items-center">
                 <h2 className="text-3xl font-bold text-white">Cronogramas de Estudo</h2>
-                <Button onClick={() => setIsCreateModalOpen(true)}>
-                    <PlusIcon className="h-5 w-5 mr-2" /> Novo Planejamento
-                </Button>
+                {plans.length > 0 && (
+                    <Button onClick={() => setIsCreateModalOpen(true)}>
+                        <PlusIcon className="h-5 w-5 mr-2" /> Novo Planejamento
+                    </Button>
+                )}
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -245,11 +264,11 @@ export const StudentScheduler: React.FC<{
                         </div>
                         
                         <div className="mt-auto flex gap-2">
-                            <Button onClick={() => setEditingPlanId(plan.id)} className="flex-1 text-sm py-2 bg-gray-700 hover:bg-gray-600">
+                            <Button onClick={() => setEditingPlanId(plan.id)} className="flex-1 text-sm py-2 bg-gray-700 hover:bg-gray-600 border-none">
                                 <PencilIcon className="h-4 w-4 mr-2" /> Editar
                             </Button>
                             {fullStudyPlan.activePlanId !== plan.id && (
-                                <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-indigo-600 hover:bg-indigo-500">
+                                <Button onClick={() => handleSetActive(plan.id)} className="flex-1 text-sm py-2 bg-indigo-600 hover:bg-indigo-500 border-none">
                                     Selecionar
                                 </Button>
                             )}
@@ -266,16 +285,18 @@ export const StudentScheduler: React.FC<{
                 )}
             </div>
 
-            <Modal isOpen={isCreateModalOpen} onClose={() => setIsCreateModalOpen(false)} title="Novo Planejamento">
+            <Modal isOpen={isCreateModalOpen} onClose={closeModal} title="Novo Planejamento">
                 <div className="space-y-6 p-2">
                     <div>
-                        <label className="block text-sm font-medium text-gray-400 mb-1">Nome do Planejamento</label>
+                        <label htmlFor="plan-name-input" className="block text-sm font-medium text-gray-400 mb-1">Nome do Planejamento</label>
                         <input 
+                            id="plan-name-input"
                             type="text" 
                             value={newPlanName} 
                             onChange={e => setNewPlanName(e.target.value)}
                             placeholder="Ex: Concurso Bombeiros 2025"
-                            className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-cyan-500"
+                            className="w-full bg-gray-700 border border-gray-600 rounded-lg p-3 text-white focus:ring-2 focus:ring-cyan-500 focus:outline-none"
+                            autoFocus
                         />
                     </div>
                     <div>

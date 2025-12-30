@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useId, useState } from 'react';
 import { XCircleIcon } from './Icons';
 
@@ -8,7 +9,6 @@ export const Spinner: React.FC = () => (
     </div>
 );
 
-// FIX: Added 'title' and 'style' to the component's props to allow passing HTML attributes and custom styling.
 export const Button: React.FC<{
     onClick?: (e: React.MouseEvent<HTMLButtonElement>) => void;
     children: React.ReactNode;
@@ -58,6 +58,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
     const lastFocusableElementRef = useRef<HTMLElement | null>(null);
     const modalTitleId = useId();
 
+    // Controle de foco apenas na abertura
     useEffect(() => {
         if (isOpen) {
             const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
@@ -66,7 +67,11 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
             if (focusableElements && focusableElements.length > 0) {
                 firstFocusableElementRef.current = focusableElements[0];
                 lastFocusableElementRef.current = focusableElements[focusableElements.length - 1];
-                firstFocusableElementRef.current.focus();
+                
+                // Só foca automaticamente se o foco atual não estiver dentro do modal
+                if (!modalRef.current?.contains(document.activeElement)) {
+                    firstFocusableElementRef.current.focus();
+                }
             }
 
             const handleKeyDown = (e: KeyboardEvent) => {
@@ -93,7 +98,7 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
                 document.removeEventListener('keydown', handleKeyDown);
             };
         }
-    }, [isOpen, onClose]);
+    }, [isOpen]); // Removido onClose da dependência para evitar re-focar ao digitar
 
 
     if (!isOpen) return null;
@@ -107,11 +112,11 @@ export const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: stri
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-            <div ref={modalRef} className={`bg-gray-800 rounded-xl shadow-lg w-full ${sizeClasses[size]} border border-gray-700`} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby={modalTitleId}>
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-[100] p-4 overflow-y-auto" onClick={onClose}>
+            <div ref={modalRef} className={`bg-gray-800 rounded-xl shadow-2xl w-full ${sizeClasses[size]} border border-gray-700 my-auto`} onClick={e => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby={modalTitleId}>
                 <div className="p-6 border-b border-gray-700 flex justify-between items-center">
                     <h2 id={modalTitleId} className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-purple-500">{title}</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Fechar modal">&times;</button>
+                    <button onClick={onClose} className="text-gray-400 hover:text-white text-2xl leading-none" aria-label="Fechar modal">&times;</button>
                 </div>
                 <div className="p-6 max-h-[80vh] overflow-y-auto">
                     {children}
