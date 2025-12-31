@@ -151,8 +151,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         const today = new Date().toISOString().split('T')[0];
         const allFlashcards = props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.flashcards, ...t.subtopics.flatMap(st => st.flashcards)]));
         const dueIds = Object.entries(props.studentProgress.srsFlashcardData || {})
-            // FIX: Explicitly typing the entries of srsFlashcardData to resolve the 'Property nextReviewDate does not exist on type unknown' error on line 154.
-            .filter(([, data]: [string, any]) => data.nextReviewDate <= today)
+            .filter(([, data]: [string, any]) => data && data.nextReviewDate && data.nextReviewDate <= today)
             .map(([id]) => id);
         return allFlashcards.filter(f => dueIds.includes(f.id));
     }, [props.allSubjects, props.studentProgress.srsFlashcardData]);
@@ -160,22 +159,83 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
     // --- Router Switch ---
     switch (props.view) {
         case 'dashboard':
-            return <DashboardHome {...props} />;
+            return <DashboardHome 
+                messages={props.messages}
+                enrolledCourses={props.enrolledCourses}
+                studentProgress={props.studentProgress}
+                currentUser={props.currentUser}
+                fullStudyPlan={props.fullStudyPlan}
+                allSubjects={props.allSubjects}
+                teacherProfiles={props.teacherProfiles}
+                onAcknowledgeMessage={props.onAcknowledgeMessage}
+                onCourseSelect={props.onCourseSelect}
+                onStartDailyChallenge={props.onStartDailyChallenge}
+                onGenerateAllChallenges={props.onGenerateAllChallenges}
+                isGeneratingAllChallenges={props.isGeneratingAllChallenges}
+                onNavigateToTopic={props.onNavigateToTopic}
+                onToggleTopicCompletion={props.onToggleTopicCompletion}
+                onOpenNewMessageModal={props.onOpenNewMessageModal}
+            />;
         case 'course':
             if (!props.selectedCourse) return null;
-            return <CourseView {...props} course={props.selectedCourse} currentUserId={props.currentUser.id} />;
+            return <CourseView 
+                course={props.selectedCourse}
+                allSubjects={props.allSubjects}
+                studentProgress={props.studentProgress}
+                allStudents={props.allStudents}
+                allStudentProgress={props.allStudentProgress}
+                currentUserId={props.currentUser.id}
+                onSubjectSelect={props.onSubjectSelect}
+                onSelectTargetCargo={props.onSelectTargetCargo}
+            />;
         case 'subject':
             if (!props.selectedSubject || !props.selectedCourse) return null;
-            return <SubjectView subject={props.selectedSubject} studentProgress={props.studentProgress} onTopicSelect={props.onTopicSelect} course={props.selectedCourse}/>;
+            return <SubjectView 
+                subject={props.selectedSubject} 
+                studentProgress={props.studentProgress} 
+                onTopicSelect={props.onTopicSelect} 
+                course={props.selectedCourse}
+            />;
         case 'topic':
             if (!props.selectedTopic || !props.selectedSubject) return null;
-            return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} studentProgress={props.studentProgress} />;
+            return <TopicView 
+                selectedSubject={props.selectedSubject} 
+                selectedTopic={props.selectedTopic} 
+                selectedSubtopic={props.selectedSubtopic}
+                studentProgress={props.studentProgress}
+                isPreview={props.isPreview}
+                isSplitView={props.isSplitView}
+                isSidebarCollapsed={props.isSidebarCollapsed}
+                onNoteSave={props.onNoteSave}
+                saveQuizProgress={props.saveQuizProgress}
+                handleTopicQuizComplete={props.handleTopicQuizComplete}
+                onPlayGame={props.onPlayGame}
+                onToggleSplitView={props.onToggleSplitView}
+                onSetIsSidebarCollapsed={props.onSetIsSidebarCollapsed}
+                onOpenChatModal={props.onOpenChatModal}
+                onAddBonusXp={props.onAddBonusXp}
+                onReportQuestion={props.onReportQuestion}
+            />;
         case 'schedule':
             return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} onSaveFullPlan={props.onSaveFullPlan} />;
         case 'performance':
             return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
         case 'reviews':
-            return <StudentReviewsView {...props} isGenerating={props.isGeneratingReview} studentProgress={props.studentProgress} incorrectQuestions={incorrectQuestions as any} srsFlashcardsDue={srsFlashcardsDue} allQuestions={allQuestions} />;
+            return <StudentReviewsView 
+                studentProgress={props.studentProgress}
+                allSubjects={props.allSubjects}
+                enrolledCourses={props.enrolledCourses}
+                onStartReview={props.onStartReview}
+                onGenerateSmartReview={props.onGenerateSmartReview}
+                onGenerateSrsReview={props.onGenerateSrsReview}
+                onGenerateSmartFlashcards={props.onGenerateSmartFlashcards}
+                onFlashcardReview={props.onFlashcardReview}
+                allQuestions={allQuestions}
+                incorrectQuestions={incorrectQuestions}
+                isGenerating={props.isGeneratingReview}
+                srsFlashcardsDue={srsFlashcardsDue}
+                onUpdateStudentProgress={props.onUpdateStudentProgress}
+            />;
         case 'review_quiz':
             if (!props.selectedReview) return null;
             return <QuizView
@@ -203,7 +263,16 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
              if (!props.dailyChallengeResults) return null;
              return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
         case 'practice_area':
-            return <StudentPracticeAreaView {...props} />;
+            return <StudentPracticeAreaView 
+                studentProgress={props.studentProgress}
+                allSubjects={props.allSubjects}
+                onStartQuiz={props.onStartQuiz}
+                onDeleteQuiz={props.onDeleteQuiz}
+                onOpenCreator={props.onOpenCreator}
+                onSaveSimulado={props.onSaveSimulado}
+                onStartSimulado={props.onStartSimulado}
+                onDeleteSimulado={props.onDeleteSimulado}
+            />;
         case 'custom_quiz_player':
             if (!props.activeCustomQuiz) return null;
             return <QuizView
@@ -230,6 +299,22 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 studentProgress={props.studentProgress}
             />;
         default:
-            return <DashboardHome {...props} />;
+            return <DashboardHome 
+                messages={props.messages}
+                enrolledCourses={props.enrolledCourses}
+                studentProgress={props.studentProgress}
+                currentUser={props.currentUser}
+                fullStudyPlan={props.fullStudyPlan}
+                allSubjects={props.allSubjects}
+                teacherProfiles={props.teacherProfiles}
+                onAcknowledgeMessage={props.onAcknowledgeMessage}
+                onCourseSelect={props.onCourseSelect}
+                onStartDailyChallenge={props.onStartDailyChallenge}
+                onGenerateAllChallenges={props.onGenerateAllChallenges}
+                isGeneratingAllChallenges={props.isGeneratingAllChallenges}
+                onNavigateToTopic={props.onNavigateToTopic}
+                onToggleTopicCompletion={props.onToggleTopicCompletion}
+                onOpenNewMessageModal={props.onOpenNewMessageModal}
+            />;
     }
 };

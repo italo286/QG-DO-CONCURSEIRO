@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
-      external: ['firebase-admin', '@netlify/functions', 'jspdf', 'jspdf-autotable'],
+      external: ['firebase-admin', '@netlify/functions'],
     },
   },
 })
