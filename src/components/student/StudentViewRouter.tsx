@@ -1,20 +1,14 @@
 
-import React from 'react';
-import {
-    User, Subject, Topic, Question, StudentProgress, TeacherMessage, StudyPlan, Course, SubTopic, ReviewSession, MiniGame, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado
-} from '../../types';
-import { getLocalDateISOString } from '../../utils';
-
-// Import all view components
-import { StudentPerformanceDashboard } from './StudentPerformanceDashboard';
+import React, { useMemo } from 'react';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, StudyPlan, Flashcard, TeacherMessage } from '../../types';
+import { DashboardHome } from './views/DashboardHome';
+import { CourseView } from './views/CourseView';
+import { SubjectView } from './views/SubjectView';
+import { TopicView } from './views/TopicView';
 import { StudentScheduler } from './StudentScheduler';
+import { StudentPerformanceDashboard } from './StudentPerformanceDashboard';
 import { StudentReviewsView } from './StudentReviewsView';
 import { QuizView } from './QuizView';
-import { GamesView } from './views/GamesView';
-import { TopicView } from './views/TopicView';
-import { SubjectView } from './views/SubjectView';
-import { CourseView } from './views/CourseView';
-import { DashboardHome } from './views/DashboardHome';
 import { DailyChallengeResultsView } from './views/DailyChallengeResultsView';
 import { StudentPracticeAreaView } from './views/StudentPracticeAreaView';
 
@@ -46,13 +40,11 @@ interface StudentViewRouterProps {
     activeCustomQuiz: CustomQuiz | null;
     activeSimulado: Simulado | null;
     isGeneratingAllChallenges: boolean;
-
-    // Callbacks
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
     onSubjectSelect: (subject: Subject) => void;
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
-    onStartDailyChallenge: (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp?: boolean) => void;
+    onStartDailyChallenge: (challenge: DailyChallenge<Question>, type: 'review' | 'glossary' | 'portuguese') => void;
     onGenerateAllChallenges: () => void;
     onNavigateToTopic: (topicId: string) => void;
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
@@ -79,81 +71,90 @@ interface StudentViewRouterProps {
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
     onOpenChatModal: () => void;
     setView: (view: ViewType) => void;
-    setActiveChallenge: (challenge: { type: 'review' | 'glossary' | 'portuguese', questions: Question[], sessionAttempts: QuestionAttempt[], isCatchUp?: boolean } | null) => void;
-    onSaveDailyChallengeAttempt: (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => void;
-    handleGameComplete: (gameId: string) => void;
-    handleGameError: () => void;
+    setActiveChallenge: (challenge: any) => void;
+    onSaveDailyChallengeAttempt: (type: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => void;
     onReportQuestion: (subjectId: string, topicId: string, questionId: string, isTec: boolean, reason: string) => void;
     onCloseDailyChallengeResults: () => void;
-    onNavigateToDailyChallengeResults?: () => void;
+    onNavigateToDailyChallengeResults: () => void;
     onOpenCreator: () => void;
     onStartQuiz: (quiz: CustomQuiz) => void;
     onDeleteQuiz: (quizId: string) => void;
     saveCustomQuizAttempt: (attempt: QuestionAttempt) => void;
-    handleCustomQuizComplete: (finalAttempts: QuestionAttempt[]) => void;
+    handleCustomQuizComplete: (attempts: QuestionAttempt[]) => void;
     onSaveSimulado: (simulado: Simulado) => void;
     onStartSimulado: (simulado: Simulado) => void;
     onDeleteSimulado: (simuladoId: string) => void;
     saveSimuladoAttempt: (attempt: QuestionAttempt) => void;
-    handleSimuladoComplete: (finalAttempts: QuestionAttempt[]) => void;
+    handleSimuladoComplete: (attempts: QuestionAttempt[]) => void;
 }
 
 export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
     if (props.isPreview && props.view !== 'dashboard') {
-        return (
-            <div className="text-center text-gray-400 p-8">
-                <p>Navegação desabilitada no modo de pré-visualização.</p>
-            </div>
-        );
+        return <div className="text-center text-gray-400 p-8"><p>Navegação desabilitada no modo de pré-visualização.</p></div>;
     }
 
-    const incorrectQuestions = React.useMemo(() => {
-        if (!props.studentProgress) return [];
-        const correctQuestionIds = new Set<string>();
-        const incorrectQuestionIds = new Set<string>();
-        const allAttempts = [
-            ...Object.values(props.studentProgress.progressByTopic).flatMap((s: any) => Object.values(s).flatMap((t: any) => t.lastAttempt)),
-            ...props.studentProgress.reviewSessions.flatMap(r => r.attempts || [])
-        ];
-        allAttempts.forEach(attempt => {
-            if (attempt.isCorrect) correctQuestionIds.add(attempt.questionId);
-            else incorrectQuestionIds.add(attempt.questionId);
-        });
-        const finalIncorrectIds = Array.from(incorrectQuestionIds).filter(id => !correctQuestionIds.has(id));
-        const allQuestionsWithContext = props.allSubjects.flatMap(subject =>
-            subject.topics.flatMap(topic =>
+    // --- Data Logic ---
+    const allQuestions = useMemo(() => {
+        return props.allSubjects.flatMap(subject => 
+            subject.topics.flatMap(topic => 
                 [
-                    ...topic.questions.map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name })),
-                    ...(topic.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name })),
+                    ...topic.questions.map(q => ({...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name})),
+                    ...(topic.tecQuestions || []).map(q => ({...q, subjectId: subject.id, topicId: topic.id, topicName: topic.name, subjectName: subject.name})),
                     ...topic.subtopics.flatMap(st => [
-                        ...st.questions.map(q => ({ ...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name })),
-                        ...(st.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name })),
+                        ...st.questions.map(q => ({...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name})),
+                        ...(st.tecQuestions || []).map(q => ({...q, subjectId: subject.id, topicId: st.id, topicName: `${topic.name} / ${st.name}`, subjectName: subject.name})),
                     ])
                 ]
             )
         );
-        return allQuestionsWithContext.filter(q => finalIncorrectIds.includes(q.id));
-    }, [props.studentProgress, props.allSubjects]);
-
-    const srsFlashcardsDue = React.useMemo(() => {
-        const today = getLocalDateISOString(new Date());
-        const allFlashcards = [
-            ...(props.studentProgress?.aiGeneratedFlashcards || []),
-            ...props.allSubjects.flatMap(s => s.topics.flatMap(t => [...(t.flashcards || []), ...t.subtopics.flatMap(st => st.flashcards || [])]))
-        ];
-        const uniqueFlashcards = allFlashcards.filter((v, i, a) => a.findIndex(t => t.id === v.id) === i);
-        if (!props.studentProgress?.srsFlashcardData) return [];
-        return uniqueFlashcards.filter(fc => {
-            const srsData = props.studentProgress.srsFlashcardData![fc.id];
-            return srsData && srsData.nextReviewDate <= today;
-        });
-    }, [props.studentProgress, props.allSubjects]);
-
-    const allQuestions = React.useMemo(() => {
-        return props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.questions, ...(t.tecQuestions || []), ...t.subtopics.flatMap(st => [...st.questions, ...(st.tecQuestions || [])])]));
     }, [props.allSubjects]);
 
+    const incorrectQuestions = useMemo(() => {
+        const attemptedIds = new Set<string>();
+        const correctIds = new Set<string>();
 
+        const processAttempt = (attempt: QuestionAttempt) => {
+            attemptedIds.add(attempt.questionId);
+            if (attempt.isCorrect) {
+                correctIds.add(attempt.questionId);
+            }
+        };
+
+        Object.values(props.studentProgress.progressByTopic).forEach(subject => {
+            Object.values(subject).forEach(topic => {
+                topic.lastAttempt.forEach(processAttempt);
+            });
+        });
+        props.studentProgress.reviewSessions.forEach(session => {
+            (session.attempts || []).forEach(processAttempt);
+        });
+
+        const incorrectIds = new Set<string>();
+        attemptedIds.forEach(id => {
+            if (!correctIds.has(id)) {
+                incorrectIds.add(id);
+            }
+        });
+
+        return allQuestions.filter(q => incorrectIds.has(q.id)).map(q => ({
+            ...q,
+            subjectId: q.subjectId || '',
+            subjectName: q.subjectName || '',
+            topicId: q.topicId || '',
+            topicName: q.topicName || ''
+        }));
+    }, [allQuestions, props.studentProgress]);
+
+    const srsFlashcardsDue = useMemo(() => {
+        const today = new Date().toISOString().split('T')[0];
+        const allFlashcards = props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.flashcards, ...t.subtopics.flatMap(st => st.flashcards)]));
+        const dueIds = Object.entries(props.studentProgress.srsFlashcardData || {})
+            .filter(([, data]) => data.nextReviewDate <= today)
+            .map(([id]) => id);
+        return allFlashcards.filter(f => dueIds.includes(f.id));
+    }, [props.allSubjects, props.studentProgress.srsFlashcardData]);
+
+    // --- Router Switch ---
     switch (props.view) {
         case 'dashboard':
             return <DashboardHome {...props} />;
@@ -165,13 +166,13 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             return <SubjectView subject={props.selectedSubject} studentProgress={props.studentProgress} onTopicSelect={props.onTopicSelect} course={props.selectedCourse}/>;
         case 'topic':
             if (!props.selectedTopic || !props.selectedSubject) return null;
-            return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} />;
+            return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} studentProgress={props.studentProgress} />;
         case 'schedule':
             return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} onSaveFullPlan={props.onSaveFullPlan} />;
         case 'performance':
             return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
         case 'reviews':
-            return <StudentReviewsView {...props} isGenerating={props.isGeneratingReview} incorrectQuestions={incorrectQuestions} srsFlashcardsDue={srsFlashcardsDue} allQuestions={allQuestions} />;
+            return <StudentReviewsView {...props} isGenerating={props.isGeneratingReview} studentProgress={props.studentProgress} incorrectQuestions={incorrectQuestions as any} srsFlashcardsDue={srsFlashcardsDue} allQuestions={allQuestions} />;
         case 'review_quiz':
             if (!props.selectedReview) return null;
             return <QuizView
@@ -181,8 +182,8 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={(attempts) => props.handleReviewQuizComplete(props.selectedReview!.id, attempts)}
                 onBack={() => props.setView('reviews')}
                 quizTitle={props.selectedReview.name}
-                subjectName={props.selectedReview.type === 'ai' ? 'Revisão Inteligente' : props.selectedReview.type === 'srs' ? 'Revisão Diária' : "Revisão"}
                 onAddBonusXp={props.onAddBonusXp}
+                studentProgress={props.studentProgress}
             />;
         case 'daily_challenge_quiz':
             if (!props.activeChallenge) return null;
@@ -193,26 +194,17 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onSaveAttempt={(attempt) => props.onSaveDailyChallengeAttempt(props.activeChallenge!.type, attempt)}
                 onComplete={(attempts) => props.handleDailyChallengeComplete(attempts, props.activeChallenge?.isCatchUp)}
                 onBack={() => { props.setView('dashboard'); props.setActiveChallenge(null); }}
-                quizTitle={`Desafio Diário: ${props.activeChallenge.type === 'review' ? 'Revisão' : props.activeChallenge.type === 'glossary' ? 'Glossário' : 'Português'}`}
-                subjectName="Desafio Diário"
+                quizTitle={`Desafio Diário`}
                 onAddBonusXp={props.onAddBonusXp}
                 isDailyChallenge={true}
                 dailyChallengeType={props.activeChallenge.type}
                 hideBackButtonOnResults={true}
                 onNavigateToDailyChallengeResults={props.onNavigateToDailyChallengeResults}
-                onReportQuestion={props.activeChallenge.type === 'review' 
-                    ? (question, reason) => {
-                        if (question.subjectId && question.topicId) {
-                            props.onReportQuestion(question.subjectId, question.topicId, question.id, !!question.isTec, reason);
-                        }
-                    } 
-                    : undefined}
+                studentProgress={props.studentProgress}
             />;
         case 'daily_challenge_results':
-            if (!props.dailyChallengeResults) return null;
-            return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
-        case 'games':
-            return <GamesView {...props} />;
+             if (!props.dailyChallengeResults) return null;
+             return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
         case 'practice_area':
             return <StudentPracticeAreaView {...props} />;
         case 'custom_quiz_player':
@@ -225,8 +217,8 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={props.handleCustomQuizComplete}
                 onBack={() => props.setView('practice_area')}
                 quizTitle={props.activeCustomQuiz.name}
-                subjectName="Quiz Personalizado"
                 onAddBonusXp={props.onAddBonusXp}
+                studentProgress={props.studentProgress}
             />;
         case 'simulado_player':
             if (!props.activeSimulado) return null;
@@ -238,10 +230,10 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={props.handleSimuladoComplete}
                 onBack={() => props.setView('practice_area')}
                 quizTitle={props.activeSimulado.name}
-                subjectName="Simulado Personalizado"
                 onAddBonusXp={props.onAddBonusXp}
                 durationInSeconds={props.activeSimulado.config.durationInSeconds}
                 feedbackMode={props.activeSimulado.config.feedbackMode}
+                studentProgress={props.studentProgress}
             />;
         default:
             return <DashboardHome {...props} />;
