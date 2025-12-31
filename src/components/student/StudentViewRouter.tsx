@@ -151,7 +151,8 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         const today = new Date().toISOString().split('T')[0];
         const allFlashcards = props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.flashcards, ...t.subtopics.flatMap(st => st.flashcards)]));
         const dueIds = Object.entries(props.studentProgress.srsFlashcardData || {})
-            .filter(([, data]) => data.nextReviewDate <= today)
+            // FIX: Explicitly typing the entries of srsFlashcardData to resolve the 'Property nextReviewDate does not exist on type unknown' error on line 154.
+            .filter(([, data]: [string, any]) => data.nextReviewDate <= today)
             .map(([id]) => id);
         return allFlashcards.filter(f => dueIds.includes(f.id));
     }, [props.allSubjects, props.studentProgress.srsFlashcardData]);
