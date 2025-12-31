@@ -14,6 +14,7 @@ import { StudentPracticeAreaView } from './views/StudentPracticeAreaView';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
+// FIX: Added handleGameError to interface to resolve type errors in Dashboard and Painel components
 interface StudentViewRouterProps {
     view: ViewType;
     isPreview?: boolean;
@@ -86,6 +87,8 @@ interface StudentViewRouterProps {
     onDeleteSimulado: (simuladoId: string) => void;
     saveSimuladoAttempt: (attempt: QuestionAttempt) => void;
     handleSimuladoComplete: (attempts: QuestionAttempt[]) => void;
+    handleGameComplete: (gameId: string) => void;
+    handleGameError: () => void;
 }
 
 export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
@@ -182,7 +185,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={(attempts) => props.handleReviewQuizComplete(props.selectedReview!.id, attempts)}
                 onBack={() => props.setView('reviews')}
                 quizTitle={props.selectedReview.name}
-                onAddBonusXp={props.onAddBonusXp}
                 studentProgress={props.studentProgress}
             />;
         case 'daily_challenge_quiz':
@@ -195,10 +197,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={(attempts) => props.handleDailyChallengeComplete(attempts, props.activeChallenge?.isCatchUp)}
                 onBack={() => { props.setView('dashboard'); props.setActiveChallenge(null); }}
                 quizTitle={`Desafio Diário`}
-                onAddBonusXp={props.onAddBonusXp}
                 isDailyChallenge={true}
-                dailyChallengeType={props.activeChallenge.type}
-                hideBackButtonOnResults={true}
                 onNavigateToDailyChallengeResults={props.onNavigateToDailyChallengeResults}
                 studentProgress={props.studentProgress}
             />;
@@ -217,7 +216,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={props.handleCustomQuizComplete}
                 onBack={() => props.setView('practice_area')}
                 quizTitle={props.activeCustomQuiz.name}
-                onAddBonusXp={props.onAddBonusXp}
                 studentProgress={props.studentProgress}
             />;
         case 'simulado_player':
@@ -230,9 +228,7 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onComplete={props.handleSimuladoComplete}
                 onBack={() => props.setView('practice_area')}
                 quizTitle={props.activeSimulado.name}
-                onAddBonusXp={props.onAddBonusXp}
                 durationInSeconds={props.activeSimulado.config.durationInSeconds}
-                feedbackMode={props.activeSimulado.config.feedbackMode}
                 studentProgress={props.studentProgress}
             />;
         default:

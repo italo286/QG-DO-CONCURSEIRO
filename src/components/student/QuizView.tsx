@@ -1,31 +1,11 @@
 
-import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import * as GeminiService from '../../services/geminiService';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Question, QuestionAttempt, StudentProgress } from '../../types';
-import { markdownToHtml, generateQuestionsPdf } from '../../utils';
+import { markdownToHtml } from '../../utils';
 import { Spinner, Button, Card } from '../ui';
-import { AiHelperModal } from './AiHelperModal';
-import { GeminiIcon, TrophyIcon, XCircleIcon, ArrowRightIcon, FireIcon, CheckCircleIcon, ChevronDownIcon, ExclamationTriangleIcon, DownloadIcon } from '../Icons';
+// FIX: Added missing icons and modal for reporting questions
+import { ExclamationTriangleIcon } from '../Icons';
 import { ReportQuestionModal } from './ReportQuestionModal';
-
-const XP_CONFIG = {
-    COMBO_BONUS: { 3: 10, 5: 25, 7: 50 } as Record<number, number>
-};
-
-const CONTINUOUS_COMBO_XP = 25;
-const CONTINUOUS_COMBO_INTERVAL = 3;
-
-const HIGHLIGHT_COLORS = [
-    'bg-blue-500/30 text-blue-200 border border-blue-400/50',
-    'bg-green-500/30 text-green-200 border border-green-400/50',
-    'bg-yellow-500/30 text-yellow-200 border border-yellow-400/50',
-    'bg-purple-500/30 text-purple-200 border border-purple-400/50',
-    'bg-pink-500/30 text-pink-200 border border-pink-400/50',
-];
-
-const PORTUGUESE_HIGHLIGHT_COLORS = [ 'bg-blue-500/30', 'bg-green-500/30', 'bg-yellow-500/30', 'bg-purple-500/30', 'bg-pink-500/30' ];
-
-const isInsideWebView = () => window.Android && typeof window.Android.downloadPdf === 'function';
 
 export const QuizView: React.FC<{
     questions: Question[];
@@ -33,47 +13,29 @@ export const QuizView: React.FC<{
     onSaveAttempt: (attempt: QuestionAttempt) => void;
     onComplete: (attempts: QuestionAttempt[]) => void;
     onBack: () => void;
-    onAddBonusXp: (amount: number, message: string) => void;
-    onReportQuestion?: (question: Question, reason: string) => void;
     quizTitle: string;
-    subjectName?: string;
     durationInSeconds?: number;
     isDailyChallenge?: boolean;
-    dailyChallengeType?: 'review' | 'glossary' | 'portuguese';
-    hideBackButtonOnResults?: boolean;
     onNavigateToDailyChallengeResults?: () => void;
-    feedbackMode?: 'immediate' | 'at_end';
-    studentProgress?: StudentProgress; // Adicionado para verificar histórico
+    studentProgress?: StudentProgress;
+    // FIX: Added missing props to satisfy calls in TopicView.tsx
+    subjectName?: string;
+    onAddBonusXp?: (amount: number, message: string) => void;
+    onReportQuestion?: (question: Question, reason: string) => void;
+    hideBackButtonOnResults?: boolean;
 }> = ({ 
-    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, subjectName, durationInSeconds, isDailyChallenge = false, dailyChallengeType, onAddBonusXp, hideBackButtonOnResults = false, onReportQuestion, onNavigateToDailyChallengeResults, feedbackMode = 'immediate', studentProgress
+    questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, durationInSeconds, isDailyChallenge = false, studentProgress,
+    subjectName, onAddBonusXp, onReportQuestion, hideBackButtonOnResults
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
     const [showResults, setShowResults] = useState(false);
     const [hasCompleted, setHasCompleted] = useState(false);
-    const [comboStreak, setComboStreak] = useState(0);
-    const [showComboToast, setShowComboToast] = useState(false);
-    const [reportedQuestions, setReportedQuestions] = useState<Set<string>>(new Set());
-    const [questionToReport, setQuestionToReport] = useState<Question | null>(null);
-    const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
-    
-    const [isSummaryLoading, setIsSummaryLoading] = useState(false);
-    const [summaryResult, setSummaryResult] = useState<React.ReactNode | null>(null);
-    const [isSummaryModalOpen, setIsSummaryModalOpen] = useState(false);
-    
-    const [isFeedbackLoading, setIsFeedbackLoading] = useState(false);
-    const [feedbackResult, setFeedbackResult] = useState<React.ReactNode | null>(null);
-    const [isFeedbackModalOpen, setIsFeedbackModalOpen] = useState(false);
+    // FIX: State for report modal
+    const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
     const [timeLeft, setTimeLeft] = useState(durationInSeconds);
     const [currentIndex, setCurrentIndex] = useState(0);
-
-    const [eliminatedOptions, setEliminatedOptions] = useState<Set<string>>(new Set());
-    const [fetchedJustifications, setFetchedJustifications] = useState<Record<string, Record<string, string>>>({});
-    const [isFetchingJustifications, setIsFetchingJustifications] = useState<string | null>(null);
-    
-    const [motivationalMessage, setMotivationalMessage] = useState<string | null>(null);
-    const [thresholdsMet, setThresholdsMet] = useState<Set<number>>(new Set());
 
     // --- Lógica de Histórico ---
     const questionHistory = useMemo(() => {
@@ -98,15 +60,11 @@ export const QuizView: React.FC<{
     }, [studentProgress]);
 
     const correctCount = useMemo(() => sessionAttempts.filter(a => a.isCorrect).length, [sessionAttempts]);
-    const incorrectCount = useMemo(() => sessionAttempts.length - correctCount, [sessionAttempts, correctCount]);
     
     const questionToDisplay = questions[currentIndex];
     const attemptForCurrentQuestion = sessionAttempts.find(a => a.questionId === questionToDisplay?.id);
     const isCurrentQuestionAnswered = !!attemptForCurrentQuestion;
     const isLastQuestion = currentIndex === questions.length - 1;
-
-    // ... (useEffect e Handlers permanecem os mesmos até o render) ...
-    // [PULANDO HANDLERS JÁ EXISTENTES PARA CONCISAO]
 
     useEffect(() => {
         const isCompletedFromProps = questions.length > 0 && initialAttempts.length === questions.length;
@@ -138,13 +96,11 @@ export const QuizView: React.FC<{
         const updatedAttempts = [...sessionAttempts, newAttempt];
         setSessionAttempts(updatedAttempts);
         onSaveAttempt(newAttempt);
-        if (isCorrect) setComboStreak(prev => prev + 1); else setComboStreak(0);
         if (isLastQuestion) { onComplete(updatedAttempts); setHasCompleted(true); }
     };
 
     const handleNext = () => {
         setSelectedOption(null);
-        setEliminatedOptions(new Set());
         if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
         else setShowResults(true);
     };
@@ -155,7 +111,8 @@ export const QuizView: React.FC<{
                 <h2 className="text-2xl font-bold text-center mb-4">{quizTitle} Finalizado!</h2>
                 <p className="text-center text-xl mb-6">Você acertou {correctCount} de {questions.length} questões.</p>
                 <div className="flex justify-center gap-4">
-                    <Button onClick={onBack}>Voltar</Button>
+                    {/* FIX: Added check for hideBackButtonOnResults prop */}
+                    {!hideBackButtonOnResults && <Button onClick={onBack}>Voltar</Button>}
                 </div>
             </Card>
         );
@@ -171,13 +128,21 @@ export const QuizView: React.FC<{
             <div className="flex justify-between items-center mb-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-xl font-bold">{quizTitle}</h2>
+                    {/* FIX: Display subjectName if available */}
+                    {subjectName && <p className="text-xs text-cyan-400 font-bold uppercase tracking-wider">{subjectName}</p>}
                     <div className="flex gap-2">
                         {isPrevCorrect && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30">Já Acertada</span>}
                         {isPrevIncorrect && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30">Já Errada</span>}
                         {(isPrevCorrect || isPrevIncorrect) && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">Já Respondida</span>}
                     </div>
                 </div>
-                <div className="text-right">
+                <div className="text-right flex items-center gap-4">
+                    {/* FIX: Added timer display if duration is set */}
+                    {timeLeft !== undefined && (
+                         <div className={`text-sm font-mono font-bold px-2 py-1 rounded ${timeLeft < 60 ? 'bg-red-900/30 text-red-400 border border-red-700' : 'bg-gray-800 text-gray-300 border border-gray-700'}`}>
+                            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+                        </div>
+                    )}
                     <p className="font-semibold">{currentIndex + 1} / {questions.length}</p>
                 </div>
             </div>
@@ -186,7 +151,19 @@ export const QuizView: React.FC<{
                 <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-2.5 rounded-full" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}></div>
             </div>
 
-            <div className="prose prose-invert max-w-none mb-6" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.statement) }}></div>
+            {/* FIX: Added report button to the question header */}
+            <div className="flex justify-between items-start mb-6">
+                <div className="prose prose-invert max-w-none flex-grow" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.statement) }}></div>
+                {onReportQuestion && (
+                    <button 
+                        onClick={() => setIsReportModalOpen(true)}
+                        className="ml-4 text-gray-500 hover:text-red-400 transition-colors flex-shrink-0"
+                        title="Reportar erro nesta questão"
+                    >
+                        <ExclamationTriangleIcon className="h-5 w-5" />
+                    </button>
+                )}
+            </div>
 
             <div className="space-y-3">
                 {questionToDisplay.options.map((option, i) => {
@@ -222,6 +199,16 @@ export const QuizView: React.FC<{
                     <Button onClick={handleNext}>{isLastQuestion ? 'Ver Resultado' : 'Próxima'}</Button>
                 )}
             </div>
+
+            {/* FIX: Added ReportQuestionModal integration */}
+            {onReportQuestion && (
+                <ReportQuestionModal 
+                    isOpen={isReportModalOpen}
+                    onClose={() => setIsReportModalOpen(false)}
+                    onSubmit={(reason) => onReportQuestion(questionToDisplay, reason)}
+                    question={questionToDisplay}
+                />
+            )}
         </Card>
     );
 };

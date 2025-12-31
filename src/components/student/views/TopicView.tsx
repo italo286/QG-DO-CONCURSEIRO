@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { 
     Subject, Topic, SubTopic, PdfFile, StudentProgress, MiniGame, QuestionAttempt, VideoFile, BankProfilePdf
@@ -27,6 +28,7 @@ interface TopicViewProps {
     onNoteSave: (contentId: string, content: string) => void;
     saveQuizProgress: (subjectId: string, topicId: string, attempt: QuestionAttempt) => void;
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
+    onPlayGame: (game: MiniGame, topicId: string) => void;
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onToggleSplitView: () => void;
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
@@ -332,6 +334,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 );
             case 'quiz':
                 const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
+                {/* FIX: Passed studentProgress to QuizView */}
                 return <QuizView 
                     questions={currentContent.questions} 
                     initialAttempts={attempts} 
@@ -342,10 +345,12 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     subjectName={selectedSubject.name}
                     onAddBonusXp={onAddBonusXp}
                     onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
+                    studentProgress={studentProgress}
                 />;
             case 'tec_questions_quiz':
                 const tecQuizId = `${currentContent.id}-tec`;
                 const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
+                {/* FIX: Passed studentProgress to QuizView */}
                 return <QuizView
                     questions={currentContent.tecQuestions || []}
                     initialAttempts={tecAttempts}
@@ -357,6 +362,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     hideBackButtonOnResults={true}
                     onAddBonusXp={onAddBonusXp}
                     onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
+                    studentProgress={studentProgress}
                 />;
             case 'tec_caderno':
                 return (
@@ -572,6 +578,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     return <div className={containerClass}><NotesEditor ref={notesEditorRef} initialContent={noteContent} onSave={(content) => onNoteSave(currentContent.id, content)} isReadOnly={isPreview} /></div>;
                 case 'quiz':
                     const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
+                    {/* FIX: Passed studentProgress to QuizView */}
                     return <QuizView 
                         questions={currentContent.questions} 
                         initialAttempts={attempts} 
@@ -582,10 +589,12 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         subjectName={selectedSubject.name}
                         onAddBonusXp={onAddBonusXp}
                         onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
+                        studentProgress={studentProgress}
                     />;
                 case 'tec_questions_quiz':
                     const tecQuizId = `${currentContent.id}-tec`;
                     const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
+                    {/* FIX: Passed studentProgress to QuizView */}
                     return <QuizView
                         questions={currentContent.tecQuestions || []}
                         initialAttempts={tecAttempts}
@@ -596,6 +605,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         subjectName={selectedSubject.name}
                         onAddBonusXp={onAddBonusXp}
                         onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
+                        studentProgress={studentProgress}
                     />;
                 case 'videos': {
                     if (activeVideo) {

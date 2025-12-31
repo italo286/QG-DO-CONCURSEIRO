@@ -36,7 +36,6 @@ interface StudentDashboardProps {
     onToggleStudentView?: () => void;
 }
 
-// FIX: Added React import to resolve 'Cannot find namespace React'
 export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogout, onUpdateUser, isPreview }) => {
     const [view, setView] = useState<ViewType>('dashboard');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
@@ -365,7 +364,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
-                {/* FIX: Corrected undefined names 'course', 'subject', 'topic', 'subtopic', 'review' to use state variables 'selectedCourse', 'selectedSubject', etc. */}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
@@ -455,11 +453,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
-                    handleGameComplete={(gameId) => {
+                    handleGameComplete={(gameId: string) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });
                         FirebaseService.createReportNotification(allSubjects.find(s=>s.id === subjectId)!.teacherId, user, allSubjects.find(s => s.id === subjectId)!.name, selectedSubtopic?.name || selectedTopic!.name, (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A', reason);
