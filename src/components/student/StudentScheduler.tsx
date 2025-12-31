@@ -5,7 +5,16 @@ import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
 import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, GeminiIcon, BellIcon, CycleIcon, DownloadIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 import jsPDF from 'jspdf';
-import autoTable from 'jspdf-autotable';
+import 'jspdf-autotable';
+
+// Fix for autoTable typing and runtime execution
+const applyAutoTable = (doc: any, options: any) => {
+    if (typeof doc.autoTable === 'function') {
+        doc.autoTable(options);
+    } else {
+        console.error("jsPDF autoTable plugin not loaded properly");
+    }
+};
 
 export const StudentScheduler: React.FC<{
     fullStudyPlan: StudyPlan;
@@ -140,7 +149,7 @@ export const StudentScheduler: React.FC<{
             return row;
         });
 
-        autoTable(doc, {
+        applyAutoTable(doc, {
             head: [['Hora', ...days]],
             body: tableBody,
             startY: 28,

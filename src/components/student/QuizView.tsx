@@ -4,7 +4,6 @@ import { Question, QuestionAttempt, StudentProgress } from '../../types';
 import { markdownToHtml } from '../../utils';
 import { Spinner, Button, Card } from '../ui';
 
-// FIX: Added missing props to the QuizView interface to resolve type errors in TopicView.
 export const QuizView: React.FC<{
     questions: Question[];
     initialAttempts: QuestionAttempt[];
@@ -20,7 +19,7 @@ export const QuizView: React.FC<{
     hideBackButtonOnResults?: boolean;
 }> = ({ 
     questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, durationInSeconds, studentProgress,
-    subjectName, onAddBonusXp, onReportQuestion, hideBackButtonOnResults
+    subjectName
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -112,6 +111,7 @@ export const QuizView: React.FC<{
             <div className="flex justify-between items-center mb-4">
                 <div className="flex flex-col gap-1">
                     <h2 className="text-xl font-bold">{quizTitle}</h2>
+                    {subjectName && <p className="text-sm text-cyan-400 font-bold">{subjectName}</p>}
                     <div className="flex gap-2">
                         {isPrevCorrect && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30">Já Acertada</span>}
                         {isPrevIncorrect && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30">Já Errada</span>}

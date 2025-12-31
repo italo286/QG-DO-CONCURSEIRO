@@ -453,11 +453,11 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
-                    handleGameComplete={(gameId) => {
+                    handleGameComplete={(gameId: string) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    // FIX: Added handleGameError to StudentViewRouter props.
+                    // FIX: Added missing handleGameError prop required by StudentViewRouterProps to resolve TypeScript error on line 367.
                     handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });
@@ -515,7 +515,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
             <XpToastDisplay toasts={xpToasts} />
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
-            <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId) => {
+            <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId: string) => {
                 const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }} onGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)} />
