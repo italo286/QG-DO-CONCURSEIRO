@@ -469,6 +469,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
+                    /* ADDED missing handleGameError prop fix to resolve TS error */
                     handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });

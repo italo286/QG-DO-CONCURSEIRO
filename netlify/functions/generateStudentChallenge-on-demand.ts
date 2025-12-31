@@ -4,15 +4,37 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
 import { StudentProgress, Subject, Question, Topic, SubTopic, QuestionAttempt } from '../../src/types.server';
 
-if (!admin.apps.length) {
-  admin.initializeApp({
-    credential: admin.credential.cert({
-      projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
-      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-    }),
-  });
+// Função para validar se as variáveis de ambiente necessárias existem
+function checkEnvVars() {
+    const required = [
+        'FIREBASE_PROJECT_ID',
+        'FIREBASE_PRIVATE_KEY',
+        'FIREBASE_CLIENT_EMAIL',
+        'API_KEY', // Chave do Gemini
+        'VITE_DAILY_CHALLENGE_API_KEY' // Chave interna de segurança
+    ];
+    const missing = required.filter(key => !process.env[key]);
+    if (missing.length > 0) {
+        throw new Error(`Variáveis de ambiente ausentes no Netlify: ${missing.join(', ')}`);
+    }
 }
+
+// Inicialização segura do Firebase Admin
+try {
+    if (!admin.apps.length) {
+        checkEnvVars();
+        admin.initializeApp({
+            credential: admin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            }),
+        });
+    }
+} catch (e) {
+    console.error("Erro crítico na inicialização do Firebase Admin:", e);
+}
+
 const db = admin.firestore();
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -44,7 +66,6 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
         else everIncorrect.add(a.questionId);
     };
 
-    // Coleta histórico de todas as fontes possíveis
     Object.values(studentProgress.progressByTopic || {}).forEach(s => 
         Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
     );
@@ -54,12 +75,10 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
 
     let pool: Question[] = [];
     subjects.forEach(subject => {
-        // Se houver filtro de disciplinas, pula as que não estão incluídas
         if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(subject.id)) return;
 
         subject.topics.forEach(topic => {
             const processT = (t: Topic | SubTopic) => {
-                // Se houver filtro de tópicos, pula os que não estão incluídas
                 if (selectedTopicIds.length > 0 && !selectedTopicIds.includes(t.id)) return;
                 
                 const questions = [
@@ -81,8 +100,6 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
         case 'mixed': default: filtered = pool; break;
     }
 
-    // FALLBACK ROBUSTO: Se o filtro for muito restrito (ex: pedir só erradas mas não ter nenhuma), 
-    // ou se o pool filtrado for menor que o desejado, completa com o que houver disponível no pool geral
     if (filtered.length < targetCount) {
         const remainingNeeded = targetCount - filtered.length;
         const remainingOptions = pool.filter(q => !filtered.some(fq => fq.id === q.id));
@@ -96,17 +113,21 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
 const handler: Handler = async (event: HandlerEvent) => {
     const { apiKey, studentId, challengeType } = event.queryStringParameters || {};
     
-    // Validação de API Key interna
+    // 1. Validação de Segurança
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return { statusCode: 401, body: 'Unauthorized' };
+        return { statusCode: 401, body: 'Unauthorized: Chave de API interna inválida.' };
     }
 
     try {
+        // 2. Validação de Ambiente
+        checkEnvVars();
+
+        // 3. Busca Progresso
         const studentDoc = await db.collection('studentProgress').doc(studentId!).get();
         if (!studentDoc.exists) return { statusCode: 404, body: 'Student Progress not found' };
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // Busca cursos onde o aluno está matriculado
+        // 4. Busca Cursos e Disciplinas
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
         coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
@@ -115,38 +136,38 @@ const handler: Handler = async (event: HandlerEvent) => {
         const subjectIdsArray = Array.from(subjectIds);
 
         if (subjectIdsArray.length > 0) {
-            // Firestore limite de 10 no 'in'. Pegamos os 10 primeiros por simplicidade
-            const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', subjectIdsArray.slice(0, 10)).get();
-            
-            for (const doc of subjectDocs.docs) {
-                const topicsSnap = await doc.ref.collection('topics').get();
-                subjects.push({ 
-                    id: doc.id, 
-                    ...doc.data(), 
-                    topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as Topic)) 
-                } as Subject);
+            // Operação em lote para buscar disciplinas (limite de 10 por query 'in')
+            const chunks = [];
+            for (let i = 0; i < subjectIdsArray.length; i += 10) {
+                chunks.push(subjectIdsArray.slice(i, i + 10));
+            }
+
+            for (const chunk of chunks) {
+                const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+                for (const doc of subjectDocs.docs) {
+                    const topicsSnap = await doc.ref.collection('topics').get();
+                    subjects.push({ 
+                        id: doc.id, 
+                        ...doc.data(), 
+                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as Topic)) 
+                    } as Subject);
+                }
             }
         }
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        // 5. Inicialização do Gemini
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         let items: any[] = [];
 
         if (challengeType === 'review') {
             items = await getReviewPool(studentProgress, subjects);
         } else if (challengeType === 'glossary') {
-            // Pool de glossário baseado nas matérias do aluno
             const glossaryPool = subjects.flatMap(s => s.topics.flatMap(t => [
                 ...(t.glossary || []), 
                 ...(t.subtopics || []).flatMap(st => st.glossary || [])
             ]));
 
-            // Fallback para glossário caso as matérias do aluno não tenham termos cadastrados
             let selectedTerms = shuffleArray(glossaryPool).slice(0, 5);
-            if (selectedTerms.length === 0) {
-                // Se o aluno não tem glossário nas matérias dele, buscamos termos genéricos de concurso se necessário
-                // (Aqui mantemos vazio por enquanto para incentivar cadastro do professor)
-            }
-
             items = selectedTerms.map(g => ({
                 id: `gloss-${Date.now()}-${Math.random()}`,
                 statement: `Considerando o vocabulário técnico jurídico e administrativo, qual a definição correta para o termo: **${g.term}**?`,
@@ -158,22 +179,21 @@ const handler: Handler = async (event: HandlerEvent) => {
                     "Manifestação unilateral de vontade que visa criar, modificar ou extinguir direitos."
                 ]),
                 correctAnswer: g.definition,
-                justification: `O termo ${g.term} refere-se precisamente a: ${g.definition}. As demais opções trazem conceitos de revogação, ato administrativo genérico ou definições de outras áreas.`
+                justification: `O termo ${g.term} refere-se precisamente a: ${g.definition}.`
             }));
         } else if (challengeType === 'portuguese') {
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: "Gere 3 questões de Língua Portuguesa focadas em gramática (sintaxe, pontuação, concordância) e interpretação de texto para concursos de alto nível. Retorne APENAS um array JSON de objetos, cada um com as chaves: 'statement' (string com o enunciado), 'options' (array de 5 strings), 'correctAnswer' (string, deve ser idêntica a uma das opções) e 'justification' (string com a explicação pedagógica).",
+                contents: "Gere 3 questões de Língua Portuguesa focadas em gramática (sintaxe, pontuação, concordância) e interpretação de texto para concursos de alto nível. Retorne um array JSON de objetos com as chaves: 'statement', 'options' (array de 5), 'correctAnswer' (deve ser idêntica a uma das opções) e 'justification'.",
                 config: { 
                     responseMimeType: "application/json",
-                    temperature: 0.7
                 }
             });
             const textResult = response.text || '[]';
             try {
-                items = JSON.parse(textResult.replace(/```json/g, '').replace(/```/g, '').trim());
+                items = JSON.parse(textResult);
             } catch (e) {
-                console.error("Erro ao parsear questões de português da IA:", e);
+                console.error("Erro no JSON do Gemini:", textResult);
                 items = [];
             }
         }
@@ -188,7 +208,15 @@ const handler: Handler = async (event: HandlerEvent) => {
         };
     } catch (error: any) {
         console.error("Erro na função de geração de desafio:", error);
-        return { statusCode: 500, body: JSON.stringify({ error: error.message }) };
+        // Retornar o erro detalhado ajuda a diagnosticar qual variável falta
+        return { 
+            statusCode: 500, 
+            body: JSON.stringify({ 
+                error: error.message,
+                details: "Verifique se API_KEY e credenciais do Firebase estão corretas no Netlify." 
+            }),
+            headers: { 'Content-Type': 'application/json' }
+        };
     }
 };
 

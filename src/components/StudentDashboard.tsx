@@ -457,6 +457,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
+                    /* ADDED missing handleGameError prop fix to resolve TS error */
+                    handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });
                         FirebaseService.createReportNotification(allSubjects.find(s=>s.id === subjectId)!.teacherId, user, allSubjects.find(s => s.id === subjectId)!.name, selectedSubtopic?.name || selectedTopic!.name, (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A', reason);
@@ -513,7 +515,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
             <XpToastDisplay toasts={xpToasts} />
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
-            <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId) => {
+            <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId: string) => {
                 const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }} onGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)} />
