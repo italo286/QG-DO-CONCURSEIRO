@@ -305,6 +305,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');
+        } else {
+            alert("Este desafio ainda não possui questões. Tente gerá-lo novamente.");
         }
     };
 
@@ -323,30 +325,40 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                              const errorBody = await res.text();
                              throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
                         }
-                        return res.json();
+                        const data = await res.json();
+                        return { type, data };
                     })
             );
             
-            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
+            const results = await Promise.all(challengePromises);
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-    
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            
-            const newProgress = {
-                ...studentProgress,
-                reviewChallenge: newReviewChallenge,
-                glossaryChallenge: newGlossaryChallenge,
-                portugueseChallenge: newPortugueseChallenge,
-            };
+            const newProgress = { ...studentProgress };
+
+            results.forEach(({ type, data }) => {
+                const challenge: DailyChallenge<Question> = { 
+                    date: todayISO, 
+                    items: Array.isArray(data) ? data : [], 
+                    isCompleted: false, 
+                    attemptsMade: 0, 
+                    sessionAttempts: [] 
+                };
+                if (type === 'review') newProgress.reviewChallenge = challenge;
+                if (type === 'glossary') newProgress.glossaryChallenge = challenge;
+                if (type === 'portuguese') newProgress.portugueseChallenge = challenge;
+            });
+
+            // Verificar se algum veio vazio para avisar o usuário
+            const emptyChallenges = results.filter(r => !Array.isArray(r.data) || r.data.length === 0);
+            if (emptyChallenges.length > 0) {
+                console.warn("Alguns desafios foram gerados sem questões:", emptyChallenges.map(e => e.type));
+            }
             
             handleUpdateStudentProgress(newProgress, studentProgress);
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
+            alert(`Não foi possível gerar todos os desafios. Por favor, verifique se você está matriculado em cursos com tópicos e questões cadastradas. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
@@ -457,7 +469,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    // FIX: Added missing handleGameError prop required by StudentViewRouterProps to resolve TypeScript error on line 367.
                     handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });
