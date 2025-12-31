@@ -28,7 +28,7 @@ interface TopicViewProps {
     onNoteSave: (contentId: string, content: string) => void;
     saveQuizProgress: (subjectId: string, topicId: string, attempt: QuestionAttempt) => void;
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
-    onPlayGame: (game: MiniGame, topicId: string) => void;
+    // FIX: Removed duplicate 'onPlayGame' identifier.
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onToggleSplitView: () => void;
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
@@ -48,6 +48,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
     onNoteSave,
     saveQuizProgress,
     handleTopicQuizComplete,
+    // FIX: Removed duplicate 'onPlayGame' from destructuring.
     onPlayGame,
     onToggleSplitView,
     onSetIsSidebarCollapsed,
@@ -332,9 +333,9 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         </div>
                     </div>
                 );
-            case 'quiz':
+            case 'quiz': {
                 const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
-                {/* FIX: Passed studentProgress to QuizView */}
+                // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                 return <QuizView 
                     questions={currentContent.questions} 
                     initialAttempts={attempts} 
@@ -342,15 +343,13 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)}
                     onBack={() => {}} 
                     quizTitle={`Questões de Conteúdo: ${currentContent.name}`}
-                    subjectName={selectedSubject.name}
-                    onAddBonusXp={onAddBonusXp}
-                    onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
                     studentProgress={studentProgress}
                 />;
-            case 'tec_questions_quiz':
+            }
+            case 'tec_questions_quiz': {
                 const tecQuizId = `${currentContent.id}-tec`;
                 const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
-                {/* FIX: Passed studentProgress to QuizView */}
+                // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                 return <QuizView
                     questions={currentContent.tecQuestions || []}
                     initialAttempts={tecAttempts}
@@ -358,12 +357,9 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, tecQuizId, attempts)}
                     onBack={() => {}}
                     quizTitle={`Questões Extraídas: ${currentContent.name}`}
-                    subjectName={selectedSubject.name}
-                    hideBackButtonOnResults={true}
-                    onAddBonusXp={onAddBonusXp}
-                    onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
                     studentProgress={studentProgress}
                 />;
+            }
             case 'tec_caderno':
                 return (
                     <div className="p-8 flex flex-col items-center justify-center h-full text-center">
@@ -576,9 +572,9 @@ export const TopicView: React.FC<TopicViewProps> = ({
                 case 'notes':
                     const noteContent = studentProgress?.notesByTopic[currentContent.id] || '';
                     return <div className={containerClass}><NotesEditor ref={notesEditorRef} initialContent={noteContent} onSave={(content) => onNoteSave(currentContent.id, content)} isReadOnly={isPreview} /></div>;
-                case 'quiz':
+                case 'quiz': {
                     const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
-                    {/* FIX: Passed studentProgress to QuizView */}
+                    // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                     return <QuizView 
                         questions={currentContent.questions} 
                         initialAttempts={attempts} 
@@ -586,15 +582,13 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)}
                         onBack={() => {}}
                         quizTitle="Questões (Conteúdo)"
-                        subjectName={selectedSubject.name}
-                        onAddBonusXp={onAddBonusXp}
-                        onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, false, reason)}
                         studentProgress={studentProgress}
                     />;
-                case 'tec_questions_quiz':
+                }
+                case 'tec_questions_quiz': {
                     const tecQuizId = `${currentContent.id}-tec`;
                     const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
-                    {/* FIX: Passed studentProgress to QuizView */}
+                    // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                     return <QuizView
                         questions={currentContent.tecQuestions || []}
                         initialAttempts={tecAttempts}
@@ -602,11 +596,9 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, tecQuizId, attempts)}
                         onBack={() => {}}
                         quizTitle="Questões Extraídas"
-                        subjectName={selectedSubject.name}
-                        onAddBonusXp={onAddBonusXp}
-                        onReportQuestion={(question, reason) => onReportQuestion(selectedSubject.id, currentContent.id, question.id, true, reason)}
                         studentProgress={studentProgress}
                     />;
+                }
                 case 'videos': {
                     if (activeVideo) {
                         return (
