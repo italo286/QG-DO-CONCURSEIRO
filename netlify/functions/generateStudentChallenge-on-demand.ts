@@ -162,12 +162,32 @@ const handler: Handler = async (event: HandlerEvent) => {
         if (challengeType === 'review') {
             items = await getReviewPool(studentProgress, subjects);
         } else if (challengeType === 'glossary') {
-            const glossaryPool = subjects.flatMap(s => s.topics.flatMap(t => [
-                ...(t.glossary || []), 
-                ...(t.subtopics || []).flatMap(st => st.glossary || [])
-            ]));
+            const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
+            const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
+            const selectedSubjectIds = isAdvanced ? (studentProgress.advancedGlossarySubjectIds || []) : [];
+            const selectedTopicIds = isAdvanced ? (studentProgress.advancedGlossaryTopicIds || []) : [];
 
-            let selectedTerms = shuffleArray(glossaryPool).slice(0, 5);
+            const glossaryPool = subjects.flatMap(s => {
+                if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(s.id)) return [];
+                
+                return s.topics.flatMap(t => {
+                    const terms = [];
+                    if (selectedTopicIds.length === 0 || selectedTopicIds.includes(t.id)) {
+                        terms.push(...(t.glossary || []));
+                    }
+                    (t.subtopics || []).forEach(st => {
+                        if (selectedTopicIds.length === 0 || selectedTopicIds.includes(st.id)) {
+                            terms.push(...(st.glossary || []));
+                        }
+                    });
+                    return terms;
+                });
+            });
+
+            // Remover duplicados por termo
+            const uniqueTerms = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+            let selectedTerms = shuffleArray(uniqueTerms).slice(0, targetCount);
+            
             items = selectedTerms.map(g => ({
                 id: `gloss-${Date.now()}-${Math.random()}`,
                 statement: `Considerando o vocabulário técnico jurídico e administrativo, qual a definição correta para o termo: **${g.term}**?`,
@@ -182,9 +202,11 @@ const handler: Handler = async (event: HandlerEvent) => {
                 justification: `O termo ${g.term} refere-se precisamente a: ${g.definition}.`
             }));
         } else if (challengeType === 'portuguese') {
+            const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
+            
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: "Gere 3 questões de Língua Portuguesa focadas em gramática (sintaxe, pontuação, concordância) e interpretação de texto para concursos de alto nível. Retorne um array JSON de objetos com as chaves: 'statement', 'options' (array de 5), 'correctAnswer' (deve ser idêntica a uma das opções) e 'justification'.",
+                contents: `Gere exatamente ${targetCount} questões de Língua Portuguesa focadas em gramática (sintaxe, pontuação, concordância) e interpretação de texto para concursos de alto nível. Retorne um array JSON de objetos com as chaves: 'statement', 'options' (array de 5), 'correctAnswer' (deve ser idêntica a uma das opções) e 'justification'.`,
                 config: { 
                     responseMimeType: "application/json",
                 }
@@ -192,6 +214,8 @@ const handler: Handler = async (event: HandlerEvent) => {
             const textResult = response.text || '[]';
             try {
                 items = JSON.parse(textResult);
+                // Garantir que não estoure o solicitado se a IA errar
+                if (items.length > targetCount) items = items.slice(0, targetCount);
             } catch (e) {
                 console.error("Erro no JSON do Gemini:", textResult);
                 items = [];
@@ -208,7 +232,6 @@ const handler: Handler = async (event: HandlerEvent) => {
         };
     } catch (error: any) {
         console.error("Erro na função de geração de desafio:", error);
-        // Retornar o erro detalhado ajuda a diagnosticar qual variável falta
         return { 
             statusCode: 500, 
             body: JSON.stringify({ 
