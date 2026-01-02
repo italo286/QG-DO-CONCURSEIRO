@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
-import { Topic, Question, MiniGame } from '../../types';
+import { Topic, Question, MiniGame, SubTopic } from '../../types';
 import { Modal, Button, ColorPalettePicker } from '../ui';
 import { GeminiIcon, GameControllerIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon, CheckBadgeIcon } from '../Icons';
 import { AiQuestionGeneratorModal } from './AiQuestionGeneratorModal';
@@ -10,6 +11,7 @@ import { GlossaryEditor } from './GlossaryEditor';
 import { BankProfileEditor } from './BankProfileEditor';
 import { AiBulkGameGeneratorModal } from './AiBulkGameGeneratorModal';
 import { ProfessorQuestionEditorModal } from './ProfessorQuestionEditorModal';
+import { AiBulkTopicContentGeneratorModal } from './AiBulkTopicContentGeneratorModal';
 
 export const ProfessorTopicEditor: React.FC<{
     isOpen: boolean;
@@ -30,6 +32,7 @@ export const ProfessorTopicEditor: React.FC<{
     const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
     const [isGlossaryModalOpen, setIsGlossaryModalOpen] = useState(false);
     const [isBulkGameModalOpen, setIsBulkGameModalOpen] = useState(false);
+    const [isBulkSubtopicModalOpen, setIsBulkSubtopicModalOpen] = useState(false);
     const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
     useEffect(() => {
@@ -151,6 +154,17 @@ export const ProfessorTopicEditor: React.FC<{
         setEditingTopic({ ...editingTopic, miniGames: newGames });
     };
 
+    const handleSaveAiBulkSubtopics = (newSubtopics: SubTopic[]) => {
+        setEditingTopic(prev => {
+            if (!prev) return null;
+            return {
+                ...prev,
+                subtopics: [...(prev.subtopics || []), ...newSubtopics]
+            };
+        });
+        setIsBulkSubtopicModalOpen(false);
+    };
+
     const handleDeleteGame = (gameId: string) => {
         if (!editingTopic || !window.confirm("Tem certeza que deseja apagar este jogo?")) return;
         const updatedGames = editingTopic.miniGames.filter(g => g.id !== gameId);
@@ -179,6 +193,7 @@ export const ProfessorTopicEditor: React.FC<{
     const handleCloseFlashcardModal = useCallback(() => setIsFlashcardModalOpen(false), []);
     const handleCloseGlossaryModal = useCallback(() => setIsGlossaryModalOpen(false), []);
     const handleCloseBulkGameModal = useCallback(() => setIsBulkGameModalOpen(false), []);
+    const handleCloseBulkSubtopicModal = useCallback(() => setIsBulkSubtopicModalOpen(false), []);
 
     if (!isOpen || !editingTopic) return null;
 
@@ -227,6 +242,7 @@ export const ProfessorTopicEditor: React.FC<{
                            <Button onClick={() => setIsTecModalOpen(true)} className="text-sm py-2 px-3"><GeminiIcon className="h-4 w-4 mr-2"/> Extrair Questões (TEC)</Button>
                            <Button onClick={() => handleOpenGameModal(null)} className="text-sm py-2 px-3"><GameControllerIcon className="h-4 w-4 mr-2"/> Add Jogo</Button>
                            <Button onClick={() => setIsBulkGameModalOpen(true)} className="text-sm py-2 px-3"><GeminiIcon className="h-4 w-4 mr-2"/> Gerar Todos os Jogos</Button>
+                           <Button onClick={() => setIsBulkSubtopicModalOpen(true)} className="text-sm py-2 px-3 bg-gradient-to-r from-blue-500 to-indigo-600 hover:from-blue-600 hover:to-indigo-700 border-none font-bold"><GeminiIcon className="h-4 w-4 mr-2"/> Gerar Subtópicos em Massa</Button>
                         </div>
                     </div>
                      <div className="p-4 bg-gray-900/50 rounded-lg">
@@ -353,6 +369,12 @@ export const ProfessorTopicEditor: React.FC<{
                 isOpen={isBulkGameModalOpen}
                 onClose={handleCloseBulkGameModal}
                 onSave={handleSaveBulkGames}
+            />
+            <AiBulkTopicContentGeneratorModal
+                isOpen={isBulkSubtopicModalOpen}
+                onClose={handleCloseBulkSubtopicModal}
+                onSave={handleSaveAiBulkSubtopics}
+                mode="subtopic"
             />
             <ProfessorFlashcardEditorModal 
                 isOpen={isFlashcardModalOpen} 

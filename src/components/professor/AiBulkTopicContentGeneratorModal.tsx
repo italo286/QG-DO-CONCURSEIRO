@@ -8,15 +8,23 @@ import { GeminiIcon, CheckCircleIcon } from '../Icons';
 interface AiBulkTopicContentGeneratorModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSave: (topics: Topic[]) => void;
+    onSave: (items: any[]) => void;
+    mode?: 'topic' | 'subtopic';
 }
 
-export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGeneratorModalProps> = ({ isOpen, onClose, onSave }) => {
+export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGeneratorModalProps> = ({ 
+    isOpen, 
+    onClose, 
+    onSave,
+    mode = 'topic'
+}) => {
     const [genericName, setGenericName] = useState('');
     const [rawLinks, setRawLinks] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [previewData, setPreviewData] = useState<any[] | null>(null);
+
+    const isSubtopic = mode === 'subtopic';
 
     useEffect(() => {
         if (!isOpen) {
@@ -30,7 +38,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
 
     const handleGeneratePreview = async () => {
         if (!genericName.trim() || !rawLinks.trim()) {
-            setError('Preencha o nome genérico e a lista de links.');
+            setError(`Preencha o nome genérico e a lista de links para os ${isSubtopic ? 'subtópicos' : 'tópicos'}.`);
             return;
         }
         setError('');
@@ -49,44 +57,52 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
         if (!previewData) return;
 
         const timestamp = Date.now();
-        const newTopics: Topic[] = previewData.map((item, i) => {
-            const topicId = `t-bulk-${timestamp}-${i}`;
-            return {
-                id: topicId,
+        const newItems = previewData.map((item, i) => {
+            const prefix = isSubtopic ? 'st' : 't';
+            const id = `${prefix}-bulk-${timestamp}-${i}`;
+            
+            const baseItem: any = {
+                id: id,
                 name: `${genericName} - Aula ${item.aulaNumber}`,
                 description: `Conteúdo da Aula ${item.aulaNumber} sobre ${genericName}`,
-                fullPdfs: item.pdf ? [{ id: `pdf-${topicId}`, fileName: item.pdf.name, url: item.pdf.url }] : [],
+                fullPdfs: item.pdf ? [{ id: `pdf-${id}`, fileName: item.pdf.name, url: item.pdf.url }] : [],
                 summaryPdfs: [],
                 raioXPdfs: [],
-                videoUrls: item.video ? [{ id: `vid-${topicId}`, name: item.video.name, url: item.video.url }] : [],
+                videoUrls: item.video ? [{ id: `vid-${id}`, name: item.video.name, url: item.video.url }] : [],
                 questions: [],
                 tecQuestions: [],
-                subtopics: [],
                 miniGames: [],
                 flashcards: [],
                 glossary: []
             };
+
+            // Topics have subtopics array, Subtopics don't
+            if (!isSubtopic) {
+                baseItem.subtopics = [];
+            }
+
+            return baseItem;
         });
 
-        onSave(newTopics);
+        onSave(newItems);
         onClose();
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Gerar Aulas em Massa com IA" size="3xl">
+        <Modal isOpen={isOpen} onClose={onClose} title={`Gerar ${isSubtopic ? 'Subtópicos' : 'Aulas'} em Massa com IA`} size="3xl">
             <div className="space-y-4">
                 <p className="text-gray-400 text-sm">
-                    Esta ferramenta cria múltiplos tópicos de uma vez. Defina o nome base e cole a lista de nomes e links (PDFs e Vídeos). A IA organizará os pares para você.
+                    Esta ferramenta cria múltiplos {isSubtopic ? 'subtópicos' : 'tópicos'} de uma vez. Defina o nome base e cole a lista de nomes e links (PDFs e Vídeos). A IA organizará os pares para você.
                 </p>
                 
                 <div>
-                    <label htmlFor="bulk-generic-name" className="block text-sm font-medium text-gray-300">Nome Genérico do Tópico</label>
+                    <label htmlFor="bulk-generic-name" className="block text-sm font-medium text-gray-300">Nome Genérico do Conteúdo</label>
                     <input 
                         id="bulk-generic-name"
                         type="text" 
                         value={genericName} 
                         onChange={e => setGenericName(e.target.value)} 
-                        placeholder="Ex: Word 2010"
+                        placeholder={isSubtopic ? "Ex: Conceitos Iniciais" : "Ex: Word 2010"}
                         className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" 
                     />
                 </div>
@@ -98,7 +114,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                         value={rawLinks} 
                         onChange={e => setRawLinks(e.target.value)} 
                         rows={8}
-                        placeholder="Cole aqui a lista de arquivos e links (ex: WORD01.pdf https://...)"
+                        placeholder="Cole aqui a lista de arquivos e links (ex: AULA01.pdf https://...)"
                         className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500 font-mono text-xs" 
                     />
                 </div>
@@ -115,7 +131,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
 
                 {previewData && (
                     <div className="border-t border-gray-700 pt-4 space-y-4">
-                        <h3 className="text-lg font-semibold text-cyan-400">Prévia das Aulas a serem Criadas</h3>
+                        <h3 className="text-lg font-semibold text-cyan-400">Prévia dos {isSubtopic ? 'Subtópicos' : 'Tópicos'} a serem Criados</h3>
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                             {previewData.map((item, idx) => (
                                 <div key={idx} className="p-3 bg-gray-900/50 rounded-lg border border-gray-700 text-sm">
@@ -133,7 +149,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                         </div>
                         <div className="pt-4 flex justify-between gap-4">
                             <Button onClick={() => setPreviewData(null)} className="bg-gray-700 hover:bg-gray-600 flex-1">Refazer Análise</Button>
-                            <Button onClick={handleFinalSave} className="flex-1">Criar {previewData.length} Aulas</Button>
+                            <Button onClick={handleFinalSave} className="flex-1">Criar {previewData.length} {isSubtopic ? 'Subtópicos' : 'Aulas'}</Button>
                         </div>
                     </div>
                 )}
