@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
 import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../../Icons';
@@ -89,7 +90,7 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
 
                     return (
                         <li key={topic.id}>
-                            <details className="bg-gray-800 rounded-lg border border-gray-700/50 border-l-4" style={topicStyle} open title={frequencyTitles[frequency]}>
+                            <details className="bg-gray-800 rounded-lg border border-gray-700/50 border-l-4" style={topicStyle} title={frequencyTitles[frequency]}>
                                 <summary className="p-4 cursor-pointer list-none">
                                     <div className="flex justify-between items-center">
                                         <div className="flex-grow min-w-0">

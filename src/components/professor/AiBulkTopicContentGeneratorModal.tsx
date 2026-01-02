@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import * as GeminiService from '../../services/geminiService';
 import { Topic, SubTopic } from '../../types';
-import { Modal, Button, Spinner } from '../ui';
+import { Modal, Button, Spinner, ColorPalettePicker } from '../ui';
 import { GeminiIcon, CheckCircleIcon } from '../Icons';
 
 interface AiBulkTopicContentGeneratorModalProps {
@@ -20,6 +20,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
 }) => {
     const [genericName, setGenericName] = useState('');
     const [rawLinks, setRawLinks] = useState('');
+    const [selectedColor, setSelectedColor] = useState<string | undefined>(undefined);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [previewData, setPreviewData] = useState<any[] | null>(null);
@@ -30,6 +31,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
         if (!isOpen) {
             setGenericName('');
             setRawLinks('');
+            setSelectedColor(undefined);
             setError('');
             setIsLoading(false);
             setPreviewData(null);
@@ -65,6 +67,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                 id: id,
                 name: `${genericName} - Aula ${item.aulaNumber}`,
                 description: `Conteúdo da Aula ${item.aulaNumber} sobre ${genericName}`,
+                color: selectedColor,
                 fullPdfs: item.pdf ? [{ id: `pdf-${id}`, fileName: item.pdf.name, url: item.pdf.url }] : [],
                 summaryPdfs: [],
                 raioXPdfs: [],
@@ -95,16 +98,25 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                     Esta ferramenta cria múltiplos {isSubtopic ? 'subtópicos' : 'tópicos'} de uma vez. Defina o nome base e cole a lista de nomes e links (PDFs e Vídeos). A IA organizará os pares para você.
                 </p>
                 
-                <div>
-                    <label htmlFor="bulk-generic-name" className="block text-sm font-medium text-gray-300">Nome Genérico do Conteúdo</label>
-                    <input 
-                        id="bulk-generic-name"
-                        type="text" 
-                        value={genericName} 
-                        onChange={e => setGenericName(e.target.value)} 
-                        placeholder={isSubtopic ? "Ex: Conceitos Iniciais" : "Ex: Word 2010"}
-                        className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" 
-                    />
+                <div className="flex gap-4 items-end">
+                    <div className="flex-grow">
+                        <label htmlFor="bulk-generic-name" className="block text-sm font-medium text-gray-300">Nome Genérico do Conteúdo</label>
+                        <input 
+                            id="bulk-generic-name"
+                            type="text" 
+                            value={genericName} 
+                            onChange={e => setGenericName(e.target.value)} 
+                            placeholder={isSubtopic ? "Ex: Conceitos Iniciais" : "Ex: Word 2010"}
+                            className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" 
+                        />
+                    </div>
+                    <div className="flex flex-col items-center">
+                        <label className="block text-xs font-medium text-gray-400 mb-1">Cor Base</label>
+                        <ColorPalettePicker 
+                            currentColor={selectedColor}
+                            onColorSelect={setSelectedColor}
+                        />
+                    </div>
                 </div>
 
                 <div>
@@ -134,7 +146,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                         <h3 className="text-lg font-semibold text-cyan-400">Prévia dos {isSubtopic ? 'Subtópicos' : 'Tópicos'} a serem Criados</h3>
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                             {previewData.map((item, idx) => (
-                                <div key={idx} className="p-3 bg-gray-900/50 rounded-lg border border-gray-700 text-sm">
+                                <div key={idx} className="p-3 bg-gray-900/50 rounded-lg border border-gray-700 text-sm" style={selectedColor ? { borderLeft: `4px solid ${selectedColor}` } : {}}>
                                     <p className="font-bold text-white mb-2">{genericName} - Aula {item.aulaNumber}</p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className={item.pdf ? 'text-green-400' : 'text-gray-600'}>
