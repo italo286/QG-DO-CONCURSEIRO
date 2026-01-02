@@ -68,6 +68,9 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const [isAiTopicModalOpen, setIsAiTopicModalOpen] = useState(false);
     const [isAiBulkModalOpen, setIsAiBulkModalOpen] = useState(false);
+    const [isAiBulkSubtopicModalOpen, setIsAiBulkSubtopicModalOpen] = useState(false);
+    const [bulkSubtopicTargetTopic, setBulkSubtopicTargetTopic] = useState<Topic | null>(null);
+
     const [draggedTopicIndex, setDraggedTopicIndex] = useState<number | null>(null);
     const [draggedSubtopicInfo, setDraggedSubtopicInfo] = useState<{ parentIndex: number; subtopicIndex: number } | null>(null);
 
@@ -115,6 +118,11 @@ export const ProfessorSubjectEditor: React.FC<{
         setParentTopicForSubTopic(parentTopic);
         setEditingSubTopic(subtopic);
         setIsSubTopicModalOpen(true);
+    };
+
+    const handleOpenAiBulkSubtopic = (topic: Topic) => {
+        setBulkSubtopicTargetTopic(topic);
+        setIsAiBulkSubtopicModalOpen(true);
     };
 
     const handleSaveTopic = useCallback((topicToSave: Topic) => {
@@ -204,6 +212,23 @@ export const ProfessorSubjectEditor: React.FC<{
         updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
         setToastMessage(`${newTopics.length} novas aulas foram criadas!`);
     }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
+
+    const handleSaveAiBulkSubtopics = useCallback((newSubtopics: SubTopic[]) => {
+        if (!bulkSubtopicTargetTopic) return;
+        const updatedTopics = currentSubject.topics.map(t => {
+            if (t.id === bulkSubtopicTargetTopic.id) {
+                return {
+                    ...t,
+                    subtopics: [...(t.subtopics || []), ...newSubtopics]
+                };
+            }
+            return t;
+        });
+        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
+        setToastMessage(`${newSubtopics.length} subtópicos adicionados a ${bulkSubtopicTargetTopic.name}!`);
+        setIsAiBulkSubtopicModalOpen(false);
+        setBulkSubtopicTargetTopic(null);
+    }, [currentSubject, bulkSubtopicTargetTopic, updateSubjectStateAndDb, setToastMessage]);
     
     const executeDeleteTopic = () => {
         if (!confirmDeleteTopicData) return;
@@ -226,6 +251,7 @@ export const ProfessorSubjectEditor: React.FC<{
     const handleCloseSubTopicModal = useCallback(() => { setIsSubTopicModalOpen(false); setEditingSubTopic(null); setParentTopicForSubTopic(null); }, []);
     const handleCloseAiTopicModal = useCallback(() => setIsAiTopicModalOpen(false), []);
     const handleCloseAiBulkModal = useCallback(() => setIsAiBulkModalOpen(false), []);
+    const handleCloseAiBulkSubtopicModal = useCallback(() => { setIsAiBulkSubtopicModalOpen(false); setBulkSubtopicTargetTopic(null); }, []);
 
     const handleDragStart = (e: DragEvent<HTMLElement>, index: number) => {
         setDraggedTopicIndex(index);
@@ -486,7 +512,22 @@ export const ProfessorSubjectEditor: React.FC<{
                                         <span className="font-semibold text-gray-200">{topic.name}</span>
                                     </div>
                                     <div className="flex items-center space-x-2">
-                                        <button onClick={(e) => {e.stopPropagation(); handleOpenSubTopicModal(null, topic)}} className="p-1 text-gray-400 hover:text-green-400 text-xs bg-gray-700 rounded-md" aria-label={`Adicionar subtópico em ${topic.name}`}>Adicionar Subtópico</button>
+                                        <div className="flex bg-gray-700 rounded-md overflow-hidden border border-gray-600">
+                                            <button 
+                                                onClick={(e) => {e.stopPropagation(); handleOpenAiBulkSubtopic(topic)}} 
+                                                className="p-1 px-2 text-cyan-400 hover:bg-gray-600 text-[10px] font-bold flex items-center border-r border-gray-600" 
+                                                title="Gerar Subtópicos em Massa com IA"
+                                            >
+                                                <GeminiIcon className="h-3 w-3 mr-1"/> MASSA
+                                            </button>
+                                            <button 
+                                                onClick={(e) => {e.stopPropagation(); handleOpenSubTopicModal(null, topic)}} 
+                                                className="p-1 px-2 text-gray-300 hover:bg-gray-600 text-[10px] font-bold" 
+                                                aria-label={`Adicionar subtópico em ${topic.name}`}
+                                            >
+                                                ADICIONAR
+                                            </button>
+                                        </div>
                                         <button onClick={(e) => {e.stopPropagation(); handleOpenTopicModal(topic)}} className="p-2 text-gray-400 hover:text-cyan-400" aria-label={`Editar tópico ${topic.name}`}><PencilIcon className="h-5 w-5"/></button>
                                         <button onClick={(e) => {e.stopPropagation(); setConfirmDeleteTopicData({ id: topic.id, name: topic.name })}} className="p-2 text-gray-400 hover:text-red-500" aria-label={`Apagar tópico ${topic.name}`}><TrashIcon className="h-5 w-5" /></button>
                                         <ChevronDownIcon className="h-5 w-5 transition-transform details-open:rotate-180" aria-hidden="true"/>
@@ -555,6 +596,14 @@ export const ProfessorSubjectEditor: React.FC<{
                 isOpen={isAiBulkModalOpen}
                 onClose={handleCloseAiBulkModal}
                 onSave={handleSaveAiBulkTopics}
+                mode="topic"
+            />
+
+            <AiBulkTopicContentGeneratorModal
+                isOpen={isAiBulkSubtopicModalOpen}
+                onClose={handleCloseAiBulkSubtopicModal}
+                onSave={handleSaveAiBulkSubtopics}
+                mode="subtopic"
             />
 
             <ProfessorTopicEditor
