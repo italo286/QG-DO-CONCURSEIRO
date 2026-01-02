@@ -305,8 +305,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
             setQuizInstanceKey(Date.now());
             setView('daily_challenge_quiz');
-        } else {
-            alert("Este desafio ainda não possui questões. Tente gerá-lo novamente.");
         }
     };
 
@@ -315,50 +313,41 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
         setIsGeneratingAllChallenges(true);
         try {
-            const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
+            // Usa process.env injetado pelo vite.config.ts em vez de import.meta.env
+            const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
             const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
             
             const challengePromises = types.map(type => 
-                fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
+                fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
                     .then(async res => {
                         if (!res.ok) {
                              const errorBody = await res.text();
                              throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
                         }
-                        const data = await res.json();
-                        return { type, data };
+                        return res.json();
                     })
             );
             
-            const results = await Promise.all(challengePromises);
+            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-            const newProgress = { ...studentProgress };
-
-            results.forEach(({ type, data }) => {
-                const challenge: DailyChallenge<Question> = { 
-                    date: todayISO, 
-                    items: Array.isArray(data) ? data : [], 
-                    isCompleted: false, 
-                    attemptsMade: 0, 
-                    sessionAttempts: [] 
-                };
-                if (type === 'review') newProgress.reviewChallenge = challenge;
-                if (type === 'glossary') newProgress.glossaryChallenge = challenge;
-                if (type === 'portuguese') newProgress.portugueseChallenge = challenge;
-            });
-
-            // Verificar se algum veio vazio para avisar o usuário
-            const emptyChallenges = results.filter(r => !Array.isArray(r.data) || r.data.length === 0);
-            if (emptyChallenges.length > 0) {
-                console.warn("Alguns desafios foram gerados sem questões:", emptyChallenges.map(e => e.type));
-            }
+    
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            
+            const newProgress = {
+                ...studentProgress,
+                reviewChallenge: newReviewChallenge,
+                glossaryChallenge: newGlossaryChallenge,
+                portugueseChallenge: newPortugueseChallenge,
+            };
             
             handleUpdateStudentProgress(newProgress, studentProgress);
     
         } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(`Não foi possível gerar todos os desafios. Por favor, verifique se você está matriculado em cursos com tópicos e questões cadastradas. Detalhes: ${error}`);
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
