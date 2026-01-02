@@ -4,14 +4,13 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
 import { StudentProgress, Subject, Question, Topic, SubTopic, QuestionAttempt } from '../../src/types.server';
 
-// Função para validar se as variáveis de ambiente necessárias existem
 function checkEnvVars() {
     const required = [
         'FIREBASE_PROJECT_ID',
         'FIREBASE_PRIVATE_KEY',
         'FIREBASE_CLIENT_EMAIL',
-        'API_KEY', // Chave do Gemini
-        'VITE_DAILY_CHALLENGE_API_KEY' // Chave interna de segurança
+        'API_KEY',
+        'VITE_DAILY_CHALLENGE_API_KEY'
     ];
     const missing = required.filter(key => !process.env[key]);
     if (missing.length > 0) {
@@ -19,7 +18,6 @@ function checkEnvVars() {
     }
 }
 
-// Inicialização segura do Firebase Admin
 try {
     if (!admin.apps.length) {
         checkEnvVars();
@@ -46,9 +44,38 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArray;
 };
 
+// Busca as disciplinas apenas quando necessário para economizar tempo/recursos
+async function fetchEnrolledSubjects(studentId: string): Promise<Subject[]> {
+    const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
+    const subjectIds = new Set<string>();
+    coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
+
+    const subjects: Subject[] = [];
+    const subjectIdsArray = Array.from(subjectIds);
+
+    if (subjectIdsArray.length > 0) {
+        const chunks = [];
+        for (let i = 0; i < subjectIdsArray.length; i += 10) {
+            chunks.push(subjectIdsArray.slice(i, i + 10));
+        }
+
+        for (const chunk of chunks) {
+            const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+            for (const doc of subjectDocs.docs) {
+                const topicsSnap = await doc.ref.collection('topics').get();
+                subjects.push({ 
+                    id: doc.id, 
+                    ...doc.data(), 
+                    topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as Topic)) 
+                } as Subject);
+            }
+        }
+    }
+    return subjects;
+}
+
 async function getReviewPool(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
     if (subjects.length === 0) return [];
-
     const isAdvanced = studentProgress.dailyReviewMode === 'advanced';
     const filterType = isAdvanced ? (studentProgress.advancedReviewQuestionType || 'incorrect') : 'unanswered';
     const targetCount = isAdvanced ? (studentProgress.advancedReviewQuestionCount || 5) : 10;
@@ -76,11 +103,9 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
     let pool: Question[] = [];
     subjects.forEach(subject => {
         if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(subject.id)) return;
-
         subject.topics.forEach(topic => {
             const processT = (t: Topic | SubTopic) => {
                 if (selectedTopicIds.length > 0 && !selectedTopicIds.includes(t.id)) return;
-                
                 const questions = [
                     ...(t.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name })),
                     ...(t.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name }))
@@ -99,145 +124,91 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
         case 'unanswered': filtered = pool.filter(q => !allAnswered.has(q.id)); break;
         case 'mixed': default: filtered = pool; break;
     }
-
     if (filtered.length < targetCount) {
         const remainingNeeded = targetCount - filtered.length;
         const remainingOptions = pool.filter(q => !filtered.some(fq => fq.id === q.id));
-        const additional = shuffleArray(remainingOptions).slice(0, remainingNeeded);
-        filtered = [...filtered, ...additional];
+        filtered = [...filtered, ...shuffleArray(remainingOptions).slice(0, remainingNeeded)];
     }
-
     return shuffleArray(filtered).slice(0, targetCount);
 }
 
 const handler: Handler = async (event: HandlerEvent) => {
     const { apiKey, studentId, challengeType } = event.queryStringParameters || {};
-    
-    // 1. Validação de Segurança
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return { statusCode: 401, body: 'Unauthorized: Chave de API interna inválida.' };
+        return { statusCode: 401, body: 'Unauthorized' };
     }
 
     try {
-        // 2. Validação de Ambiente
         checkEnvVars();
 
-        // 3. Busca Progresso
+        // Busca APENAS o progresso do aluno primeiro
         const studentDoc = await db.collection('studentProgress').doc(studentId!).get();
         if (!studentDoc.exists) return { statusCode: 404, body: 'Student Progress not found' };
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // 4. Busca Cursos e Disciplinas
-        const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
-        const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
-
-        const subjects: Subject[] = [];
-        const subjectIdsArray = Array.from(subjectIds);
-
-        if (subjectIdsArray.length > 0) {
-            // Operação em lote para buscar disciplinas (limite de 10 por query 'in')
-            const chunks = [];
-            for (let i = 0; i < subjectIdsArray.length; i += 10) {
-                chunks.push(subjectIdsArray.slice(i, i + 10));
-            }
-
-            for (const chunk of chunks) {
-                const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-                for (const doc of subjectDocs.docs) {
-                    const topicsSnap = await doc.ref.collection('topics').get();
-                    subjects.push({ 
-                        id: doc.id, 
-                        ...doc.data(), 
-                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as Topic)) 
-                    } as Subject);
-                }
-            }
-        }
-
-        // 5. Inicialização do Gemini
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
         let items: any[] = [];
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-        if (challengeType === 'review') {
-            items = await getReviewPool(studentProgress, subjects);
-        } else if (challengeType === 'glossary') {
-            const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
-            const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
-            const selectedSubjectIds = isAdvanced ? (studentProgress.advancedGlossarySubjectIds || []) : [];
-            const selectedTopicIds = isAdvanced ? (studentProgress.advancedGlossaryTopicIds || []) : [];
-
-            const glossaryPool = subjects.flatMap(s => {
-                if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(s.id)) return [];
-                
-                return s.topics.flatMap(t => {
-                    const terms = [];
-                    if (selectedTopicIds.length === 0 || selectedTopicIds.includes(t.id)) {
-                        terms.push(...(t.glossary || []));
-                    }
-                    (t.subtopics || []).forEach(st => {
-                        if (selectedTopicIds.length === 0 || selectedTopicIds.includes(st.id)) {
-                            terms.push(...(st.glossary || []));
-                        }
-                    });
-                    return terms;
-                });
-            });
-
-            // Remover duplicados por termo
-            const uniqueTerms = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
-            let selectedTerms = shuffleArray(uniqueTerms).slice(0, targetCount);
-            
-            items = selectedTerms.map(g => ({
-                id: `gloss-${Date.now()}-${Math.random()}`,
-                statement: `Considerando o vocabulário técnico jurídico e administrativo, qual a definição correta para o termo: **${g.term}**?`,
-                options: shuffleArray([
-                    g.definition, 
-                    "Procedimento de urgência aplicado apenas em casos de calamidade pública.", 
-                    "Regra de conduta moral que não possui força vinculativa no direito positivo.", 
-                    "Extinção de um ato administrativo por razões de conveniência e oportunidade.", 
-                    "Manifestação unilateral de vontade que visa criar, modificar ou extinguir direitos."
-                ]),
-                correctAnswer: g.definition,
-                justification: `O termo ${g.term} refere-se precisamente a: ${g.definition}.`
-            }));
-        } else if (challengeType === 'portuguese') {
+        if (challengeType === 'portuguese') {
+            // FLUXO RÁPIDO: Português não depende de disciplinas do Firestore
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
-            
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões de Língua Portuguesa focadas em gramática (sintaxe, pontuação, concordância) e interpretação de texto para concursos de alto nível. Retorne um array JSON de objetos com as chaves: 'statement', 'options' (array de 5), 'correctAnswer' (deve ser idêntica a uma das opções) e 'justification'.`,
-                config: { 
-                    responseMimeType: "application/json",
-                }
+                contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa (Gramática/Interpretação) para concursos nível superior. Retorne APENAS um array JSON de objetos: {"statement": string, "options": string[], "correctAnswer": string, "justification": string}.`,
+                config: { responseMimeType: "application/json" }
             });
-            const textResult = response.text || '[]';
             try {
-                items = JSON.parse(textResult);
-                // Garantir que não estoure o solicitado se a IA errar
+                items = JSON.parse(response.text || '[]');
                 if (items.length > targetCount) items = items.slice(0, targetCount);
             } catch (e) {
-                console.error("Erro no JSON do Gemini:", textResult);
-                items = [];
+                console.error("Erro parse Gemini:", response.text);
+                throw new Error("Falha ao processar resposta da IA.");
+            }
+        } else {
+            // FLUXO LENTO: Revisão e Glossário dependem do Firestore (apenas chamados se necessário)
+            const subjects = await fetchEnrolledSubjects(studentId!);
+
+            if (challengeType === 'review') {
+                items = await getReviewPool(studentProgress, subjects);
+            } else if (challengeType === 'glossary') {
+                const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
+                const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
+                const selSubIds = isAdvanced ? (studentProgress.advancedGlossarySubjectIds || []) : [];
+                const selTopIds = isAdvanced ? (studentProgress.advancedGlossaryTopicIds || []) : [];
+
+                const glossaryPool = subjects.flatMap(s => {
+                    if (selSubIds.length > 0 && !selSubIds.includes(s.id)) return [];
+                    return s.topics.flatMap(t => {
+                        const terms = [];
+                        if (selTopIds.length === 0 || selTopIds.includes(t.id)) terms.push(...(t.glossary || []));
+                        (t.subtopics || []).forEach(st => {
+                            if (selTopIds.length === 0 || selTopIds.includes(st.id)) terms.push(...(st.glossary || []));
+                        });
+                        return terms;
+                    });
+                });
+
+                const uniqueTerms = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+                items = shuffleArray(uniqueTerms).slice(0, targetCount).map(g => ({
+                    id: `gloss-${Date.now()}-${Math.random()}`,
+                    statement: `Qual a definição correta para o termo técnico: **${g.term}**?`,
+                    options: shuffleArray([g.definition, "Opção incorreta 1", "Opção incorreta 2", "Opção incorreta 3", "Opção incorreta 4"]),
+                    correctAnswer: g.definition,
+                    justification: `O termo ${g.term} define-se como: ${g.definition}.`
+                }));
             }
         }
 
         return { 
             statusCode: 200, 
             body: JSON.stringify(items), 
-            headers: { 
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            } 
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' } 
         };
     } catch (error: any) {
-        console.error("Erro na função de geração de desafio:", error);
+        console.error("Erro na função:", error);
         return { 
-            statusCode: 500, 
-            body: JSON.stringify({ 
-                error: error.message,
-                details: "Verifique se API_KEY e credenciais do Firebase estão corretas no Netlify." 
-            }),
+            statusCode: error.message.includes('timeout') ? 504 : 500, 
+            body: JSON.stringify({ error: error.message }),
             headers: { 'Content-Type': 'application/json' }
         };
     }
