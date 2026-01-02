@@ -147,7 +147,7 @@ const handler: Handler = async (event: HandlerEvent) => {
         const studentProgress = studentDoc.data() as StudentProgress;
 
         let items: any[] = [];
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         if (challengeType === 'portuguese') {
             // FLUXO RÁPIDO: Português não depende de disciplinas do Firestore
