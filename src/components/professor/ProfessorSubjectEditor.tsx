@@ -5,6 +5,7 @@ import { Subject, Topic, SubTopic } from '../../types';
 import { Card, Button, Spinner, ColorPalettePicker, ConfirmModal } from '../ui';
 import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
+import { AiBulkTopicContentGeneratorModal } from './AiBulkTopicContentGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
 import { ProfessorSubTopicEditor } from './ProfessorSubTopicEditor';
 
@@ -66,6 +67,7 @@ export const ProfessorSubjectEditor: React.FC<{
     const [parentTopicForSubTopic, setParentTopicForSubTopic] = useState<Topic | null>(null);
 
     const [isAiTopicModalOpen, setIsAiTopicModalOpen] = useState(false);
+    const [isAiBulkModalOpen, setIsAiBulkModalOpen] = useState(false);
     const [draggedTopicIndex, setDraggedTopicIndex] = useState<number | null>(null);
     const [draggedSubtopicInfo, setDraggedSubtopicInfo] = useState<{ parentIndex: number; subtopicIndex: number } | null>(null);
 
@@ -196,6 +198,12 @@ export const ProfessorSubjectEditor: React.FC<{
         setIsAiTopicModalOpen(false);
         setToastMessage(`${newTopics.length} tópicos foram adicionados!`);
     }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
+
+    const handleSaveAiBulkTopics = useCallback((newTopics: Topic[]) => {
+        const updatedTopics = [...currentSubject.topics, ...newTopics];
+        updateSubjectStateAndDb({...currentSubject, topics: updatedTopics});
+        setToastMessage(`${newTopics.length} novas aulas foram criadas!`);
+    }, [currentSubject, updateSubjectStateAndDb, setToastMessage]);
     
     const executeDeleteTopic = () => {
         if (!confirmDeleteTopicData) return;
@@ -217,6 +225,7 @@ export const ProfessorSubjectEditor: React.FC<{
     const handleCloseTopicModal = useCallback(() => { setIsTopicModalOpen(false); setEditingTopic(null); }, []);
     const handleCloseSubTopicModal = useCallback(() => { setIsSubTopicModalOpen(false); setEditingSubTopic(null); setParentTopicForSubTopic(null); }, []);
     const handleCloseAiTopicModal = useCallback(() => setIsAiTopicModalOpen(false), []);
+    const handleCloseAiBulkModal = useCallback(() => setIsAiBulkModalOpen(false), []);
 
     const handleDragStart = (e: DragEvent<HTMLElement>, index: number) => {
         setDraggedTopicIndex(index);
@@ -433,12 +442,16 @@ export const ProfessorSubjectEditor: React.FC<{
             </Card>
 
             <section className="mt-8" aria-labelledby="topics-heading">
-                <div className="flex justify-between items-center mb-4">
+                <div className="flex justify-between items-center mb-4 flex-wrap gap-2">
                     <h3 id="topics-heading" className="text-xl font-bold text-white">Tópicos e Subtópicos</h3>
-                    <div className="flex space-x-2">
+                    <div className="flex flex-wrap gap-2">
+                        <Button onClick={() => setIsAiBulkModalOpen(true)} className="py-2 text-sm bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600">
+                             <GeminiIcon className="h-4 w-4 mr-2"/>
+                             Gerar Aulas em Massa
+                        </Button>
                         <Button onClick={() => setIsAiTopicModalOpen(true)} className="py-2 text-sm bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-500">
                             <GeminiIcon className="h-4 w-4 mr-2"/>
-                            Criar com IA
+                            Extrair Estrutura IA
                         </Button>
                         <Button onClick={() => handleOpenTopicModal(null)} className="py-2 text-sm">
                             <PlusIcon className="h-4 w-4 mr-2" aria-hidden="true" />
@@ -526,7 +539,7 @@ export const ProfessorSubjectEditor: React.FC<{
                     ))}
                     {currentSubject.topics.length === 0 && (
                         <Card className="text-center text-gray-400 p-6">
-                            Nenhum tópico adicionado ainda. Arraste para reordenar.
+                            Nenhum tópico adicionado ainda. Use as ferramentas acima para começar.
                         </Card>
                     )}
                 </div>
@@ -536,6 +549,12 @@ export const ProfessorSubjectEditor: React.FC<{
                 isOpen={isAiTopicModalOpen}
                 onClose={handleCloseAiTopicModal}
                 onSave={handleSaveAiTopics}
+            />
+
+            <AiBulkTopicContentGeneratorModal
+                isOpen={isAiBulkModalOpen}
+                onClose={handleCloseAiBulkModal}
+                onSave={handleSaveAiBulkTopics}
             />
 
             <ProfessorTopicEditor

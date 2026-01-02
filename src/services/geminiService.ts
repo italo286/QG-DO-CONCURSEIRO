@@ -323,3 +323,25 @@ export const analyzeTopicFrequencies = async (analysisText: string, topics: any[
     }));
     return parseJsonResponse(response.text ?? '', 'array');
 };
+
+/**
+ * Processa um texto com nomes e links de arquivos e agrupa em pares de PDF e Vídeo para criação de aulas.
+ */
+export const parseBulkTopicContent = async (genericName: string, rawContent: string): Promise<any[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `Analise a seguinte lista de arquivos e links para o tópico "${genericName}". 
+    Group os itens em "Aulas". Cada aula deve idealmente ter 1 arquivo PDF e 1 arquivo de Vídeo (baseado nos nomes dos arquivos e links).
+    Se houver apenas um dos tipos para uma aula, inclua-o sozinho no grupo.
+    Retorne APENAS um array JSON de objetos: 
+    { "aulaNumber": number, "pdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
+    
+    Conteúdo para análise:
+    ${rawContent}`;
+
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+    }));
+    return parseJsonResponse(response.text ?? '', 'array');
+};
