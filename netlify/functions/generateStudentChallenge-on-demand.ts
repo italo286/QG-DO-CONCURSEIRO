@@ -135,7 +135,11 @@ async function getReviewPool(studentProgress: StudentProgress, subjects: Subject
 const handler: Handler = async (event: HandlerEvent) => {
     const { apiKey, studentId, challengeType } = event.queryStringParameters || {};
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return { statusCode: 401, body: 'Unauthorized' };
+        return { statusCode: 401, body: 'Unauthorized: API Key interna inválida.' };
+    }
+
+    if (!process.env.API_KEY) {
+        return { statusCode: 400, body: 'Erro: API_KEY do Gemini não configurada no Netlify.' };
     }
 
     try {

@@ -329,10 +329,10 @@ export const analyzeTopicFrequencies = async (analysisText: string, topics: any[
  */
 export const parseBulkTopicContent = async (genericName: string, rawContent: string): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Analise a seguinte lista de arquivos e links para o tópico "${genericName}". 
-    Group os itens em "Aulas". Cada aula deve idealmente ter 1 arquivo PDF e 1 arquivo de Vídeo (baseado nos nomes dos arquivos e links).
-    Se houver apenas um dos tipos para uma aula, inclua-o sozinho no grupo.
-    Retorne APENAS um array JSON de objetos: 
+    const prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
+    Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
+    Dê a cada grupo o nome de "${genericName} - Aula X", onde X é a sequência numérica detectada ou lógica.
+    Retorne APENAS um array JSON de objetos seguindo este formato rigoroso: 
     { "aulaNumber": number, "pdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
     
     Conteúdo para análise:
