@@ -1,7 +1,9 @@
 
+
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI } from "@google/genai";
+// FIX: Added GenerateContentResponse to imports to properly type AI responses
+import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 interface QuestionAttempt {
     questionId: string;
@@ -22,6 +24,20 @@ interface StudentProgress {
     progressByTopic: { [subjectId: string]: { [topicId: string]: { lastAttempt: QuestionAttempt[], score: number } } };
     reviewSessions: { attempts?: QuestionAttempt[] }[];
     studentId: string;
+}
+
+// Helper para retry com backoff exponencial
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+    try {
+        return await fn();
+    } catch (error: any) {
+        if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
+            await new Promise(resolve => setTimeout(resolve, delay));
+            // FIX: Pass generic type T to recursive call to ensure return type safety
+            return retryWithBackoff<T>(fn, retries - 1, delay * 2);
+        }
+        throw error;
+    }
 }
 
 const getFirestoreTools = () => {
@@ -59,7 +75,7 @@ const cleanJsonResponse = (text: string) => {
         }
         return JSON.parse(cleanText);
     } catch (e) {
-        throw new Error(`Erro de parse JSON da IA`);
+        throw new Error(`Erro de parse JSON da IA: ${e instanceof Error ? e.message : 'Unknown error'}`);
     }
 };
 
@@ -76,20 +92,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!studentDoc.exists) throw new Error('Progresso não encontrado');
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        const geminiKey = process.env.API_KEY;
-        const ai = new GoogleGenAI({ apiKey: geminiKey! });
+        // FIX: Initializing GoogleGenAI with process.env.API_KEY directly as per guidelines
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
-        // --- PORTUGUÊS (Rigor: Quantidade + Contexto de Concursos) ---
+        // --- PORTUGUÊS ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
-            const response = await ai.models.generateContent({
+            // FIX: Added explicit type parameter <GenerateContentResponse> to retryWithBackoff call to resolve 'unknown' type error
+            const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. 
-                Foque em temas de alta complexidade como: Concordância, Regência, Crase ou Pontuação.
-                Para cada questão, inclua um campo "mnemonicTopic" com o tema central para futura geração de imagem.
-                JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Português", "topicName": "Geral", "mnemonicTopic": string}]`,
+                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Português", "topicName": "Geral"}]`,
                 config: { responseMimeType: "application/json" }
-            });
+            }));
             const items = cleanJsonResponse(response.text || '[]').map((it: any, idx: number) => ({
                 ...it, id: `port-${Date.now()}-${idx}`
             }));
@@ -119,7 +133,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }
         }
 
-        // --- REVISÃO (Rigor: Filtros de Erro/Acerto + Tópicos) ---
+        // --- REVISÃO ---
         if (challengeType === 'review') {
             const isAdv = studentProgress.dailyReviewMode === 'advanced';
             const selSubIds = isAdv ? (studentProgress.advancedReviewSubjectIds || []) : [];
@@ -171,7 +185,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json(final);
         }
 
-        // --- GLOSSÁRIO (Rigor: Tópicos Selecionados) ---
+        // --- GLOSSÁRIO ---
         if (challengeType === 'glossary') {
             const isAdv = studentProgress.glossaryChallengeMode === 'advanced';
             const selSubIds = isAdv ? (studentProgress.advancedGlossarySubjectIds || []) : [];
@@ -182,34 +196,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             subjects.forEach(s => {
                 if (selSubIds.length > 0 && !selSubIds.includes(s.id)) return;
                 s.topics.forEach((t: any) => {
-                    const processGloss = (item: any, parent: any) => {
+                    const processGloss = (item: any) => {
                         if (selTopIds.length > 0 && !selTopIds.includes(item.id)) return;
-                        (item.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: item.name, mnemonicTopic: g.term }));
+                        (item.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: item.name }));
                     };
-                    processGloss(t, null);
-                    (t.subtopics || []).forEach((st: any) => processGloss(st, t));
+                    processGloss(t);
+                    (t.subtopics || []).forEach((st: any) => processGloss(st));
                 });
             });
 
             const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
             const selectedTerms = shuffleArray(unique).slice(0, targetCount);
-            const items = [];
+            
+            if (selectedTerms.length === 0) return res.status(200).json([]);
 
-            for (const g of selectedTerms) {
-                const gen = await ai.models.generateContent({
-                    model: 'gemini-3-flash-preview',
-                    contents: `Termo: "${g.term}", Definição: "${g.definition}". Gere 1 questão de múltipla escolha extremamente focada em conceitos que caem em provas de concursos federais.
-                    JSON: {"statement": string, "options": string[], "correctAnswer": string, "justification": string, "mnemonicTopic": "${g.term}"}`,
-                    config: { responseMimeType: "application/json" }
-                });
-                const q = cleanJsonResponse(gen.text || '{}');
-                items.push({ ...q, id: `gloss-${Date.now()}-${Math.random()}`, subjectName: g.subjectName, topicName: g.topicName });
-            }
-            return res.status(200).json(items);
+            // OTIMIZAÇÃO: Gerar todas as questões de uma vez só para poupar cota de IA
+            const termsPrompt = selectedTerms.map(g => `Termo: "${g.term}", Definição: "${g.definition}"`).join('; ');
+            // FIX: Added explicit type parameter <GenerateContentResponse> to retryWithBackoff call to resolve 'unknown' type error
+            const gen = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `Baseado nos seguintes pares de termos técnicos e definições de concurso, gere exatamente uma questão de múltipla escolha para CADA par. Retorne um array JSON. 
+                Pares: ${termsPrompt}. 
+                JSON Format: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "mnemonicTopic": string}]`,
+                config: { responseMimeType: "application/json" }
+            }));
+            
+            const questions = cleanJsonResponse(gen.text || '[]');
+            const finalItems = questions.map((q: any, idx: number) => {
+                const originalTerm = selectedTerms[idx] || selectedTerms[0];
+                return { 
+                    ...q, 
+                    id: `gloss-${Date.now()}-${idx}`, 
+                    subjectName: originalTerm.subjectName, 
+                    topicName: originalTerm.topicName 
+                };
+            });
+
+            return res.status(200).json(finalItems);
         }
 
         return res.status(400).json({ error: 'Tipo inválido' });
     } catch (e: any) {
+        console.error("Server Error:", e);
         return res.status(500).json({ error: e.message });
     }
 }
