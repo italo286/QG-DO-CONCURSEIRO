@@ -5,7 +5,6 @@ import { GoogleGenAI } from "@google/genai";
 
 /** 
  * Tipos definidos localmente para evitar problemas de caminho relativo 
- * no ambiente de build da Vercel (Serverless Functions)
  */
 interface QuestionAttempt {
     questionId: string;
@@ -43,49 +42,28 @@ interface StudentProgress {
     studentId: string;
 }
 
-interface Subject {
-    id: string;
-    name: string;
-    topics: { id: string, name: string, glossary?: { term: string, definition: string }[], questions: any[], tecQuestions?: any[], subtopics: any[] }[];
-}
-
-// Inicialização segura com verificação de nulos
-const initFirebase = () => {
-    // Vercel/Node ESM às vezes precisa acessar .default ou lidar com admin sendo undefined
+// Helper para inicialização e obtenção das ferramentas do Firestore
+const getFirestoreTools = () => {
     const firebaseAdmin = (admin as any).default || admin;
     
-    if (!firebaseAdmin || !firebaseAdmin.apps) {
-        throw new Error("Falha ao carregar o SDK do Firebase Admin. Verifique as dependências.");
+    if (!firebaseAdmin.apps.length) {
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+        privateKey = privateKey.trim().replace(/^"/, '').replace(/"$/, '').replace(/\\n/g, '\n');
+
+        firebaseAdmin.initializeApp({
+            credential: firebaseAdmin.credential.cert({
+                projectId: process.env.FIREBASE_PROJECT_ID,
+                privateKey: privateKey,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+            }),
+        });
     }
 
-    if (firebaseAdmin.apps.length === 0) {
-        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
-        
-        if (!privateKey) {
-            throw new Error("Variável FIREBASE_PRIVATE_KEY não definida no ambiente.");
-        }
+    const db = firebaseAdmin.firestore();
+    // Acessa FieldPath de forma segura, tentando várias resoluções comuns do SDK
+    const FieldPath = firebaseAdmin.firestore.FieldPath;
 
-        // Limpeza profunda da chave privada
-        privateKey = privateKey.trim();
-        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
-            privateKey = privateKey.substring(1, privateKey.length - 1);
-        }
-        privateKey = privateKey.replace(/\\n/g, '\n');
-
-        try {
-            firebaseAdmin.initializeApp({
-                credential: firebaseAdmin.credential.cert({
-                    projectId: process.env.FIREBASE_PROJECT_ID,
-                    privateKey: privateKey,
-                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-                }),
-            });
-            console.log("Firebase Admin inicializado com sucesso.");
-        } catch (initErr: any) {
-            throw new Error(`Erro ao inicializar Firebase com credenciais: ${initErr.message}`);
-        }
-    }
-    return firebaseAdmin.firestore();
+    return { db, FieldPath };
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -102,74 +80,59 @@ const cleanJsonResponse = (text: string) => {
         let cleanText = text.trim();
         if (cleanText.includes('```')) {
             const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (matches && matches[1]) {
-                cleanText = matches[1];
-            }
+            if (matches && matches[1]) cleanText = matches[1];
         }
         return JSON.parse(cleanText);
     } catch (e) {
-        console.error("Erro parse Gemini JSON:", text);
-        throw new Error("Formato de JSON inválido retornado pela IA.");
+        throw new Error("A IA retornou um JSON malformado.");
     }
 };
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { apiKey, studentId, challengeType } = req.query;
 
-    // 1. Validação da chave da API interna
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return res.status(401).json({ error: 'Não autorizado: Chave de API interna inválida.' });
+        return res.status(401).json({ error: 'Não autorizado' });
     }
 
     try {
-        // 2. Inicialização do Firebase
-        const db = initFirebase();
-
-        // 3. Verificação da API Key da Gemini
-        if (!process.env.API_KEY) {
-            return res.status(500).json({ error: 'Configuração ausente: API_KEY da Gemini não definida.' });
-        }
-
+        const { db, FieldPath } = getFirestoreTools();
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) {
-            return res.status(404).json({ error: 'Perfil do aluno não encontrado.' });
-        }
-        
+        if (!studentDoc.exists) return res.status(404).json({ error: 'Aluno não encontrado' });
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // --- PORTUGUÊS (Independente) ---
+        // --- PORTUGUÊS ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
+                contents: `Gere ${targetCount} questões de múltipla escolha (A-E) de Português para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
                 config: { responseMimeType: "application/json" }
             });
             return res.status(200).json(cleanJsonResponse(response.text || '[]'));
         }
 
-        // --- CARREGAMENTO DE DISCIPLINAS PARA REVISÃO/GLOSSÁRIO ---
+        // --- DISCIPLINAS (REVISÃO / GLOSSÁRIO) ---
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => {
-            if (d.subjectId) subjectIds.add(d.subjectId);
-        }));
+        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
 
-        const subjects: Subject[] = [];
+        const subjects: any[] = [];
         const subjectIdsArray = Array.from(subjectIds);
 
         if (subjectIdsArray.length > 0) {
+            // Firestore 'in' query limitada a 10 itens
             for (let i = 0; i < subjectIdsArray.length; i += 10) {
                 const chunk = subjectIdsArray.slice(i, i + 10);
-                const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
+                const subjectDocs = await db.collection('subjects').where(FieldPath.documentId(), 'in', chunk).get();
                 for (const doc of subjectDocs.docs) {
                     const topicsSnap = await doc.ref.collection('topics').get();
                     subjects.push({ 
                         id: doc.id, 
                         name: doc.data().name, 
-                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as any)) 
+                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() })) 
                     });
                 }
             }
@@ -192,14 +155,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 else everIncorrect.add(a.questionId);
             };
 
-            Object.values(studentProgress.progressByTopic || {}).forEach(s => 
-                Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
-            );
+            Object.values(studentProgress.progressByTopic || {}).forEach(s => Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt)));
             (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
 
             let pool: Question[] = [];
             subjects.forEach(subject => {
-                subject.topics.forEach(topic => {
+                subject.topics.forEach((topic: any) => {
                     const processT = (t: any) => {
                         const qs = [
                             ...(t.questions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name })),
@@ -230,7 +191,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
             const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
 
-            const glossaryPool = subjects.flatMap(s => s.topics.flatMap(t => {
+            const glossaryPool = subjects.flatMap(s => s.topics.flatMap((t: any) => {
                 const terms = [...(t.glossary || [])];
                 (t.subtopics || []).forEach((st: any) => terms.push(...(st.glossary || [])));
                 return terms;
@@ -249,12 +210,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json(items);
         }
 
-        return res.status(400).json({ error: `Tipo de desafio '${challengeType}' não suportado.` });
+        return res.status(400).json({ error: 'Tipo inválido' });
 
     } catch (error: any) {
-        console.error("ERRO CRÍTICO NA API:", error);
+        console.error("ERRO CRÍTICO:", error);
         return res.status(500).json({ 
-            error: "Erro no servidor ao gerar desafio.", 
+            error: "Erro na função serverless", 
             details: error.message,
             stack: error.stack 
         });
