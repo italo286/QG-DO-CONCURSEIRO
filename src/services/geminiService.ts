@@ -331,9 +331,10 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
     Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
-    Dê a cada grupo o nome de "${genericName} - Aula X", onde X é a sequência numérica detectada ou lógica.
-    Retorne APENAS um array JSON de objetos seguindo este formato rigoroso: 
-    { "aulaNumber": number, "pdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
+    Agrupe os arquivos logicamente.
+    Retorne um array JSON de objetos ordenado crescentemente com base na numeração detectada nos nomes originais (ex: se houver aula 22 e aula 23, retorne aula 22 primeiro).
+    O formato deve ser rigorosamente: 
+    { "originalAulaNumber": number, "pdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
     
     Conteúdo para análise:
     ${rawContent}`;

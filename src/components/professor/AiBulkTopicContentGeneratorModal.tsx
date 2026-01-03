@@ -62,11 +62,12 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
         const newItems = previewData.map((item, i) => {
             const prefix = isSubtopic ? 'st' : 't';
             const id = `${prefix}-bulk-${timestamp}-${i}`;
+            const aulaSequence = String(i + 1).padStart(2, '0');
             
             const baseItem: any = {
                 id: id,
-                name: `${genericName} - Aula ${item.aulaNumber}`,
-                description: `Conteúdo da Aula ${item.aulaNumber} sobre ${genericName}`,
+                name: `${genericName} - Aula ${aulaSequence}`,
+                description: `Conteúdo da Aula ${i + 1} sobre ${genericName}`,
                 color: selectedColor,
                 fullPdfs: item.pdf ? [{ id: `pdf-${id}`, fileName: item.pdf.name, url: item.pdf.url }] : [],
                 summaryPdfs: [],
@@ -147,7 +148,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                         <div className="space-y-2 max-h-60 overflow-y-auto pr-2">
                             {previewData.map((item, idx) => (
                                 <div key={idx} className="p-3 bg-gray-900/50 rounded-lg border border-gray-700 text-sm" style={selectedColor ? { borderLeft: `4px solid ${selectedColor}` } : {}}>
-                                    <p className="font-bold text-white mb-2">{genericName} - Aula {item.aulaNumber}</p>
+                                    <p className="font-bold text-white mb-2">{genericName} - Aula {String(idx + 1).padStart(2, '0')}</p>
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className={item.pdf ? 'text-green-400' : 'text-gray-600'}>
                                             <span className="font-semibold">PDF:</span> {item.pdf ? item.pdf.name : 'Não detectado'}
