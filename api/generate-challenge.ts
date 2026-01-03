@@ -49,27 +49,43 @@ interface Subject {
     topics: { id: string, name: string, glossary?: { term: string, definition: string }[], questions: any[], tecQuestions?: any[], subtopics: any[] }[];
 }
 
-// Inicialização segura
+// Inicialização segura com verificação de nulos
 const initFirebase = () => {
-    if (!admin.apps.length) {
-        let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+    // Vercel/Node ESM às vezes precisa acessar .default ou lidar com admin sendo undefined
+    const firebaseAdmin = (admin as any).default || admin;
+    
+    if (!firebaseAdmin || !firebaseAdmin.apps) {
+        throw new Error("Falha ao carregar o SDK do Firebase Admin. Verifique as dependências.");
+    }
+
+    if (firebaseAdmin.apps.length === 0) {
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY;
         
-        // Limpeza profunda da chave privada para evitar erros de aspas/quebra de linha no Vercel
+        if (!privateKey) {
+            throw new Error("Variável FIREBASE_PRIVATE_KEY não definida no ambiente.");
+        }
+
+        // Limpeza profunda da chave privada
         privateKey = privateKey.trim();
         if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
             privateKey = privateKey.substring(1, privateKey.length - 1);
         }
         privateKey = privateKey.replace(/\\n/g, '\n');
 
-        admin.initializeApp({
-            credential: admin.credential.cert({
-                projectId: process.env.FIREBASE_PROJECT_ID,
-                privateKey: privateKey,
-                clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-            }),
-        });
+        try {
+            firebaseAdmin.initializeApp({
+                credential: firebaseAdmin.credential.cert({
+                    projectId: process.env.FIREBASE_PROJECT_ID,
+                    privateKey: privateKey,
+                    clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+                }),
+            });
+            console.log("Firebase Admin inicializado com sucesso.");
+        } catch (initErr: any) {
+            throw new Error(`Erro ao inicializar Firebase com credenciais: ${initErr.message}`);
+        }
     }
-    return admin.firestore();
+    return firebaseAdmin.firestore();
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -100,20 +116,30 @@ const cleanJsonResponse = (text: string) => {
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { apiKey, studentId, challengeType } = req.query;
 
-    // Validação de segurança básica
+    // 1. Validação da chave da API interna
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return res.status(401).json({ error: 'Unauthorized: Chave de API inválida.' });
+        return res.status(401).json({ error: 'Não autorizado: Chave de API interna inválida.' });
     }
 
     try {
+        // 2. Inicialização do Firebase
         const db = initFirebase();
+
+        // 3. Verificação da API Key da Gemini
+        if (!process.env.API_KEY) {
+            return res.status(500).json({ error: 'Configuração ausente: API_KEY da Gemini não definida.' });
+        }
+
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) return res.status(404).json({ error: 'Aluno não encontrado' });
+        if (!studentDoc.exists) {
+            return res.status(404).json({ error: 'Perfil do aluno não encontrado.' });
+        }
+        
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // --- PORTUGUÊS (Não depende de busca de disciplinas) ---
+        // --- PORTUGUÊS (Independente) ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await ai.models.generateContent({
@@ -124,16 +150,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             return res.status(200).json(cleanJsonResponse(response.text || '[]'));
         }
 
-        // Para os outros, precisamos das disciplinas
+        // --- CARREGAMENTO DE DISCIPLINAS PARA REVISÃO/GLOSSÁRIO ---
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
+        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => {
+            if (d.subjectId) subjectIds.add(d.subjectId);
+        }));
 
         const subjects: Subject[] = [];
         const subjectIdsArray = Array.from(subjectIds);
 
         if (subjectIdsArray.length > 0) {
-            // Firestore 'in' query limitada a 10
             for (let i = 0; i < subjectIdsArray.length; i += 10) {
                 const chunk = subjectIdsArray.slice(i, i + 10);
                 const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
@@ -165,7 +192,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 else everIncorrect.add(a.questionId);
             };
 
-            Object.values(studentProgress.progressByTopic || {}).forEach(s => Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt)));
+            Object.values(studentProgress.progressByTopic || {}).forEach(s => 
+                Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
+            );
             (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
 
             let pool: Question[] = [];
@@ -208,22 +237,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             }));
 
             const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+            if (unique.length === 0) return res.status(200).json([]);
+
             const items = shuffleArray(unique).slice(0, targetCount).map(g => ({
                 id: `gloss-${Date.now()}-${Math.random()}`,
                 statement: `Qual a definição correta para: **${g.term}**?`,
-                options: shuffleArray([g.definition, "Definição incorreta 1", "Definição incorreta 2", "Definição incorreta 3", "Definição incorreta 4"]),
+                options: shuffleArray([g.definition, "Opção incorreta 1", "Opção incorreta 2", "Opção incorreta 3", "Opção incorreta 4"]),
                 correctAnswer: g.definition,
                 justification: `O termo ${g.term} define-se como: ${g.definition}`
             }));
             return res.status(200).json(items);
         }
 
-        return res.status(400).json({ error: 'Tipo inválido' });
+        return res.status(400).json({ error: `Tipo de desafio '${challengeType}' não suportado.` });
 
     } catch (error: any) {
-        console.error("ERRO API:", error);
+        console.error("ERRO CRÍTICO NA API:", error);
         return res.status(500).json({ 
-            error: "Falha na execução da função", 
+            error: "Erro no servidor ao gerar desafio.", 
             details: error.message,
             stack: error.stack 
         });
