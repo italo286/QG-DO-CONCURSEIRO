@@ -1,9 +1,8 @@
 
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { StudyPlan, Subject, StudentProgress } from '../../types';
-import { Card, Button } from '../ui';
-// FIX: Added missing ArrowRightIcon import from Icons component.
-import { CalendarIcon, PencilIcon, BookOpenIcon, CheckCircleIcon, ArrowRightIcon } from '../Icons';
+import { Card } from '../ui';
+import { CalendarIcon, PencilIcon, ArrowRightIcon } from '../Icons';
 import { getBrasiliaDate } from '../../utils';
 
 export const DailySchedule: React.FC<{
@@ -14,6 +13,21 @@ export const DailySchedule: React.FC<{
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
 }> = ({ fullStudyPlan, subjects, studentProgress, onNavigateToTopic, onToggleTopicCompletion }) => {
     
+    // Estado para a hora atual em minutos (ex: 15:00 = 900)
+    const [currentMinutes, setCurrentMinutes] = useState(() => {
+        const now = getBrasiliaDate();
+        return now.getUTCHours() * 60 + now.getUTCMinutes();
+    });
+
+    // Atualiza a hora a cada minuto para o progresso ser "vivo"
+    useEffect(() => {
+        const timer = setInterval(() => {
+            const now = getBrasiliaDate();
+            setCurrentMinutes(now.getUTCHours() * 60 + now.getUTCMinutes());
+        }, 60000);
+        return () => clearInterval(timer);
+    }, []);
+
     const activePlan = (fullStudyPlan.plans || []).find(p => p.id === fullStudyPlan.activePlanId);
     const now = getBrasiliaDate();
     const todayIndex = now.getUTCDay();
@@ -27,6 +41,12 @@ export const DailySchedule: React.FC<{
             }
         }
         return null;
+    };
+
+    // Converte string "HH:mm" para minutos totais
+    const timeToMinutes = (timeStr: string) => {
+        const [h, m] = timeStr.split(':').map(Number);
+        return h * 60 + m;
     };
 
     if (!activePlan) {
@@ -63,49 +83,67 @@ export const DailySchedule: React.FC<{
                     <p className="text-gray-500 text-sm font-bold uppercase tracking-widest italic">Descanso Programado</p>
                 </div>
             ) : (
-                <div className="relative space-y-6 before:absolute before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-700">
-                    {sortedTimes.map(time => {
+                <div className="relative space-y-6">
+                    {sortedTimes.map((time, index) => {
                         const content = todayItems[time];
                         const isTopicId = content.startsWith('t') || content.startsWith('st');
                         const topicInfo = isTopicId ? getTopicInfo(content) : null;
-                        const isCompleted = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
+                        const isCompletedManually = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
                         
+                        const itemMinutes = timeToMinutes(time);
+                        // Marcado se já passou do horário OU se foi marcado manualmente
+                        const isPast = currentMinutes >= itemMinutes;
+                        const isMarked = isPast || isCompletedManually;
+
+                        const isLast = index === sortedTimes.length - 1;
+
                         return (
                             <div key={time} className="relative pl-10 group">
-                                {/* Ponto da Timeline */}
-                                <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-4 border-gray-900 flex items-center justify-center z-10 transition-colors ${isCompleted ? 'bg-green-500' : 'bg-gray-700 group-hover:bg-cyan-500'}`}>
-                                    {isCompleted && <CheckIcon className="h-3 w-3 text-white" />}
+                                {/* Linha Vertical Segmentada (desce do círculo) */}
+                                {!isLast && (
+                                    <div className={`absolute left-3.5 top-7 w-0.5 h-full z-0 transition-colors duration-500 ${isMarked ? 'bg-cyan-500' : 'bg-gray-700'}`} />
+                                )}
+
+                                {/* Círculo da Timeline */}
+                                <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-4 border-gray-900 flex items-center justify-center z-10 transition-all duration-700 ${isMarked ? 'bg-cyan-500 shadow-[0_0_10px_rgba(6,182,212,0.5)]' : 'bg-gray-700 group-hover:bg-gray-600'}`}>
+                                    {isCompletedManually ? (
+                                        <CheckIcon className="h-3 w-3 text-white" />
+                                    ) : isPast ? (
+                                        <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
+                                    ) : null}
                                 </div>
 
                                 <div className="space-y-1">
-                                    <span className="text-[10px] font-black text-gray-500 font-mono tracking-tighter uppercase">{time}</span>
+                                    <span className={`text-[10px] font-black font-mono tracking-tighter uppercase transition-colors ${isMarked ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                        {time} {isPast && !isCompletedManually && !isLast && <span className="ml-2 opacity-50 lowercase font-sans font-medium">(concluído)</span>}
+                                    </span>
                                     
                                     <div 
-                                        className={`p-3 rounded-xl border transition-all duration-300 ${isCompleted ? 'bg-green-900/10 border-green-500/20 opacity-60 scale-[0.98]' : 'bg-gray-900/40 border-gray-700 hover:border-cyan-500/30'}`}
-                                        style={(!isCompleted && topicInfo?.color) ? { borderLeft: `3px solid ${topicInfo.color}` } : {}}
+                                        className={`p-3 rounded-xl border transition-all duration-300 ${isMarked ? 'bg-cyan-500/5 border-cyan-500/30' : 'bg-gray-900/40 border-gray-700 hover:border-gray-600'}`}
+                                        style={(!isMarked && topicInfo?.color) ? { borderLeft: `3px solid ${topicInfo.color}` } : {}}
                                     >
                                         {topicInfo ? (
                                             <div className="flex justify-between items-start gap-2">
                                                 <div className="min-w-0">
-                                                    <p className={`text-xs font-black uppercase text-gray-500 tracking-tighter mb-0.5 truncate`}>
+                                                    <p className={`text-xs font-black uppercase tracking-tighter mb-0.5 truncate ${isMarked ? 'text-cyan-500/70' : 'text-gray-500'}`}>
                                                         {topicInfo.subjectName}
                                                     </p>
-                                                    <p className={`text-sm font-bold leading-tight ${isCompleted ? 'line-through text-gray-500' : 'text-white'}`}>
+                                                    <p className={`text-sm font-bold leading-tight ${isMarked ? 'text-white' : 'text-gray-300'}`}>
                                                         {topicInfo.name}
                                                     </p>
                                                 </div>
                                                 <div className="flex flex-col gap-1">
                                                     <button 
-                                                        onClick={() => onToggleTopicCompletion(topicInfo.subjectId, content, !isCompleted)}
-                                                        className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isCompleted ? 'text-green-500 bg-green-500/10' : 'text-gray-500 bg-gray-800 hover:text-white hover:bg-cyan-600'}`}
-                                                        title={isCompleted ? "Desmarcar conclusão" : "Marcar como concluído"}
+                                                        onClick={() => onToggleTopicCompletion(topicInfo.subjectId, content, !isCompletedManually)}
+                                                        className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isCompletedManually ? 'text-cyan-500 bg-cyan-500/10' : 'text-gray-500 bg-gray-800 hover:text-white hover:bg-cyan-600'}`}
+                                                        title={isCompletedManually ? "Desmarcar conclusão" : "Marcar como concluído"}
                                                     >
                                                         <CheckIcon className="h-3 w-3" />
                                                     </button>
-                                                    {!isCompleted && (
+                                                    {!isCompletedManually && (
                                                         <button 
                                                             onClick={() => onNavigateToTopic(content)}
-                                                            className="h-6 w-6 rounded-lg bg-cyan-600/20 text-cyan-400 flex items-center justify-center hover:bg-cyan-600 hover:text-white transition-all"
+                                                            className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isMarked ? 'bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600' : 'bg-gray-800 text-gray-500 hover:bg-cyan-600'} hover:text-white`}
                                                             title="Ir para aula"
                                                         >
                                                             <ArrowRightIcon className="h-3 w-3" />
@@ -115,8 +153,8 @@ export const DailySchedule: React.FC<{
                                             </div>
                                         ) : (
                                             <div className="flex items-center gap-2">
-                                                <PencilIcon className="h-3 w-3 text-purple-400 flex-shrink-0" />
-                                                <p className="text-xs text-gray-300 italic line-clamp-2">"{content}"</p>
+                                                <PencilIcon className={`h-3 w-3 flex-shrink-0 ${isMarked ? 'text-cyan-400' : 'text-purple-400'}`} />
+                                                <p className={`text-xs italic line-clamp-2 ${isMarked ? 'text-cyan-100/70' : 'text-gray-400'}`}>"{content}"</p>
                                             </div>
                                         )}
                                     </div>
