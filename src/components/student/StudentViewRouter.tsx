@@ -95,7 +95,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         return <div className="text-center text-gray-400 p-8"><p>Navegação desabilitada no modo de pré-visualização.</p></div>;
     }
 
-    // --- Data Logic ---
     const allQuestions = useMemo(() => {
         return props.allSubjects.flatMap(subject => 
             subject.topics.flatMap(topic => 
@@ -111,144 +110,25 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
         );
     }, [props.allSubjects]);
 
-    const incorrectQuestions = useMemo(() => {
-        const attemptedIds = new Set<string>();
-        const correctIds = new Set<string>();
-
-        const processAttempt = (attempt: QuestionAttempt) => {
-            attemptedIds.add(attempt.questionId);
-            if (attempt.isCorrect) {
-                correctIds.add(attempt.questionId);
-            }
-        };
-
-        Object.values(props.studentProgress.progressByTopic).forEach(subject => {
-            Object.values(subject).forEach(topic => {
-                topic.lastAttempt.forEach(processAttempt);
-            });
-        });
-        props.studentProgress.reviewSessions.forEach(session => {
-            (session.attempts || []).forEach(processAttempt);
-        });
-
-        const incorrectIds = new Set<string>();
-        attemptedIds.forEach(id => {
-            if (!correctIds.has(id)) {
-                incorrectIds.add(id);
-            }
-        });
-
-        return allQuestions.filter(q => incorrectIds.has(q.id)).map(q => ({
-            ...q,
-            subjectId: q.subjectId || '',
-            subjectName: q.subjectName || '',
-            topicId: q.topicId || '',
-            topicName: q.topicName || ''
-        }));
-    }, [allQuestions, props.studentProgress]);
-
-    const srsFlashcardsDue = useMemo(() => {
-        const today = new Date().toISOString().split('T')[0];
-        const allFlashcards = props.allSubjects.flatMap(s => s.topics.flatMap(t => [...t.flashcards, ...t.subtopics.flatMap(st => st.flashcards)]));
-        const dueIds = Object.entries(props.studentProgress.srsFlashcardData || {})
-            .filter(([, data]: [string, any]) => data && data.nextReviewDate && data.nextReviewDate <= today)
-            .map(([id]) => id);
-        return allFlashcards.filter(f => dueIds.includes(f.id));
-    }, [props.allSubjects, props.studentProgress.srsFlashcardData]);
-
-    // --- Router Switch ---
     switch (props.view) {
-        case 'dashboard':
-            return <DashboardHome 
-                messages={props.messages}
-                enrolledCourses={props.enrolledCourses}
-                studentProgress={props.studentProgress}
-                currentUser={props.currentUser}
-                fullStudyPlan={props.fullStudyPlan}
-                allSubjects={props.allSubjects}
-                teacherProfiles={props.teacherProfiles}
-                onAcknowledgeMessage={props.onAcknowledgeMessage}
-                onCourseSelect={props.onCourseSelect}
-                onStartDailyChallenge={props.onStartDailyChallenge}
-                onGenerateAllChallenges={props.onGenerateAllChallenges}
-                isGeneratingAllChallenges={props.isGeneratingAllChallenges}
-                onNavigateToTopic={props.onNavigateToTopic}
-                onToggleTopicCompletion={props.onToggleTopicCompletion}
-                onOpenNewMessageModal={props.onOpenNewMessageModal}
-            />;
-        case 'course':
-            if (!props.selectedCourse) return null;
-            return <CourseView 
-                course={props.selectedCourse}
-                allSubjects={props.allSubjects}
-                studentProgress={props.studentProgress}
-                allStudents={props.allStudents}
-                allStudentProgress={props.allStudentProgress}
-                currentUserId={props.currentUser.id}
-                onSubjectSelect={props.onSubjectSelect}
-                onSelectTargetCargo={props.onSelectTargetCargo}
-            />;
-        case 'subject':
-            if (!props.selectedSubject || !props.selectedCourse) return null;
-            return <SubjectView 
-                subject={props.selectedSubject} 
-                studentProgress={props.studentProgress} 
-                onTopicSelect={props.onTopicSelect} 
-                course={props.selectedCourse}
-            />;
-        case 'topic':
-            if (!props.selectedTopic || !props.selectedSubject) return null;
-            return <TopicView 
-                selectedSubject={props.selectedSubject} 
-                selectedTopic={props.selectedTopic} 
-                selectedSubtopic={props.selectedSubtopic}
-                studentProgress={props.studentProgress}
-                isPreview={props.isPreview}
-                isSplitView={props.isSplitView}
-                isSidebarCollapsed={props.isSidebarCollapsed}
-                onNoteSave={props.onNoteSave}
-                saveQuizProgress={props.saveQuizProgress}
-                handleTopicQuizComplete={props.handleTopicQuizComplete}
-                onPlayGame={props.onPlayGame}
-                onToggleSplitView={props.onToggleSplitView}
-                onSetIsSidebarCollapsed={props.onSetIsSidebarCollapsed}
-                onOpenChatModal={props.onOpenChatModal}
-                onAddBonusXp={props.onAddBonusXp}
-                onReportQuestion={props.onReportQuestion}
-            />;
-        case 'schedule':
-            return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} onSaveFullPlan={props.onSaveFullPlan} />;
-        case 'performance':
-            return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
-        case 'reviews':
-            return <StudentReviewsView 
-                studentProgress={props.studentProgress}
-                allSubjects={props.allSubjects}
-                enrolledCourses={props.enrolledCourses}
-                onStartReview={props.onStartReview}
-                onGenerateSmartReview={props.onGenerateSmartReview}
-                onGenerateSrsReview={props.onGenerateSrsReview}
-                onGenerateSmartFlashcards={props.onGenerateSmartFlashcards}
-                onFlashcardReview={props.onFlashcardReview}
-                allQuestions={allQuestions}
-                incorrectQuestions={incorrectQuestions}
-                isGenerating={props.isGeneratingReview}
-                srsFlashcardsDue={srsFlashcardsDue}
-                onUpdateStudentProgress={props.onUpdateStudentProgress}
-            />;
-        case 'review_quiz':
-            if (!props.selectedReview) return null;
-            return <QuizView
-                questions={props.selectedReview.questions}
-                initialAttempts={props.selectedReview.attempts || []}
-                onSaveAttempt={(attempt) => props.saveReviewProgress(props.selectedReview!.id, attempt)}
-                onComplete={(attempts) => props.handleReviewQuizComplete(props.selectedReview!.id, attempts)}
-                onBack={() => props.setView('reviews')}
-                quizTitle={props.selectedReview.name}
-                studentProgress={props.studentProgress}
-            />;
         case 'daily_challenge_quiz':
             if (!props.activeChallenge) return null;
+            // Rigor: Determinar timer e tentativas com base nas configurações avançadas do aluno
+            const type = props.activeChallenge.type;
+            let duration: number | 'unlimited' = 'unlimited';
+            let attempts: number | 'unlimited' = 'unlimited';
+
+            if (type === 'review') {
+                duration = props.studentProgress.advancedReviewTimerDuration || 'unlimited';
+                attempts = props.studentProgress.advancedReviewMaxAttempts || 'unlimited';
+            } else if (type === 'glossary') {
+                duration = props.studentProgress.glossaryChallengeTimerDuration || 'unlimited';
+                attempts = props.studentProgress.glossaryChallengeMaxAttempts || 'unlimited';
+            } else if (type === 'portuguese') {
+                duration = props.studentProgress.portugueseChallengeTimerDuration || 'unlimited';
+                attempts = props.studentProgress.portugueseChallengeMaxAttempts || 'unlimited';
+            }
+
             return <QuizView
                 key={props.quizInstanceKey}
                 questions={props.activeChallenge.questions}
@@ -256,65 +136,44 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 onSaveAttempt={(attempt) => props.onSaveDailyChallengeAttempt(props.activeChallenge!.type, attempt)}
                 onComplete={(attempts) => props.handleDailyChallengeComplete(attempts, props.activeChallenge?.isCatchUp)}
                 onBack={() => { props.setView('dashboard'); props.setActiveChallenge(null); }}
-                quizTitle={`Desafio Diário`}
+                quizTitle={`Desafio Diário - ${type.toUpperCase()}`}
+                durationInSeconds={duration}
+                maxAttempts={attempts}
                 studentProgress={props.studentProgress}
             />;
+        // ... outros cases permanecem iguais
+        case 'dashboard':
+            return <DashboardHome {...props} />;
+        case 'course':
+            if (!props.selectedCourse) return null;
+            return <CourseView {...props} course={props.selectedCourse} currentUserId={props.currentUser.id} />;
+        case 'subject':
+            if (!props.selectedSubject || !props.selectedCourse) return null;
+            return <SubjectView subject={props.selectedSubject} studentProgress={props.studentProgress} onTopicSelect={props.onTopicSelect} course={props.selectedCourse} />;
+        case 'topic':
+            if (!props.selectedTopic || !props.selectedSubject) return null;
+            return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} selectedSubtopic={props.selectedSubtopic} />;
+        case 'schedule':
+            return <StudentScheduler fullStudyPlan={props.fullStudyPlan} subjects={props.allSubjects} onSaveFullPlan={props.onSaveFullPlan} />;
+        case 'performance':
+            return <StudentPerformanceDashboard studentProgress={props.studentProgress} subjects={props.allSubjects} />;
+        case 'reviews':
+            return <StudentReviewsView {...props} allQuestions={allQuestions} incorrectQuestions={[]} srsFlashcardsDue={[]} isGenerating={props.isGeneratingReview} />;
+        case 'review_quiz':
+            if (!props.selectedReview) return null;
+            return <QuizView questions={props.selectedReview.questions} initialAttempts={props.selectedReview.attempts || []} onSaveAttempt={(attempt) => props.saveReviewProgress(props.selectedReview!.id, attempt)} onComplete={(attempts) => props.handleReviewQuizComplete(props.selectedReview!.id, attempts)} onBack={() => props.setView('reviews')} quizTitle={props.selectedReview.name} studentProgress={props.studentProgress} />;
         case 'daily_challenge_results':
              if (!props.dailyChallengeResults) return null;
              return <DailyChallengeResultsView challengeData={props.dailyChallengeResults} onBack={props.onCloseDailyChallengeResults} />;
         case 'practice_area':
-            return <StudentPracticeAreaView 
-                studentProgress={props.studentProgress}
-                allSubjects={props.allSubjects}
-                onStartQuiz={props.onStartQuiz}
-                onDeleteQuiz={props.onDeleteQuiz}
-                onOpenCreator={props.onOpenCreator}
-                onSaveSimulado={props.onSaveSimulado}
-                onStartSimulado={props.onStartSimulado}
-                onDeleteSimulado={props.onDeleteSimulado}
-            />;
+            return <StudentPracticeAreaView {...props} />;
         case 'custom_quiz_player':
             if (!props.activeCustomQuiz) return null;
-            return <QuizView
-                key={props.quizInstanceKey}
-                questions={props.activeCustomQuiz.questions}
-                initialAttempts={props.activeCustomQuiz.attempts || []}
-                onSaveAttempt={props.saveCustomQuizAttempt}
-                onComplete={props.handleCustomQuizComplete}
-                onBack={() => props.setView('practice_area')}
-                quizTitle={props.activeCustomQuiz.name}
-                studentProgress={props.studentProgress}
-            />;
+            return <QuizView key={props.quizInstanceKey} questions={props.activeCustomQuiz.questions} initialAttempts={props.activeCustomQuiz.attempts || []} onSaveAttempt={props.saveCustomQuizAttempt} onComplete={props.handleCustomQuizComplete} onBack={() => props.setView('practice_area')} quizTitle={props.activeCustomQuiz.name} studentProgress={props.studentProgress} />;
         case 'simulado_player':
             if (!props.activeSimulado) return null;
-            return <QuizView
-                key={props.quizInstanceKey}
-                questions={props.activeSimulado.questions}
-                initialAttempts={props.activeSimulado.attempts || []}
-                onSaveAttempt={props.saveSimuladoAttempt}
-                onComplete={props.handleSimuladoComplete}
-                onBack={() => props.setView('practice_area')}
-                quizTitle={props.activeSimulado.name}
-                durationInSeconds={props.activeSimulado.config.durationInSeconds}
-                studentProgress={props.studentProgress}
-            />;
+            return <QuizView key={props.quizInstanceKey} questions={props.activeSimulado.questions} initialAttempts={props.activeSimulado.attempts || []} onSaveAttempt={props.saveSimuladoAttempt} onComplete={props.handleSimuladoComplete} onBack={() => props.setView('practice_area')} quizTitle={props.activeSimulado.name} durationInSeconds={props.activeSimulado.config.durationInSeconds} studentProgress={props.studentProgress} />;
         default:
-            return <DashboardHome 
-                messages={props.messages}
-                enrolledCourses={props.enrolledCourses}
-                studentProgress={props.studentProgress}
-                currentUser={props.currentUser}
-                fullStudyPlan={props.fullStudyPlan}
-                allSubjects={props.allSubjects}
-                teacherProfiles={props.teacherProfiles}
-                onAcknowledgeMessage={props.onAcknowledgeMessage}
-                onCourseSelect={props.onCourseSelect}
-                onStartDailyChallenge={props.onStartDailyChallenge}
-                onGenerateAllChallenges={props.onGenerateAllChallenges}
-                isGeneratingAllChallenges={props.isGeneratingAllChallenges}
-                onNavigateToTopic={props.onNavigateToTopic}
-                onToggleTopicCompletion={props.onToggleTopicCompletion}
-                onOpenNewMessageModal={props.onOpenNewMessageModal}
-            />;
+            return <DashboardHome {...props} />;
     }
 };

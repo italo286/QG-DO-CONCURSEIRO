@@ -312,49 +312,43 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         if (isPreview || !studentProgress) return;
     
         setIsGeneratingAllChallenges(true);
-        const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
-        const todayISO = getLocalDateISOString(getBrasiliaDate());
-        
-        let newProgress = { ...studentProgress };
-        const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
-        
         try {
-            for (const type of types) {
-                console.log(`Gerando desafio: ${type}...`);
-                let attempts = 0;
-                let success = false;
-                let items = [];
-
-                // Retry logic para cada desafio individualmente
-                while (attempts < 2 && !success) {
-                    try {
-                        const res = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
-                        items = await res.json();
-                        success = true;
-                    } catch (e) {
-                        attempts++;
-                        if (attempts < 2) await new Promise(r => setTimeout(r, 1000));
-                    }
-                }
-
-                if (success && items.length > 0) {
-                    const challengeKey = `${type}Challenge` as const;
-                    newProgress[challengeKey] = {
-                        date: todayISO,
-                        items: items,
-                        isCompleted: false,
-                        attemptsMade: 0,
-                        sessionAttempts: []
-                    };
-                }
-            }
+            const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
+            const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
+            
+            // Chamadas paralelas para as rotas da API
+            const challengePromises = types.map(type => 
+                fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`)
+                    .then(async res => {
+                        if (!res.ok) {
+                             const errorBody = await res.text();
+                             throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
+                        }
+                        return res.json();
+                    })
+            );
+            
+            const [reviewItems, glossaryItems, portugueseItems] = await Promise.all(challengePromises);
+            
+            const todayISO = getLocalDateISOString(getBrasiliaDate());
+    
+            // Correção aqui: usando as variáveis específicas em vez de uma variável 'items' genérica que estava causando bug
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            
+            const newProgress = {
+                ...studentProgress,
+                reviewChallenge: newReviewChallenge,
+                glossaryChallenge: newGlossaryChallenge,
+                portugueseChallenge: newPortugueseChallenge,
+            };
             
             await handleUpdateStudentProgress(newProgress, studentProgress);
-            console.log("Todos os desafios possíveis foram gerados e salvos.");
+    
         } catch (error) {
-            console.error("Erro fatal ao gerar desafios:", error);
-            alert(`Ocorreu um erro ao gerar os desafios. Alguns podem não estar disponíveis. Tente novamente mais tarde.`);
+            console.error("Erro ao gerar todos os desafios diários:", error);
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente.`);
         } finally {
             setIsGeneratingAllChallenges(false);
         }
