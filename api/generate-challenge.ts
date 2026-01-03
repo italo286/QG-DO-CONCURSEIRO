@@ -24,8 +24,8 @@ interface StudentProgress {
     studentId: string;
 }
 
-// Helper para retry com backoff exponencial mais agressivo (ajustado para limites Gemini Free)
-async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5, delay = 5000): Promise<T> {
+// Helper para retry curto no servidor (máximo 8 segundos para evitar timeout da função)
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
     try {
         return await fn();
     } catch (error: any) {
@@ -35,9 +35,8 @@ async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5, delay = 50
                            error.message?.includes('RESOURCE_EXHAUSTED');
 
         if (retries > 0 && isQuotaError) {
-            console.warn(`[Gemini Quota] Limite atingido. Tentando novamente em ${delay}ms... (${retries} restantes)`);
             await new Promise(resolve => setTimeout(resolve, delay));
-            return retryWithBackoff<T>(fn, retries - 1, delay * 2);
+            return retryWithBackoff<T>(fn, retries - 1, delay + 2000);
         }
         throw error;
     }
@@ -96,13 +95,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const studentProgress = studentDoc.data() as StudentProgress;
 
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
+        // USANDO MODELO LITE PARA MELHOR GERENCIAMENTO DE COTA
+        const MODEL = 'gemini-flash-lite-latest';
 
         // --- PORTUGUÊS ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos federais. Retorne um array JSON. Campos: statement, options, correctAnswer, justification, mnemonicTopic.`,
+                model: MODEL,
+                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos federais (Nível Superior). Retorne um array JSON com: statement, options (5 itens), correctAnswer (string exata), justification, mnemonicTopic.`,
                 config: { responseMimeType: "application/json" }
             }));
             const items = cleanJsonResponse(response.text || '[]').map((it: any, idx: number) => ({
@@ -213,10 +214,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const termsPrompt = selectedTerms.map(g => `Termo: "${g.term}", Definição: "${g.definition}"`).join('; ');
             const gen = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: `Baseado nos seguintes pares de termos técnicos e definições de concurso, gere exatamente uma questão de múltipla escolha para CADA par. Retorne um array JSON. 
-                Pares: ${termsPrompt}. 
-                JSON Format: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "mnemonicTopic": string}]`,
+                model: MODEL,
+                contents: `Gere uma questão de múltipla escolha técnica para CADA um destes termos: ${termsPrompt}. Retorne um array JSON. Campos: statement, options (5 itens), correctAnswer, justification, mnemonicTopic.`,
                 config: { responseMimeType: "application/json" }
             }));
             
@@ -237,6 +236,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Tipo inválido' });
     } catch (e: any) {
         console.error("Server Error Detail:", e);
-        return res.status(500).json({ error: e.message || 'Erro desconhecido no servidor' });
+        // Se for erro de cota, retornar 429 explícito
+        if (e.status === 429 || e.message?.includes('429')) {
+            return res.status(429).json({ error: 'IA Temporariamente Congestionada. Tente novamente em 1 minuto.' });
+        }
+        return res.status(500).json({ error: e.message || 'Erro interno no QG' });
     }
 }

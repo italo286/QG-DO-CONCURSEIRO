@@ -331,17 +331,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 
                 if (!res.ok) {
                     const errorBody = await res.text();
+                    // SE O ERRO FOR 429 OU CONTER QUOTA, O APP ESPERA MAIS TEMPO
                     if (res.status === 429 || errorBody.includes('quota') || errorBody.includes('429')) {
-                        throw new Error(`O sistema de IA está congestionado. O QG tentou 5 vezes, mas o Gemini pediu uma pausa. Aguarde 60 segundos e tente novamente.`);
+                        setChallengeGenerationStatus('IA Congestionada. Aguardando 30s...');
+                        await new Promise(r => setTimeout(r, 30000));
+                        // Tentar novamente uma única vez
+                        const retryRes = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
+                        if (!retryRes.ok) throw new Error('O sistema de IA está muito ocupado agora. Tente gerar novamente em 1 minuto.');
+                        results[type] = await retryRes.json();
+                    } else {
+                        throw new Error(`Erro operacional em ${type}: ${res.status}`);
                     }
-                    throw new Error(`Erro operacional em ${type}: ${res.status}`);
+                } else {
+                    results[type] = await res.json();
                 }
                 
-                results[type] = await res.json();
-                
                 // Intervalo de segurança maior entre chamadas para evitar burst de requisições
-                setChallengeGenerationStatus('Aguardando liberação do sistema...');
-                await new Promise(r => setTimeout(r, 3000));
+                setChallengeGenerationStatus('Resfriando sistemas (8s)...');
+                await new Promise(r => setTimeout(r, 8000));
             }
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
@@ -379,6 +386,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
+                )}
+                {/* EXIBIÇÃO DO STATUS DE GERAÇÃO */}
+                {isGeneratingAllChallenges && challengeGenerationStatus && (
+                    <div className="mb-6 p-4 bg-cyan-900/30 border border-cyan-500/50 rounded-xl flex items-center gap-4 animate-pulse">
+                        <Spinner />
+                        <span className="font-black text-cyan-400 uppercase tracking-widest text-xs">{challengeGenerationStatus}</span>
+                    </div>
                 )}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
