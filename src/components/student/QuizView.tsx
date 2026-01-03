@@ -1,10 +1,9 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Question, QuestionAttempt, StudentProgress } from '../../types';
 import { markdownToHtml } from '../../utils';
-import { Spinner, Button, Card, Modal } from '../ui';
-import { CheckCircleIcon, XCircleIcon, GeminiIcon, SparklesIcon, LightBulbIcon } from '../Icons';
-import { GoogleGenAI } from "@google/genai";
+import { Spinner, Button, Card } from '../ui';
+import { CheckCircleIcon, XCircleIcon, SparklesIcon, LightBulbIcon } from '../Icons';
 
 export const QuizView: React.FC<{
     questions: Question[];
@@ -26,14 +25,10 @@ export const QuizView: React.FC<{
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
+    const [discardedOptions, setDiscardedOptions] = useState<Set<string>>(new Set());
     const [showResults, setShowResults] = useState(false);
     const [hasCompleted, setHasCompleted] = useState(false);
     
-    // Mnemonic State
-    const [mnemonicImage, setMnemonicImage] = useState<string | null>(null);
-    const [isGeneratingMnemonic, setIsGeneratingMnemonic] = useState(false);
-    const [isMnemonicOpen, setIsMnemonicOpen] = useState(false);
-
     const isTimerActive = durationInSeconds !== undefined && durationInSeconds !== 'unlimited';
     const initialTime = typeof durationInSeconds === 'number' ? durationInSeconds : 0;
     const [timeLeft, setTimeLeft] = useState(initialTime);
@@ -42,7 +37,7 @@ export const QuizView: React.FC<{
 
     useEffect(() => {
         setSelectedOption(null);
-        setMnemonicImage(null);
+        setDiscardedOptions(new Set()); // Reset discarded on question change
     }, [currentIndex]);
 
     const questionToDisplay = questions[currentIndex];
@@ -64,6 +59,31 @@ export const QuizView: React.FC<{
         }
     }, [timeLeft, isTimerActive, showResults, hasCompleted]);
 
+    const handleOptionClick = (option: string) => {
+        if (isCurrentQuestionAnswered) return;
+        // Não permite selecionar se estiver descartada
+        if (discardedOptions.has(option)) return;
+        setSelectedOption(option);
+    };
+
+    const handleOptionDoubleClick = (option: string) => {
+        if (isCurrentQuestionAnswered) return;
+        
+        setDiscardedOptions(prev => {
+            const next = new Set(prev);
+            if (next.has(option)) {
+                next.delete(option);
+            } else {
+                next.add(option);
+                // Se descartou a que estava selecionada, limpa a seleção
+                if (selectedOption === option) {
+                    setSelectedOption(null);
+                }
+            }
+            return next;
+        });
+    };
+
     const handleRespond = () => {
         if (!selectedOption || !questionToDisplay || isCurrentQuestionAnswered) return;
         const isCorrect = selectedOption === questionToDisplay.correctAnswer;
@@ -80,33 +100,6 @@ export const QuizView: React.FC<{
     const handleNext = () => {
         if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
         else setShowResults(true);
-    };
-
-    const generateMnemonic = async () => {
-        if (!questionToDisplay) return;
-        setIsGeneratingMnemonic(true);
-        setIsMnemonicOpen(true);
-        try {
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-            const prompt = `Gere uma imagem mnemônica colorida e didática para ajudar um aluno de concurso a memorizar o conceito: "${(questionToDisplay as any).mnemonicTopic || questionToDisplay.statement}". A imagem deve ser clara, sem texto complexo, focada em associação visual forte.`;
-            
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash-image',
-                contents: [{ parts: [{ text: prompt }] }],
-                config: { imageConfig: { aspectRatio: "1:1" } }
-            });
-
-            for (const part of response.candidates[0].content.parts) {
-                if (part.inlineData) {
-                    setMnemonicImage(`data:image/png;base64,${part.inlineData.data}`);
-                    break;
-                }
-            }
-        } catch (e) {
-            console.error("Erro ao gerar mnemônico:", e);
-        } finally {
-            setIsGeneratingMnemonic(false);
-        }
     };
 
     if (showResults) {
@@ -180,18 +173,25 @@ export const QuizView: React.FC<{
                         </div>
                     )}
                     <div className="prose prose-invert max-w-none text-xl font-medium leading-relaxed text-gray-100" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.statement) }}></div>
+                    <p className="mt-4 text-[10px] text-gray-500 font-bold uppercase tracking-widest flex items-center gap-1">
+                        <LightBulbIcon className="h-3 w-3" /> Dica: Clique duas vezes para descartar uma alternativa.
+                    </p>
                 </div>
 
                 <div className="space-y-3">
                     {questionToDisplay.options.map((option, i) => {
                         const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion?.selectedAnswer === option : selectedOption === option;
                         const isCorrectAnswer = questionToDisplay.correctAnswer === option;
+                        const isDiscarded = discardedOptions.has(option);
                         
                         let stateClass = 'bg-gray-800/50 border-gray-700 hover:bg-gray-700 hover:border-gray-600';
+                        
                         if (isCurrentQuestionAnswered) {
                             if (isCorrectAnswer) stateClass = 'bg-green-500/20 border-green-500 text-green-100 shadow-[0_0_20px_-5px_rgba(34,197,94,0.3)]';
                             else if (isSelected) stateClass = 'bg-red-500/20 border-red-500 text-red-100 shadow-[0_0_20px_-5px_rgba(239,68,68,0.3)]';
                             else stateClass = 'bg-gray-800/40 border-gray-800 opacity-40 grayscale';
+                        } else if (isDiscarded) {
+                            stateClass = 'bg-gray-900/30 border-gray-800 opacity-30 grayscale scale-[0.98] blur-[0.3px]';
                         } else if (isSelected) {
                             stateClass = 'bg-cyan-500/10 border-cyan-500 ring-2 ring-cyan-500/20 text-white';
                         }
@@ -199,16 +199,23 @@ export const QuizView: React.FC<{
                         return (
                             <button 
                                 key={`${currentIndex}-${i}`} 
-                                onClick={() => !isCurrentQuestionAnswered && setSelectedOption(option)} 
-                                className={`w-full text-left p-5 rounded-2xl transition-all border-2 flex items-start group relative ${stateClass}`} 
+                                onClick={() => handleOptionClick(option)}
+                                onDoubleClick={() => handleOptionDoubleClick(option)}
+                                className={`w-full text-left p-5 rounded-2xl transition-all border-2 flex items-start group relative select-none ${stateClass}`} 
                                 disabled={isCurrentQuestionAnswered}
                             >
-                                <span className={`font-black mr-4 w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 transition-colors ${isSelected ? 'bg-cyan-500 text-white' : 'bg-gray-700 text-gray-400 group-hover:text-white'}`}>
+                                <span className={`font-black mr-4 w-8 h-8 rounded-xl flex items-center justify-center text-sm flex-shrink-0 transition-colors ${isSelected ? 'bg-cyan-500 text-white' : 'bg-gray-700 text-gray-400 group-hover:text-white'} ${isDiscarded ? 'line-through opacity-50' : ''}`}>
                                     {String.fromCharCode(65 + i)}
                                 </span>
-                                <span className="flex-grow pt-1 text-sm md:text-base font-semibold" dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }}></span>
-                                {isCurrentQuestionAnswered && isCorrectAnswer && <CheckCircleIcon className="h-6 w-6 text-green-500 ml-2" />}
-                                {isCurrentQuestionAnswered && isSelected && !isCorrectAnswer && <XCircleIcon className="h-6 w-6 text-red-500 ml-2" />}
+                                <span className={`flex-grow pt-1 text-sm md:text-base font-semibold ${isDiscarded ? 'line-through text-gray-500' : ''}`} dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }}></span>
+                                
+                                {isCurrentQuestionAnswered && isCorrectAnswer && <CheckCircleIcon className="h-6 w-6 text-green-500 ml-2 flex-shrink-0" />}
+                                {isCurrentQuestionAnswered && isSelected && !isCorrectAnswer && <XCircleIcon className="h-6 w-6 text-red-500 ml-2 flex-shrink-0" />}
+                                {!isCurrentQuestionAnswered && isDiscarded && (
+                                    <div className="ml-2 flex-shrink-0 text-red-500/50">
+                                        <XCircleIcon className="h-5 w-5" title="Alternativa Descartada" />
+                                    </div>
+                                )}
                             </button>
                         );
                     })}
@@ -222,13 +229,7 @@ export const QuizView: React.FC<{
                             </h4>
                             <div className="text-sm text-gray-300 leading-relaxed italic" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.justification) }}></div>
                             
-                            <div className="mt-6 pt-6 border-t border-gray-800 flex justify-between items-center">
-                                <button 
-                                    onClick={generateMnemonic} 
-                                    className="text-[10px] font-black uppercase tracking-widest text-purple-400 hover:text-purple-300 flex items-center gap-2 group/mnem"
-                                >
-                                    <GeminiIcon className="h-4 w-4 group-hover/mnem:animate-pulse" /> Gerar Mnemônico IA
-                                </button>
+                            <div className="mt-6 pt-6 border-t border-gray-800 flex justify-end items-center">
                                 <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">ID: {questionToDisplay.id.split('-')[0]}</span>
                             </div>
                         </div>
@@ -254,25 +255,6 @@ export const QuizView: React.FC<{
                     )}
                 </div>
             </Card>
-
-            <Modal isOpen={isMnemonicOpen} onClose={() => setIsMnemonicOpen(false)} title="Associação Mnemônica" size="lg">
-                <div className="space-y-4 text-center p-4">
-                    {isGeneratingMnemonic ? (
-                        <div className="py-20 flex flex-col items-center gap-4">
-                            <Spinner />
-                            <p className="text-cyan-400 font-bold animate-pulse">A IA está desenhando um mnemônico para você...</p>
-                        </div>
-                    ) : mnemonicImage ? (
-                        <>
-                            <img src={mnemonicImage} alt="Mnemônico Visual" className="w-full rounded-3xl shadow-2xl border-4 border-gray-700" />
-                            <p className="text-gray-300 text-sm mt-4 italic">Use esta associação visual para nunca mais esquecer este tópico em prova!</p>
-                        </>
-                    ) : (
-                        <p className="text-red-400">Falha ao gerar o mnemônico. Tente novamente.</p>
-                    )}
-                    <Button onClick={() => setIsMnemonicOpen(false)} className="w-full">Entendi, Continuar</Button>
-                </div>
-            </Modal>
         </div>
     );
 };
