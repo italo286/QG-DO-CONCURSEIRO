@@ -4,7 +4,6 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
 import { StudentProgress, Subject, Question, Topic, SubTopic, QuestionAttempt } from '../src/types.server';
 
-// Inicialização do Firebase Admin para Vercel
 if (!admin.apps.length) {
     try {
         admin.initializeApp({
@@ -20,6 +19,23 @@ if (!admin.apps.length) {
 }
 
 const db = admin.firestore();
+
+// Helper para limpar a resposta da IA e extrair apenas o JSON
+const cleanJsonResponse = (text: string) => {
+    try {
+        let cleanText = text.trim();
+        if (cleanText.includes('```')) {
+            const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (matches && matches[1]) {
+                cleanText = matches[1];
+            }
+        }
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Erro ao limpar JSON da IA:", text);
+        throw new Error("A IA retornou um formato inválido. Tente novamente.");
+    }
+};
 
 const shuffleArray = <T>(array: T[]): T[] => {
     const newArray = [...array];
@@ -130,6 +146,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     try {
+        console.log(`Iniciando geração de desafio: ${challengeType} para o aluno: ${studentId}`);
+        
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
         if (!studentDoc.exists) return res.status(404).send('Aluno não encontrado');
         const studentProgress = studentDoc.data() as StudentProgress;
@@ -143,10 +161,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa (Gramática/Interpretação) para concursos nível superior. Retorne APENAS um array JSON de objetos: {"statement": string, "options": string[], "correctAnswer": string, "justification": string}.`,
                 config: { responseMimeType: "application/json" }
             });
-            return res.status(200).json(JSON.parse(response.text || '[]'));
+            return res.status(200).json(cleanJsonResponse(response.text || '[]'));
         }
 
         const subjects = await fetchEnrolledSubjects(studentId as string);
+        console.log(`Disciplinas encontradas para o desafio: ${subjects.length}`);
 
         if (challengeType === 'review') {
             const items = await getReviewPool(studentProgress, subjects);
@@ -172,6 +191,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
 
             const uniqueTerms = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+            if (uniqueTerms.length === 0) {
+                 return res.status(200).json([]);
+            }
+
             const items = shuffleArray(uniqueTerms).slice(0, targetCount).map(g => ({
                 id: `gloss-${Date.now()}-${Math.random()}`,
                 statement: `Qual a definição correta para o termo técnico: **${g.term}**?`,
@@ -185,7 +208,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json([]);
         
     } catch (error: any) {
-        console.error("Erro na API de desafios:", error);
-        return res.status(500).json({ error: error.message });
+        console.error(`ERRO CRÍTICO na API de desafios (${challengeType}):`, error);
+        return res.status(500).json({ error: error.message || "Erro desconhecido no servidor" });
     }
 }
