@@ -2,18 +2,64 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
-import { StudentProgress, Subject, Question, Topic, SubTopic, QuestionAttempt } from '../src/types.server';
 
-// Inicialização do Firebase Admin com tratamento robusto para Vercel
-if (!admin.apps.length) {
-    try {
-        const privateKey = process.env.FIREBASE_PRIVATE_KEY 
-            ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') 
-            : undefined;
+/** 
+ * Tipos definidos localmente para evitar problemas de caminho relativo 
+ * no ambiente de build da Vercel (Serverless Functions)
+ */
+interface QuestionAttempt {
+    questionId: string;
+    isCorrect: boolean;
+}
 
-        if (!privateKey) {
-            console.error("FIREBASE_PRIVATE_KEY não encontrada no ambiente.");
+interface Question {
+    id: string;
+    statement: string;
+    options: string[];
+    correctAnswer: string;
+    justification: string;
+    subjectId?: string;
+    topicId?: string;
+    subjectName?: string;
+    topicName?: string;
+}
+
+interface StudentProgress {
+    dailyReviewMode?: 'standard' | 'advanced';
+    advancedReviewQuestionType?: 'incorrect' | 'correct' | 'unanswered' | 'mixed';
+    advancedReviewQuestionCount?: number;
+    advancedReviewSubjectIds?: string[];
+    advancedReviewTopicIds?: string[];
+    progressByTopic: { [subjectId: string]: { [topicId: string]: { lastAttempt: QuestionAttempt[], score: number } } };
+    reviewSessions: { attempts?: QuestionAttempt[] }[];
+    customQuizzes: { attempts?: QuestionAttempt[] }[];
+    simulados?: { attempts?: QuestionAttempt[] }[];
+    glossaryChallengeMode?: 'standard' | 'advanced';
+    glossaryChallengeQuestionCount?: number;
+    advancedGlossarySubjectIds?: string[];
+    advancedGlossaryTopicIds?: string[];
+    portugueseChallengeQuestionCount?: number;
+    xp: number;
+    studentId: string;
+}
+
+interface Subject {
+    id: string;
+    name: string;
+    topics: { id: string, name: string, glossary?: { term: string, definition: string }[], questions: any[], tecQuestions?: any[], subtopics: any[] }[];
+}
+
+// Inicialização segura
+const initFirebase = () => {
+    if (!admin.apps.length) {
+        let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+        
+        // Limpeza profunda da chave privada para evitar erros de aspas/quebra de linha no Vercel
+        privateKey = privateKey.trim();
+        if (privateKey.startsWith('"') && privateKey.endsWith('"')) {
+            privateKey = privateKey.substring(1, privateKey.length - 1);
         }
+        privateKey = privateKey.replace(/\\n/g, '\n');
 
         admin.initializeApp({
             credential: admin.credential.cert({
@@ -22,30 +68,8 @@ if (!admin.apps.length) {
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
             }),
         });
-        console.log("Firebase Admin inicializado com sucesso.");
-    } catch (e) {
-        console.error("Erro fatal na inicialização do Firebase Admin:", e);
     }
-}
-
-const db = admin.firestore();
-
-// Helper para limpar a resposta da IA e extrair apenas o JSON
-const cleanJsonResponse = (text: string) => {
-    try {
-        let cleanText = text.trim();
-        // Remove blocos de código markdown se existirem
-        if (cleanText.includes('```')) {
-            const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (matches && matches[1]) {
-                cleanText = matches[1];
-            }
-        }
-        return JSON.parse(cleanText);
-    } catch (e) {
-        console.error("Erro ao fazer parse do JSON da Gemini:", text);
-        throw new Error("A resposta da IA não pôde ser convertida em lista de questões.");
-    }
+    return admin.firestore();
 };
 
 const shuffleArray = <T>(array: T[]): T[] => {
@@ -57,224 +81,151 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArray;
 };
 
-async function fetchEnrolledSubjects(studentId: string): Promise<Subject[]> {
+const cleanJsonResponse = (text: string) => {
     try {
+        let cleanText = text.trim();
+        if (cleanText.includes('```')) {
+            const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+            if (matches && matches[1]) {
+                cleanText = matches[1];
+            }
+        }
+        return JSON.parse(cleanText);
+    } catch (e) {
+        console.error("Erro parse Gemini JSON:", text);
+        throw new Error("Formato de JSON inválido retornado pela IA.");
+    }
+};
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+    const { apiKey, studentId, challengeType } = req.query;
+
+    // Validação de segurança básica
+    if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
+        return res.status(401).json({ error: 'Unauthorized: Chave de API inválida.' });
+    }
+
+    try {
+        const db = initFirebase();
+        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+        const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
+        if (!studentDoc.exists) return res.status(404).json({ error: 'Aluno não encontrado' });
+        const studentProgress = studentDoc.data() as StudentProgress;
+
+        // --- PORTUGUÊS (Não depende de busca de disciplinas) ---
+        if (challengeType === 'portuguese') {
+            const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `Gere ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
+                config: { responseMimeType: "application/json" }
+            });
+            return res.status(200).json(cleanJsonResponse(response.text || '[]'));
+        }
+
+        // Para os outros, precisamos das disciplinas
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => {
-            const data = doc.data();
-            (data.disciplines || []).forEach((d: any) => {
-                if (d.subjectId) subjectIds.add(d.subjectId);
-            });
-        });
+        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
 
         const subjects: Subject[] = [];
         const subjectIdsArray = Array.from(subjectIds);
 
         if (subjectIdsArray.length > 0) {
-            // Firestore 'in' query limita a 10 itens por vez
+            // Firestore 'in' query limitada a 10
             for (let i = 0; i < subjectIdsArray.length; i += 10) {
                 const chunk = subjectIdsArray.slice(i, i + 10);
                 const subjectDocs = await db.collection('subjects').where(admin.firestore.FieldPath.documentId(), 'in', chunk).get();
-                
                 for (const doc of subjectDocs.docs) {
                     const topicsSnap = await doc.ref.collection('topics').get();
                     subjects.push({ 
                         id: doc.id, 
-                        ...doc.data(), 
-                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as Topic)) 
-                    } as Subject);
+                        name: doc.data().name, 
+                        topics: topicsSnap.docs.map(t => ({ id: t.id, ...t.data() } as any)) 
+                    });
                 }
             }
         }
-        return subjects;
-    } catch (err) {
-        console.error("Erro ao buscar disciplinas matriculadas:", err);
-        throw new Error("Erro na comunicação com o banco de dados (Subjects).");
-    }
-}
 
-async function getReviewPool(studentProgress: StudentProgress, subjects: Subject[]): Promise<Question[]> {
-    if (subjects.length === 0) return [];
-    
-    const isAdvanced = studentProgress.dailyReviewMode === 'advanced';
-    const filterType = isAdvanced ? (studentProgress.advancedReviewQuestionType || 'incorrect') : 'unanswered';
-    const targetCount = isAdvanced ? (studentProgress.advancedReviewQuestionCount || 5) : 5;
-    const selectedSubjectIds = isAdvanced ? (studentProgress.advancedReviewSubjectIds || []) : [];
-    const selectedTopicIds = isAdvanced ? (studentProgress.advancedReviewTopicIds || []) : [];
-
-    const everCorrect = new Set<string>();
-    const everIncorrect = new Set<string>();
-    const allAnswered = new Set<string>();
-
-    const processAttempt = (a: QuestionAttempt) => {
-        if (!a || !a.questionId) return;
-        allAnswered.add(a.questionId);
-        if (a.isCorrect) everCorrect.add(a.questionId);
-        else everIncorrect.add(a.questionId);
-    };
-
-    // Mapear progresso existente
-    Object.values(studentProgress.progressByTopic || {}).forEach(s => 
-        Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
-    );
-    (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
-
-    let pool: Question[] = [];
-    subjects.forEach(subject => {
-        if (selectedSubjectIds.length > 0 && !selectedSubjectIds.includes(subject.id)) return;
-        
-        subject.topics.forEach(topic => {
-            const processT = (t: Topic | SubTopic) => {
-                if (selectedTopicIds.length > 0 && !selectedTopicIds.includes(t.id)) return;
-                
-                const normalQuestions = (t.questions || []).map(q => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name }));
-                const tecQuestions = (t.tecQuestions || []).map(q => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name }));
-                
-                pool.push(...normalQuestions, ...tecQuestions);
-            };
-            
-            processT(topic);
-            (topic.subtopics || []).forEach(processT);
-        });
-    });
-
-    let filtered: Question[] = [];
-    switch (filterType) {
-        case 'incorrect': filtered = pool.filter(q => everIncorrect.has(q.id)); break;
-        case 'correct': filtered = pool.filter(q => everCorrect.has(q.id)); break;
-        case 'unanswered': filtered = pool.filter(q => !allAnswered.has(q.id)); break;
-        case 'mixed': default: filtered = pool; break;
-    }
-    
-    // Fallback se não houver questões suficientes do tipo filtrado
-    if (filtered.length < targetCount && pool.length > 0) {
-        const remainingNeeded = targetCount - filtered.length;
-        const usedIds = new Set(filtered.map(q => q.id));
-        const remainingOptions = pool.filter(q => !usedIds.has(q.id));
-        filtered = [...filtered, ...shuffleArray(remainingOptions).slice(0, remainingNeeded)];
-    }
-    
-    return shuffleArray(filtered).slice(0, targetCount);
-}
-
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-    const { apiKey, studentId, challengeType } = req.query;
-
-    // 1. Verificação de API Key interna
-    if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return res.status(401).json({ error: 'Não autorizado: Chave de API inválida.' });
-    }
-
-    // 2. Verificação de API Key do Gemini
-    if (!process.env.API_KEY) {
-        return res.status(500).json({ error: 'Configuração ausente: API_KEY do Gemini não definida.' });
-    }
-
-    try {
-        console.log(`API Desafio: Iniciando ${challengeType} para aluno ${studentId}`);
-        
-        const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) {
-            return res.status(404).json({ error: 'Perfil do aluno não encontrado no banco de dados.' });
-        }
-        
-        const studentProgress = studentDoc.data() as StudentProgress;
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
-        // --- TIPO: PORTUGUÊS ---
-        if (challengeType === 'portuguese') {
-            const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
-            const prompt = `Gere ${targetCount} questões inéditas de múltipla escolha (A a E) de Língua Portuguesa nível superior para concursos. Foco em Gramática e Interpretação de Texto. Retorne um array JSON.`;
-            
-            const response = await ai.models.generateContent({
-                model: 'gemini-3-flash-preview',
-                contents: prompt,
-                config: { 
-                    responseMimeType: "application/json",
-                    systemInstruction: "Você é um professor de português especialista em bancas como FGV, FCC e Cebraspe. Gere apenas o JSON solicitado."
-                }
-            });
-            
-            const items = cleanJsonResponse(response.text || '[]');
-            return res.status(200).json(items);
-        }
-
-        // Para os demais desafios, precisamos das disciplinas
-        const subjects = await fetchEnrolledSubjects(studentId as string);
-
-        // --- TIPO: REVISÃO ---
+        // --- REVISÃO ---
         if (challengeType === 'review') {
-            const items = await getReviewPool(studentProgress, subjects);
-            return res.status(200).json(items);
-        }
+            const isAdvanced = studentProgress.dailyReviewMode === 'advanced';
+            const filterType = isAdvanced ? (studentProgress.advancedReviewQuestionType || 'incorrect') : 'unanswered';
+            const targetCount = isAdvanced ? (studentProgress.advancedReviewQuestionCount || 5) : 5;
+            
+            const everCorrect = new Set<string>();
+            const everIncorrect = new Set<string>();
+            const allAnswered = new Set<string>();
 
-        // --- TIPO: GLOSSÁRIO ---
-        if (challengeType === 'glossary') {
-            const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
-            const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
-            const selSubIds = isAdvanced ? (studentProgress.advancedGlossarySubjectIds || []) : [];
-            const selTopIds = isAdvanced ? (studentProgress.advancedGlossaryTopicIds || []) : [];
+            const processAttempt = (a: QuestionAttempt) => {
+                if (!a?.questionId) return;
+                allAnswered.add(a.questionId);
+                if (a.isCorrect) everCorrect.add(a.questionId);
+                else everIncorrect.add(a.questionId);
+            };
 
-            const glossaryPool = subjects.flatMap(s => {
-                if (selSubIds.length > 0 && !selSubIds.includes(s.id)) return [];
-                return s.topics.flatMap(t => {
-                    const terms = [];
-                    if (selTopIds.length === 0 || selTopIds.includes(t.id)) {
-                        terms.push(...(t.glossary || []));
-                    }
-                    (t.subtopics || []).forEach(st => {
-                        if (selTopIds.length === 0 || selTopIds.includes(st.id)) {
-                            terms.push(...(st.glossary || []));
-                        }
-                    });
-                    return terms;
+            Object.values(studentProgress.progressByTopic || {}).forEach(s => Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt)));
+            (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
+
+            let pool: Question[] = [];
+            subjects.forEach(subject => {
+                subject.topics.forEach(topic => {
+                    const processT = (t: any) => {
+                        const qs = [
+                            ...(t.questions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name })),
+                            ...(t.tecQuestions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name }))
+                        ];
+                        pool.push(...qs);
+                    };
+                    processT(topic);
+                    (topic.subtopics || []).forEach(processT);
                 });
             });
 
-            // Remover duplicados por termo
-            const uniqueTerms = Array.from(new Map(glossaryPool.map(t => [t.term.toLowerCase(), t])).values());
-            
-            if (uniqueTerms.length === 0) {
-                return res.status(200).json([]);
+            let filtered: Question[] = [];
+            if (filterType === 'incorrect') filtered = pool.filter(q => everIncorrect.has(q.id));
+            else if (filterType === 'correct') filtered = pool.filter(q => everCorrect.has(q.id));
+            else if (filterType === 'unanswered') filtered = pool.filter(q => !allAnswered.has(q.id));
+            else filtered = pool;
+
+            if (filtered.length < targetCount) {
+                const remains = pool.filter(q => !filtered.some(fq => fq.id === q.id));
+                filtered = [...filtered, ...shuffleArray(remains).slice(0, targetCount - filtered.length)];
             }
+            return res.status(200).json(shuffleArray(filtered).slice(0, targetCount));
+        }
 
-            const selectedTerms = shuffleArray(uniqueTerms).slice(0, targetCount);
-            const items = selectedTerms.map(g => {
-                // Tenta pegar definições de outros termos para usar como opções erradas
-                const otherDefinitions = uniqueTerms
-                    .filter(t => t.term !== g.term)
-                    .map(t => t.definition);
-                
-                const distractors = shuffleArray(otherDefinitions).slice(0, 4);
-                
-                // Se não tiver distratores suficientes do banco, usa genéricos
-                while(distractors.length < 4) {
-                    distractors.push("Definição incorreta baseada em conceitos transversais da matéria.");
-                }
+        // --- GLOSSÁRIO ---
+        if (challengeType === 'glossary') {
+            const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
+            const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
 
-                return {
-                    id: `gloss-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                    statement: `Sobre o termo técnico **${g.term}**, selecione a definição correta:`,
-                    options: shuffleArray([g.definition, ...distractors]),
-                    correctAnswer: g.definition,
-                    justification: `O termo **${g.term}** é corretamente definido como: ${g.definition}.`
-                };
-            });
-            
+            const glossaryPool = subjects.flatMap(s => s.topics.flatMap(t => {
+                const terms = [...(t.glossary || [])];
+                (t.subtopics || []).forEach((st: any) => terms.push(...(st.glossary || [])));
+                return terms;
+            }));
+
+            const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+            const items = shuffleArray(unique).slice(0, targetCount).map(g => ({
+                id: `gloss-${Date.now()}-${Math.random()}`,
+                statement: `Qual a definição correta para: **${g.term}**?`,
+                options: shuffleArray([g.definition, "Definição incorreta 1", "Definição incorreta 2", "Definição incorreta 3", "Definição incorreta 4"]),
+                correctAnswer: g.definition,
+                justification: `O termo ${g.term} define-se como: ${g.definition}`
+            }));
             return res.status(200).json(items);
         }
 
-        return res.status(400).json({ error: `Tipo de desafio '${challengeType}' desconhecido.` });
-        
+        return res.status(400).json({ error: 'Tipo inválido' });
+
     } catch (error: any) {
-        console.error(`ERRO CRÍTICO na API (${challengeType}):`, error);
-        
-        // Retorna o erro real no body para depuração no console do navegador
+        console.error("ERRO API:", error);
         return res.status(500).json({ 
-            error: "Falha interna no servidor ao processar o desafio.",
+            error: "Falha na execução da função", 
             details: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            stack: error.stack 
         });
     }
 }
