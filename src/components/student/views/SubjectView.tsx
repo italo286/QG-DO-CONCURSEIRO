@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
 import { 
     BookOpenIcon,
@@ -48,6 +48,8 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
 
 
 export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgress, onTopicSelect, course }) => {
+    const [openTopics, setOpenTopics] = useState<{[key: string]: boolean}>({});
+    
     const subjectProgressData = studentProgress?.progressByTopic[subject.id];
     const courseDiscipline = course.disciplines.find(d => d.subjectId === subject.id);
     const topicFrequencies = courseDiscipline?.topicFrequencies || {};
@@ -58,6 +60,24 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
             case 'media': return { label: 'MÉDIA INCIDÊNCIA', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
             case 'baixa': return { label: 'BAIXA INCIDÊNCIA', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
             default: return null;
+        }
+    };
+
+    const hasContent = (topic: Topic) => {
+        return (topic.fullPdfs?.length || 0) > 0 || 
+               (topic.videoUrls?.length || 0) > 0 || 
+               (topic.questions?.length || 0) > 0 || 
+               (topic.tecQuestions?.length || 0) > 0 ||
+               (topic.mindMapUrl);
+    };
+
+    const handleTopicAction = (e: React.MouseEvent, topic: Topic) => {
+        e.preventDefault();
+        if (hasContent(topic)) {
+            onTopicSelect(topic);
+        } else {
+            // Tópico vazio: abre a lista de subtópicos
+            setOpenTopics(prev => ({ ...prev, [topic.id]: !prev[topic.id] }));
         }
     };
 
@@ -76,9 +96,9 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
             <div className="bg-gray-800/40 rounded-3xl p-6 border border-gray-700/50 flex items-center gap-6">
                 <div 
                     className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-xl flex-shrink-0"
-                    style={{ backgroundColor: subject.color || '#4B5563', boxShadow: `0 8px 20px ${subject.color}40` }}
+                    style={{ backgroundColor: subject.color || '#4B5563', boxShadow: `0 8px 25px ${subject.color || '#4B5563'}40` }}
                 >
-                    <SubjectIcon subjectName={subject.name} className="h-8 w-8" />
+                    <SubjectIcon subjectName={subject.name} className="h-8 w-8 filter drop-shadow-md" />
                 </div>
                 <div>
                     <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{subject.name}</h2>
@@ -92,10 +112,16 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                     const score = topicProgress?.score || 0;
                     const isCompleted = topicProgress?.completed;
                     const freqConfig = getFrequencyConfig(topicFrequencies[topic.id] as Frequency);
+                    const isOpen = openTopics[topic.id];
+                    const contentAvailable = hasContent(topic);
 
                     return (
                         <li key={topic.id} className="group">
-                            <details className="bg-gray-800/30 rounded-2xl border border-gray-700/50 group-hover:border-cyan-500/30 transition-all duration-300">
+                            <details 
+                                className="bg-gray-800/30 rounded-2xl border border-gray-700/50 group-hover:border-cyan-500/30 transition-all duration-300"
+                                open={isOpen}
+                                onToggle={(e) => setOpenTopics(prev => ({ ...prev, [topic.id]: (e.target as HTMLDetailsElement).open }))}
+                            >
                                 <summary className="p-5 cursor-pointer list-none">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                         <div className="flex-grow min-w-0">
@@ -125,14 +151,14 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                             </div>
                                             
                                             <Button 
-                                                onClick={(e) => { e.preventDefault(); onTopicSelect(topic); }} 
-                                                className="text-xs font-black py-2.5 px-6 uppercase tracking-widest shadow-lg shadow-black/20"
-                                                style={topic.color ? { backgroundColor: topic.color } : undefined}
+                                                onClick={(e) => handleTopicAction(e, topic)} 
+                                                className={`text-xs font-black py-2.5 px-6 uppercase tracking-widest shadow-lg shadow-black/20 transition-all active:scale-95 ${!contentAvailable ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' : ''}`}
+                                                style={contentAvailable && topic.color ? { backgroundColor: topic.color } : undefined}
                                             >
-                                                Estudar
+                                                {contentAvailable ? 'Estudar' : 'Ver Subtópicos'}
                                             </Button>
                                             
-                                            <ChevronDownIcon className="h-5 w-5 text-gray-600 transition-transform details-open:rotate-180" />
+                                            <ChevronDownIcon className={`h-5 w-5 text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
                                         </div>
                                     </div>
                                 </summary>
@@ -165,9 +191,9 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                                                 </div>
                                                                 <button 
                                                                     onClick={() => onTopicSelect(subtopic, topic)}
-                                                                    className="p-2 rounded-lg bg-gray-700 text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
+                                                                    className="px-4 py-2 rounded-lg bg-cyan-500/10 text-cyan-400 border border-cyan-500/20 hover:bg-cyan-500 hover:text-white font-black text-[10px] uppercase tracking-widest transition-all"
                                                                 >
-                                                                    <SparklesIcon className="h-4 w-4" />
+                                                                    Estudar
                                                                 </button>
                                                             </div>
                                                         </div>
