@@ -4,7 +4,7 @@ import * as admin from 'firebase-admin';
 import { GoogleGenAI } from "@google/genai";
 
 /** 
- * Tipos definidos localmente para evitar problemas de caminho relativo 
+ * Tipos definidos localmente para garantir isolamento da função serverless
  */
 interface QuestionAttempt {
     questionId: string;
@@ -42,7 +42,7 @@ interface StudentProgress {
     studentId: string;
 }
 
-// Helper para inicialização e obtenção das ferramentas do Firestore
+// Inicialização segura e resiliente
 const getFirestoreTools = () => {
     const firebaseAdmin = (admin as any).default || admin;
     
@@ -60,8 +60,13 @@ const getFirestoreTools = () => {
     }
 
     const db = firebaseAdmin.firestore();
-    // Acessa FieldPath de forma segura, tentando várias resoluções comuns do SDK
-    const FieldPath = firebaseAdmin.firestore.FieldPath;
+    
+    // Tenta obter FieldPath de múltiplas formas para evitar o erro 'undefined' no Vercel
+    const FieldPath = firebaseAdmin.firestore.FieldPath || (admin as any).firestore?.FieldPath;
+    
+    if (!FieldPath) {
+        throw new Error("Não foi possível localizar 'FieldPath' no SDK do Firebase Admin.");
+    }
 
     return { db, FieldPath };
 };
@@ -78,13 +83,17 @@ const shuffleArray = <T>(array: T[]): T[] => {
 const cleanJsonResponse = (text: string) => {
     try {
         let cleanText = text.trim();
+        // Remove markdown blocks se a IA os incluiu
         if (cleanText.includes('```')) {
             const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (matches && matches[1]) cleanText = matches[1];
+            if (matches && matches[1]) {
+                cleanText = matches[1];
+            }
         }
         return JSON.parse(cleanText);
     } catch (e) {
-        throw new Error("A IA retornou um JSON malformado.");
+        console.error("Erro no parse do JSON da IA:", text);
+        throw new Error("A IA retornou um formato de dados inválido.");
     }
 };
 
@@ -92,38 +101,43 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { apiKey, studentId, challengeType } = req.query;
 
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
-        return res.status(401).json({ error: 'Não autorizado' });
+        return res.status(401).json({ error: 'Acesso não autorizado.' });
     }
 
     try {
         const { db, FieldPath } = getFirestoreTools();
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        
+        // Verifica API Key do Gemini
+        const geminiKey = process.env.API_KEY;
+        if (!geminiKey) throw new Error("API_KEY do Gemini não configurada.");
+        const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) return res.status(404).json({ error: 'Aluno não encontrado' });
+        if (!studentDoc.exists) return res.status(404).json({ error: 'Progresso do aluno não encontrado.' });
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // --- PORTUGUÊS ---
+        // --- PORTUGUÊS (FLUXO INDEPENDENTE) ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere ${targetCount} questões de múltipla escolha (A-E) de Português para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
+                contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
                 config: { responseMimeType: "application/json" }
             });
             return res.status(200).json(cleanJsonResponse(response.text || '[]'));
         }
 
-        // --- DISCIPLINAS (REVISÃO / GLOSSÁRIO) ---
+        // --- CARREGAMENTO DE DISCIPLINAS (PARA REVISÃO/GLOSSÁRIO) ---
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
+        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => {
+            if (d.subjectId) subjectIds.add(d.subjectId);
+        }));
 
         const subjects: any[] = [];
         const subjectIdsArray = Array.from(subjectIds);
 
         if (subjectIdsArray.length > 0) {
-            // Firestore 'in' query limitada a 10 itens
             for (let i = 0; i < subjectIdsArray.length; i += 10) {
                 const chunk = subjectIdsArray.slice(i, i + 10);
                 const subjectDocs = await db.collection('subjects').where(FieldPath.documentId(), 'in', chunk).get();
@@ -155,7 +169,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 else everIncorrect.add(a.questionId);
             };
 
-            Object.values(studentProgress.progressByTopic || {}).forEach(s => Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt)));
+            Object.values(studentProgress.progressByTopic || {}).forEach(s => 
+                Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
+            );
             (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
 
             let pool: Question[] = [];
@@ -202,22 +218,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const items = shuffleArray(unique).slice(0, targetCount).map(g => ({
                 id: `gloss-${Date.now()}-${Math.random()}`,
-                statement: `Qual a definição correta para: **${g.term}**?`,
-                options: shuffleArray([g.definition, "Opção incorreta 1", "Opção incorreta 2", "Opção incorreta 3", "Opção incorreta 4"]),
+                statement: `Qual a definição correta para o termo: **${g.term}**?`,
+                options: shuffleArray([g.definition, "Definição incorreta 1", "Definição incorreta 2", "Definição incorreta 3", "Definição incorreta 4"]),
                 correctAnswer: g.definition,
                 justification: `O termo ${g.term} define-se como: ${g.definition}`
             }));
             return res.status(200).json(items);
         }
 
-        return res.status(400).json({ error: 'Tipo inválido' });
+        return res.status(400).json({ error: 'Tipo de desafio inválido.' });
 
     } catch (error: any) {
-        console.error("ERRO CRÍTICO:", error);
+        console.error("ERRO NO HANDLER:", error);
         return res.status(500).json({ 
-            error: "Erro na função serverless", 
-            details: error.message,
-            stack: error.stack 
+            error: "Erro no processamento da requisição.", 
+            details: error.message
         });
     }
 }
