@@ -327,17 +327,38 @@ export const analyzeTopicFrequencies = async (analysisText: string, topics: any[
 /**
  * Processa um texto com nomes e links de arquivos e agrupa em pares de PDF e Vídeo para criação de aulas.
  */
-export const parseBulkTopicContent = async (genericName: string, rawContent: string): Promise<any[]> => {
+export const parseBulkTopicContent = async (genericName: string, rawContent: string, isReplication: boolean = false): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
-    Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
-    Agrupe os arquivos logicamente.
-    Retorne um array JSON de objetos ordenado crescentemente com base na numeração detectada nos nomes originais (ex: se houver aula 22 e aula 23, retorne aula 22 primeiro).
-    O formato deve ser rigorosamente: 
-    { "originalAulaNumber": number, "pdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
     
-    Conteúdo para análise:
-    ${rawContent}`;
+    let prompt = "";
+    if (isReplication) {
+        prompt = `Analise a lista de arquivos e links para o tópico "${genericName}".
+        Esta lista está no MODO REPLICAÇÃO:
+        1. Identifique um ou dois PDFs base na lista. 
+           - Se houver um PDF que contenha no nome "material original", ele será o "fullPdf".
+           - Se houver um PDF que contenha no nome "material simplificado", ele será o "summaryPdf".
+           - Se houver apenas um PDF genérico, considere-o como "fullPdf".
+        2. Identifique todos os links de VÍDEO. Cada vídeo representa uma nova aula individual.
+        3. Para CADA vídeo encontrado, gere um item no array.
+        4. No modo replicação, você deve REPLICAR (repetir) os PDFs base em TODOS os itens gerados.
+        
+        Retorne um array JSON de objetos ordenado crescentemente pela ordem dos vídeos.
+        O formato deve ser rigorosamente: 
+        { "originalAulaNumber": number, "fullPdf": { "name": string, "url": string } | null, "summaryPdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
+        
+        Conteúdo para análise:
+        ${rawContent}`;
+    } else {
+        prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
+        Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
+        Agrupe os arquivos logicamente.
+        Retorne um array JSON de objetos ordenado crescentemente com base na numeração detectada nos nomes originais.
+        O formato deve ser rigorosamente: 
+        { "originalAulaNumber": number, "fullPdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }
+        
+        Conteúdo para análise:
+        ${rawContent}`;
+    }
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: 'gemini-3-flash-preview',
