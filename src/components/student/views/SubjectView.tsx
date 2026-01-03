@@ -1,11 +1,11 @@
+
 import React from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
 import { 
-    // FIX: Added 'BookOpenIcon' to the imports to resolve 'Cannot find name' error.
     BookOpenIcon,
     ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, 
     FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon, CheckCircleIcon,
-    SparklesIcon
+    SparklesIcon, SubjectIcon
 } from '../../Icons';
 import { Button } from '../../ui';
 
@@ -78,7 +78,7 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                     className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-xl flex-shrink-0"
                     style={{ backgroundColor: subject.color || '#4B5563', boxShadow: `0 8px 20px ${subject.color}40` }}
                 >
-                    <BookOpenIcon className="h-8 w-8" />
+                    <SubjectIcon subjectName={subject.name} className="h-8 w-8" />
                 </div>
                 <div>
                     <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{subject.name}</h2>

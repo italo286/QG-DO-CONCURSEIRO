@@ -148,6 +148,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         });
     }, [isPreview, handleUpdateStudentProgress, setStudentProgress]);
 
+    const handleDeleteMessage = async (messageId: string) => {
+        if (window.confirm("Tem certeza que deseja descartar este aviso? Ele não aparecerá mais para você.")) {
+            try {
+                await FirebaseService.deleteMessageForUser(messageId, user.id);
+            } catch (error) {
+                console.error("Erro ao descartar mensagem:", error);
+            }
+        }
+    };
+
     useEffect(() => {
         if (!studentProgress) return;
         const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
@@ -480,6 +490,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onToggleSplitView={() => setIsSplitView(!isSplitView)}
                     onSetIsSidebarCollapsed={setIsSidebarCollapsed}
                     onOpenChatModal={() => setIsChatModalOpen(true)}
+                    onDeleteMessage={handleDeleteMessage}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}

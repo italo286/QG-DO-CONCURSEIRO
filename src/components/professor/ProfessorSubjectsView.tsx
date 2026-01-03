@@ -1,7 +1,8 @@
+
 import React, { useState, useMemo } from 'react';
 import { Subject } from '../../types';
 import { Card, Button } from '../ui';
-import { PlusIcon } from '../Icons';
+import { PlusIcon, SubjectIcon } from '../Icons';
 
 interface ProfessorSubjectsViewProps {
     subjects: Subject[];
@@ -44,10 +45,15 @@ export const ProfessorSubjectsView: React.FC<ProfessorSubjectsViewProps> = ({ su
                         <li key={subject.id}>
                             <button
                                 onClick={() => onEditSubject(subject)}
-                                className="w-full text-left p-4 bg-gray-800 rounded-lg hover:bg-gray-700/50 border border-gray-700 transition-colors"
+                                className="w-full text-left p-4 bg-gray-800 rounded-lg hover:bg-gray-700/50 border border-gray-700 transition-colors flex items-center gap-4"
                             >
-                                <p className="font-bold text-lg text-cyan-400">{subject.name}</p>
-                                <p className="text-sm text-gray-400 mt-1">{subject.topics.length} tópico(s)</p>
+                                <div className="p-3 bg-gray-900 rounded-xl">
+                                    <SubjectIcon subjectName={subject.name} className="h-6 w-6 text-cyan-400" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-lg text-cyan-400">{subject.name}</p>
+                                    <p className="text-sm text-gray-400 mt-1">{subject.topics.length} tópico(s)</p>
+                                </div>
                             </button>
                         </li>
                     ))}

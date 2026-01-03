@@ -1,7 +1,8 @@
+
 import React, { useMemo } from 'react';
 import { Course, StudentProgress, Subject, User, CourseDiscipline } from '../../../types';
 import { Card } from '../../ui';
-import { BookOpenIcon, TrophyIcon, ChartBarIcon, CheckBadgeIcon } from '../../Icons';
+import { BookOpenIcon, TrophyIcon, ChartBarIcon, CheckBadgeIcon, SubjectIcon } from '../../Icons';
 import { WeeklyLeaderboard } from '../WeeklyLeaderboard';
 
 interface CourseViewProps {
@@ -127,7 +128,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         {courseSubjects.map(subject => {
                             const subjectProgress = studentProgress?.progressByTopic[subject.id] || {};
-                            // FIX: Added type cast to 'any' for 'p' to resolve 'Property completed does not exist on type unknown' error.
                             const completedCount = Object.values(subjectProgress).filter((p: any) => p.completed).length;
                             
                             return (
@@ -138,7 +138,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                                 >
                                     <Card className="h-full border-gray-700/50 hover:border-cyan-500/50 bg-gray-800/30 transition-all duration-300 relative overflow-hidden flex flex-col">
                                         <div className="absolute top-0 right-0 p-4 opacity-5 group-hover:opacity-10 transition-opacity">
-                                            <BookOpenIcon className="h-20 w-20" />
+                                            <SubjectIcon subjectName={subject.name} className="h-20 w-20" />
                                         </div>
                                         
                                         <div className="p-6 flex-grow">
@@ -147,7 +147,7 @@ export const CourseView: React.FC<CourseViewProps> = ({
                                                     className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
                                                     style={{ backgroundColor: `${subject.color || '#4B5563'}20`, color: subject.color || '#9CA3AF' }}
                                                 >
-                                                    <BookOpenIcon className="h-6 w-6" />
+                                                    <SubjectIcon subjectName={subject.name} className="h-6 w-6" />
                                                 </div>
                                                 <div className="flex flex-col items-end">
                                                     <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Score Médio</span>

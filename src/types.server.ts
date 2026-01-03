@@ -1,3 +1,4 @@
+
 export type UserRole = 'aluno' | 'professor';
 
 export interface User {
@@ -140,6 +141,7 @@ export interface Subject {
   description: string;
   topics: Topic[];
   color?: string;
+  iconName?: string;
 }
 
 export interface CourseDiscipline {

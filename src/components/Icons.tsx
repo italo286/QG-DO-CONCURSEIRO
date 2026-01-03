@@ -1,3 +1,4 @@
+
 import React from 'react';
 
 // FIX: Added 'title' prop for tooltips, consistent with other components like Button, to resolve type errors when icons are used with a title.
@@ -377,3 +378,72 @@ export const SaveIcon: React.FC<IconProps> = ({ className, style, title }) => (
         <polyline points="7 3 7 8 15 8" />
     </svg>
 );
+
+export const ScaleIcon: React.FC<IconProps> = ({ className, style, title }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {title && <title>{title}</title>}
+        <path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h18"/>
+    </svg>
+);
+
+export const CalculatorIcon: React.FC<IconProps> = ({ className, style, title }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {title && <title>{title}</title>}
+        <rect width="16" height="20" x="4" y="2" rx="2"/><line x1="8" x2="16" y1="6" y2="6"/><line x1="16" x2="16" y1="14" y2="14"/><line x1="16" x2="16" y1="18" y2="18"/><line x1="12" x2="12" y1="14" y2="14"/><line x1="12" x2="12" y1="18" y2="18"/><line x1="8" x2="8" y1="14" y2="14"/><line x1="8" x2="8" y1="18" y2="18"/>
+    </svg>
+);
+
+export const CommandLineIcon: React.FC<IconProps> = ({ className, style, title }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {title && <title>{title}</title>}
+        <polyline points="4 17 10 11 4 5"/><line x1="12" x2="20" y1="19" y2="19"/>
+    </svg>
+);
+
+export const GlobeIcon: React.FC<IconProps> = ({ className, style, title }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {title && <title>{title}</title>}
+        <circle cx="12" cy="12" r="10"/><line x1="2" x2="22" y1="12" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+    </svg>
+);
+
+export const AcademicCapIcon: React.FC<IconProps> = ({ className, style, title }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} style={style}>
+        {title && <title>{title}</title>}
+        <path d="M22 10v6M2 10l10-5 10 5-10 5z"/><path d="M6 12v5c0 2 2 3 6 3s6-1 6-3v-5"/>
+    </svg>
+);
+
+/**
+ * Mapeamento inteligente de ícones por palavras-chave (IA Determinística)
+ */
+export const SubjectIcon: React.FC<IconProps & { subjectName: string }> = ({ subjectName, ...props }) => {
+    const name = subjectName.toLowerCase();
+    
+    if (name.includes('direito') || name.includes('lei') || name.includes('constitucional') || name.includes('penal') || name.includes('civil') || name.includes('tributário') || name.includes('administrativo')) {
+        return <ScaleIcon {...props} />;
+    }
+    if (name.includes('português') || name.includes('gramática') || name.includes('literatura') || name.includes('redação') || name.includes('escrita')) {
+        return <PencilIcon {...props} />;
+    }
+    if (name.includes('matemática') || name.includes('raciocínio') || name.includes('estatística') || name.includes('financeira') || name.includes('contabilidade') || name.includes('cálculo')) {
+        return <CalculatorIcon {...props} />;
+    }
+    if (name.includes('informática') || name.includes('tecnologia') || name.includes('sistemas') || name.includes('windows') || name.includes('linux') || name.includes('ti') || name.includes('rede')) {
+        return <CommandLineIcon {...props} />;
+    }
+    if (name.includes('administração') || name.includes('gestão') || name.includes('pública') || name.includes('rh') || name.includes('planejamento')) {
+        return <BriefcaseIcon {...props} />;
+    }
+    if (name.includes('inglês') || name.includes('espanhol') || name.includes('língua') || name.includes('estrangeira')) {
+        return <TranslateIcon {...props} />;
+    }
+    if (name.includes('história') || name.includes('geografia') || name.includes('atualidades') || name.includes('mundo') || name.includes('política')) {
+        return <GlobeIcon {...props} />;
+    }
+    if (name.includes('ética') || name.includes('filosofia') || name.includes('sociologia')) {
+        return <BrainIcon {...props} />;
+    }
+    
+    return <BookOpenIcon {...props} />;
+};

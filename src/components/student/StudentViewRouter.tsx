@@ -70,6 +70,7 @@ interface StudentViewRouterProps {
     onToggleSplitView: () => void;
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
     onOpenChatModal: () => void;
+    onDeleteMessage: (messageId: string) => void;
     setView: (view: ViewType) => void;
     setActiveChallenge: (challenge: any) => void;
     onSaveDailyChallengeAttempt: (type: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => void;
@@ -141,7 +142,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
                 maxAttempts={attempts}
                 studentProgress={props.studentProgress}
             />;
-        // ... outros cases permanecem iguais
         case 'dashboard':
             return <DashboardHome {...props} />;
         case 'course':
