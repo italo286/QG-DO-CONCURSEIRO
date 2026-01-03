@@ -17,7 +17,6 @@ interface StudentProgress {
     advancedReviewQuestionCount?: number;
     advancedReviewSubjectIds?: string[];
     advancedReviewTopicIds?: string[];
-    // FIX: Added missing properties used in Portuguese and Glossary challenge generation to resolve type errors.
     portugueseChallengeQuestionCount?: number;
     glossaryChallengeMode?: 'standard' | 'advanced';
     glossaryChallengeQuestionCount?: number;
@@ -28,16 +27,18 @@ interface StudentProgress {
     studentId: string;
 }
 
-// Inicialização segura e resiliente
+// Inicialização segura e resiliente do Firebase Admin
 const getFirestoreTools = () => {
+    // Resolve o problema de interoperabilidade entre CommonJS e ESM no runtime do Node/Vercel
     const firebaseAdmin = (admin as any).default || admin;
     
     if (!firebaseAdmin.apps.length) {
         let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
+        // Limpeza profunda da chave privada para evitar erros de caractere
         privateKey = privateKey.trim().replace(/^"/, '').replace(/"$/, '').replace(/\\n/g, '\n');
 
         firebaseAdmin.initializeApp({
-            credential: admin.credential.cert({
+            credential: firebaseAdmin.credential.cert({
                 projectId: process.env.FIREBASE_PROJECT_ID,
                 privateKey: privateKey,
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
@@ -46,16 +47,19 @@ const getFirestoreTools = () => {
     }
 
     const db = firebaseAdmin.firestore();
-    const FieldPath = firebaseAdmin.firestore.FieldPath || (admin as any).firestore?.FieldPath;
     
-    if (!FieldPath) {
-        throw new Error("Não foi possível localizar 'FieldPath' no SDK do Firebase Admin.");
+    // Tenta obter FieldPath e FieldValue de forma segura
+    const FieldPath = firebaseAdmin.firestore.FieldPath;
+    const FieldValue = firebaseAdmin.firestore.FieldValue;
+    
+    if (!FieldPath || !FieldValue) {
+        throw new Error("Não foi possível localizar 'FieldPath' ou 'FieldValue' no SDK do Firebase Admin.");
     }
 
-    return { db, FieldPath };
+    return { db, FieldPath, FieldValue, firebaseAdmin };
 };
 
-const logGenerationEvent = async (db: admin.firestore.Firestore, data: {
+const logGenerationEvent = async (db: admin.firestore.Firestore, FieldValue: any, data: {
     studentId: string;
     challengeType: string;
     status: 'success' | 'error' | 'started';
@@ -66,10 +70,10 @@ const logGenerationEvent = async (db: admin.firestore.Firestore, data: {
     try {
         await db.collection('generationLogs').add({
             ...data,
-            timestamp: admin.firestore.FieldValue.serverTimestamp(),
+            timestamp: FieldValue.serverTimestamp(),
         });
     } catch (e) {
-        console.error("Erro ao gravar log no Firestore:", e);
+        console.error("Erro crítico ao gravar log no Firestore:", e);
     }
 };
 
@@ -91,7 +95,7 @@ const cleanJsonResponse = (text: string) => {
         }
         return JSON.parse(cleanText);
     } catch (e) {
-        throw new Error("A IA retornou um formato de dados inválido.");
+        throw new Error(`A IA retornou um formato de dados inválido: ${text.substring(0, 100)}...`);
     }
 };
 
@@ -103,22 +107,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ error: 'Acesso não autorizado.' });
     }
 
-    const { db, FieldPath } = getFirestoreTools();
+    // Usamos let para poder acessar as ferramentas em blocos catch se necessário
+    let firestore: any = null;
 
     try {
-        await logGenerationEvent(db, {
+        firestore = getFirestoreTools();
+        const { db, FieldPath, FieldValue } = firestore;
+
+        await logGenerationEvent(db, FieldValue, {
             studentId: studentId as string,
             challengeType: challengeType as string,
             status: 'started',
-            message: `Iniciando geração de ${challengeType}`
+            message: `Iniciando requisição de geração para ${challengeType}`
         });
 
         const geminiKey = process.env.API_KEY;
-        if (!geminiKey) throw new Error("API_KEY do Gemini não configurada.");
+        if (!geminiKey) throw new Error("API_KEY do Gemini não configurada no ambiente.");
         const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) throw new Error('Progresso do aluno não encontrado.');
+        if (!studentDoc.exists) throw new Error('Documento de progresso do aluno não existe no Firestore.');
         const studentProgress = studentDoc.data() as StudentProgress;
 
         // --- PORTUGUÊS ---
@@ -131,11 +139,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             });
             const items = cleanJsonResponse(response.text || '[]');
             
-            await logGenerationEvent(db, {
+            await logGenerationEvent(db, FieldValue, {
                 studentId: studentId as string,
                 challengeType: challengeType as string,
                 status: 'success',
-                message: `Geradas ${items.length} questões de português`,
+                message: `Sucesso: Geradas ${items.length} questões de português`,
                 metadata: { duration: Date.now() - startTime, count: items.length }
             });
 
@@ -212,11 +220,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             const finalPool = shuffleArray(filtered).slice(0, targetCount);
 
-            await logGenerationEvent(db, {
+            await logGenerationEvent(db, FieldValue, {
                 studentId: studentId as string,
                 challengeType: challengeType as string,
                 status: 'success',
-                message: `Filtradas ${finalPool.length} questões de revisão do pool de ${pool.length}`,
+                message: `Sucesso: Filtradas ${finalPool.length} questões do pool de ${pool.length}`,
                 metadata: { 
                     totalPool: pool.length, 
                     filteredPool: filtered.length, 
@@ -230,55 +238,48 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         // --- GLOSSÁRIO ---
         if (challengeType === 'glossary') {
-            const isAdvanced = studentProgress.glossaryChallengeMode === 'advanced';
-            const targetCount = isAdvanced ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
-            const selSubIds = isAdvanced ? (studentProgress.advancedGlossarySubjectIds || []) : [];
-            const selTopIds = isAdvanced ? (studentProgress.advancedGlossaryTopicIds || []) : [];
-
-            const glossaryPool = subjects.flatMap(s => {
-                if (selSubIds.length > 0 && !selSubIds.includes(s.id)) return [];
-                return s.topics.flatMap((t: any) => {
-                    const terms = [];
-                    if (selTopIds.length === 0 || selTopIds.includes(t.id)) terms.push(...(t.glossary || []));
-                    (t.subtopics || []).forEach((st: any) => {
-                        if (selTopIds.length === 0 || selTopIds.includes(st.id)) terms.push(...(st.glossary || []));
-                    });
-                    return terms;
-                });
-            });
-
-            const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
-            const items = shuffleArray(unique).slice(0, targetCount).map(g => ({
-                id: `gloss-${Date.now()}-${Math.random()}`,
-                statement: `Qual a definição correta para o termo: **${g.term}**?`,
-                options: shuffleArray([g.definition, "Incorreta 1", "Incorreta 2", "Incorreta 3", "Incorreta 4"]),
-                correctAnswer: g.definition,
-                justification: `Definição: ${g.definition}`
+            const glossaryPool = subjects.flatMap(s => s.topics.flatMap((t: any) => {
+                const terms = [...(t.glossary || [])];
+                (t.subtopics || []).forEach((st: any) => terms.push(...(st.glossary || [])));
+                return terms;
             }));
 
-            await logGenerationEvent(db, {
+            const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
+            const items = shuffleArray(unique).slice(0, 5).map(g => ({
+                id: `gloss-${Date.now()}-${Math.random()}`,
+                statement: `Qual a definição correta para o termo: **${g.term}**?`,
+                options: shuffleArray([g.definition, "Opção Incorreta A", "Opção Incorreta B", "Opção Incorreta C", "Opção Incorreta D"]),
+                correctAnswer: g.definition,
+                justification: `Definição correta: ${g.definition}`
+            }));
+
+            await logGenerationEvent(db, FieldValue, {
                 studentId: studentId as string,
                 challengeType: challengeType as string,
                 status: 'success',
-                message: `Gerado glossário com ${items.length} termos de um pool de ${unique.length}`,
+                message: `Sucesso: Gerado glossário com ${items.length} termos de um pool de ${unique.length}`,
                 metadata: { duration: Date.now() - startTime }
             });
 
             return res.status(200).json(items);
         }
 
-        throw new Error("Tipo de desafio não reconhecido");
+        throw new Error("Tipo de desafio não reconhecido ou suportado.");
 
     } catch (error: any) {
         console.error("ERRO NO HANDLER:", error);
-        await logGenerationEvent(db, {
-            studentId: studentId as string,
-            challengeType: challengeType as string,
-            status: 'error',
-            message: `Falha crítica: ${error.message}`,
-            errorDetails: error.stack,
-            metadata: { duration: Date.now() - startTime }
-        });
+        
+        // Se conseguimos inicializar o firestore, gravamos o erro para o professor ver
+        if (firestore) {
+            await logGenerationEvent(firestore.db, firestore.FieldValue, {
+                studentId: studentId as string,
+                challengeType: challengeType as string,
+                status: 'error',
+                message: `Falha na geração: ${error.message}`,
+                errorDetails: error.stack,
+                metadata: { duration: Date.now() - startTime }
+            });
+        }
 
         return res.status(500).json({ 
             error: "Erro no processamento da requisição.", 
