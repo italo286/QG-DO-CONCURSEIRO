@@ -4,7 +4,6 @@ import { User, Subject, Course, StudentProgress, TeacherMessage, StudyPlan, Revi
 import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 
 type Unsubscribe = () => void;
-// type Timestamp = firebase.firestore.Timestamp; // This was being used incorrectly as timestamps are stored as numbers
 
 // --- User Management ---
 export const getUserProfile = async (uid: string): Promise<User | null> => {
@@ -19,7 +18,6 @@ export const getUserProfile = async (uid: string): Promise<User | null> => {
 export const getUserProfilesByIds = async (uids: string[]): Promise<User[]> => {
     if (uids.length === 0) return [];
     
-    // Firestore v8 'in' query is limited to 10 elements
     const chunks = [];
     for (let i = 0; i < uids.length; i += 10) {
         chunks.push(uids.slice(i, i + 10));
@@ -45,7 +43,7 @@ export const createUserProfile = async (uid: string, username: string, name: str
     username,
     name: name || username,
     role,
-    avatarUrl: 'https://cdn-icons-png.flaticon.com/512/921/921124.png', // Default avatar
+    avatarUrl: 'https://cdn-icons-png.flaticon.com/512/921/921124.png',
   });
 
   if (role === 'aluno') {
@@ -109,6 +107,22 @@ export const listenToStudents = (callback: (students: User[]) => void): Unsubscr
     });
 };
 
+// --- Monitoring ---
+export const listenToGenerationLogs = (limit: number, callback: (logs: any[]) => void): Unsubscribe => {
+    return db.collection('generationLogs')
+        .orderBy('timestamp', 'desc')
+        .limit(limit)
+        .onSnapshot(snap => {
+            callback(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+        });
+};
+
+export const clearAllLogs = async (): Promise<void> => {
+    const logs = await db.collection('generationLogs').get();
+    const batch = db.batch();
+    logs.docs.forEach(doc => batch.delete(doc.ref));
+    await batch.commit();
+};
 
 // --- File Management ---
 export const uploadImage = async (path: string, file: File): Promise<string> => {
@@ -117,26 +131,7 @@ export const uploadImage = async (path: string, file: File): Promise<string> => 
     return await storageRef.getDownloadURL();
 };
 
-
 // --- Subject Management ---
-export const getSubjects = async (teacherIds: string[]): Promise<Subject[]> => {
-    if (teacherIds.length === 0) {
-        return [];
-    }
-    const subjectsRef = db.collection('subjects');
-    const q = subjectsRef.where('teacherId', 'in', teacherIds);
-    const querySnapshot = await q.get();
-    const subjectsData = querySnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Omit<Subject, 'id' | 'topics'>) }));
-
-    const subjectsWithTopics = await Promise.all(subjectsData.map(async (subject) => {
-        const topicsSnapshot = await db.collection('subjects').doc(subject.id).collection('topics').orderBy('order').get();
-        const topics = topicsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Topic));
-        return { ...subject, topics };
-    }));
-    
-    return subjectsWithTopics;
-};
-
 export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subject[]) => void): Unsubscribe => {
     if (teacherIds.length === 0) {
         callback([]);
@@ -153,21 +148,15 @@ export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subj
 
         const subjectsDataPromises = querySnapshot.docs.map(async (doc) => {
             const subjectData = doc.data();
-
-            // Fetch topics from the subcollection first. This is the new, preferred way.
             const topicsSnapshot = await db.collection('subjects').doc(doc.id).collection('topics').orderBy('order').get();
             let fetchedTopics: Topic[] = [];
 
             if (!topicsSnapshot.empty) {
-                // New model: Use topics from the subcollection.
                 fetchedTopics = topicsSnapshot.docs.map(topicDoc => ({ id: topicDoc.id, ...topicDoc.data() } as Topic));
             } else if (Array.isArray(subjectData.topics) && subjectData.topics.length > 0) {
-                // Fallback for old model: Use topics from the array field.
-                console.warn(`Subject '${subjectData.name}' (${doc.id}) is using the legacy 'topics' array. Data will be migrated on next save.`);
                 fetchedTopics = subjectData.topics;
             }
             
-            // Reconstruct the full subject object, ensuring the 'topics' array field from the raw data is ignored.
             const { topics, ...baseData } = subjectData;
             
             return { 
@@ -187,13 +176,11 @@ export const listenToSubjects = (teacherIds: string[], callback: (subjects: Subj
     return () => unsub();
 };
 
-
 export const saveSubject = async (subjectData: Omit<Subject, 'id'>): Promise<Subject> => {
     const { topics, ...baseSubjectData } = subjectData;
     const newDocRef = db.collection("subjects").doc();
     await newDocRef.set(baseSubjectData);
     
-    // Although we expect topics to be empty on creation, handle it just in case.
     if (topics && topics.length > 0) {
         const batch = db.batch();
         const topicsRef = newDocRef.collection('topics');
@@ -213,29 +200,22 @@ export const updateSubject = async (subject: Subject): Promise<void> => {
     const topicsRef = subjectRef.collection('topics');
 
     const batch = db.batch();
-
-    // Update the base subject document and remove the legacy 'topics' array field.
-    // This effectively migrates the data structure upon save.
     const updateData = {
         ...baseSubjectData,
         topics: firebase.firestore.FieldValue.delete()
     };
     batch.update(subjectRef, updateData);
 
-    // Get existing topics to determine which ones to delete
     const existingTopicsSnapshot = await topicsRef.get();
-    // FIX: Explicitly specify Set<string> to ensure topicId is inferred correctly and avoid 'unknown' errors on line 239.
     const existingTopicIds = new Set<string>(existingTopicsSnapshot.docs.map(doc => doc.id as string));
     const newTopicIds = new Set<string>(topics.map(t => t.id));
 
-    // Delete topics that are no longer in the subject
     existingTopicIds.forEach((topicId: string) => {
         if (!newTopicIds.has(topicId)) {
             batch.delete(topicsRef.doc(topicId));
         }
     });
     
-    // Set (update/create) new topics
     topics.forEach((topic, index) => {
         const topicDocRef = topicsRef.doc(topic.id);
         batch.set(topicDocRef, {...topic, order: index });
@@ -249,25 +229,13 @@ export const updateSubjectQuestion = async (
     topicId: string,
     questionId: string,
     isTec: boolean,
-    reportInfo: { reason: string; studentId: string; } | null // can be null to resolve
+    reportInfo: { reason: string; studentId: string; } | null
 ): Promise<void> => {
-    // The topicId might be a subtopic ID. The document we need to update is the top-level topic document.
-    // We assume subtopics are not nested further.
     const topicDocRef = db.collection('subjects').doc(subjectId).collection('topics').doc(topicId);
 
     await db.runTransaction(async (transaction) => {
         const doc = await transaction.get(topicDocRef);
         if (!doc.exists) {
-            // It might be a subtopic, so we can't find the parent topic this way easily.
-            // A full refactor would be needed. For now, we assume the client sends the top-level topic ID.
-            // Or, we find the parent topic, which is slow.
-            // Let's assume the component will handle finding the parent and this function will be simpler.
-            // **Correction**: The bug is document size, so we need to target the individual topic doc.
-            // The logic inside ProfessorSubjectEditor passes up the entire subject, so the parent topic is available.
-            // But this function is called from QuizView, which might not have the parent topic context.
-            // The simplest fix is to try and find the document.
-            // Let's assume topicId IS the document id in the subcollection.
-            // FIX: Added explicit type casting for topicId and subjectId to satisfy TypeScript string requirement for Error constructor.
             throw new Error(`Topic document with ID ${topicId as string} not found in subject ${subjectId as string}`);
         }
 
@@ -292,7 +260,6 @@ export const updateSubjectQuestion = async (
             return updatedQuestions;
         };
 
-        // Check top-level topic questions
         if (isTec) {
             topicData.tecQuestions = updateQuestionInList(topicData.tecQuestions);
         } else {
@@ -302,7 +269,6 @@ export const updateSubjectQuestion = async (
             }
         }
 
-        // Check subtopic questions if not updated yet
         if (!wasUpdated && topicData.subtopics) {
             topicData.subtopics = topicData.subtopics.map(subtopic => {
                 if (isTec) {
@@ -328,7 +294,6 @@ export const deleteSubject = async (subjectId: string): Promise<void> => {
     const subjectRef = db.collection('subjects').doc(subjectId);
     const topicsRef = subjectRef.collection('topics');
 
-    // Delete all documents in the 'topics' subcollection first
     const topicsSnapshot = await topicsRef.get();
     if (!topicsSnapshot.empty) {
         const batch = db.batch();
@@ -338,19 +303,10 @@ export const deleteSubject = async (subjectId: string): Promise<void> => {
         await batch.commit();
     }
     
-    // Then delete the main subject document
     await subjectRef.delete();
 };
 
-
 // --- Course Management ---
-export const getCourses = async (teacherId: string): Promise<Course[]> => {
-    const coursesRef = db.collection('courses');
-    const q = coursesRef.where('teacherId', '==', teacherId);
-    const querySnapshot = await q.get();
-    return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Course));
-};
-
 export const listenToCourses = (teacherId: string, callback: (courses: Course[]) => void): Unsubscribe => {
     const coursesRef = db.collection('courses');
     const q = coursesRef.where('teacherId', '==', teacherId);
@@ -379,7 +335,7 @@ export const saveCourse = async (courseData: Omit<Course, 'id'>): Promise<Course
 export const updateCourse = async (course: Course): Promise<void> => {
     const courseRef = db.collection('courses').doc(course.id);
     const dataToUpdate = { ...course };
-    delete (dataToUpdate as any).id; // Prevent writing the 'id' field into the document
+    delete (dataToUpdate as any).id;
     await courseRef.update(dataToUpdate);
 };
 
@@ -387,7 +343,6 @@ export const deleteCourse = async (courseId: string): Promise<void> => {
     const courseRef = db.collection('courses').doc(courseId);
     await courseRef.delete();
 };
-
 
 // --- Student Progress ---
 export const saveStudentProgress = async (progress: StudentProgress): Promise<void> => {
@@ -401,7 +356,6 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
         if(doc.exists) {
             callback(doc.data() as StudentProgress);
         } else {
-            // Create initial progress if it doesn't exist (e.g., for existing users without this doc)
             const initialProgress: StudentProgress = {
                 studentId: studentId,
                 progressByTopic: {},
@@ -443,9 +397,7 @@ export const listenToStudentProgress = (studentId: string, callback: (progress: 
                 },
                 dailyChallengeCompletions: {},
             };
-            // Asynchronously create the document in Firestore
             progressRef.set(initialProgress).catch(err => console.error("Failed to create initial student progress:", err));
-            // Immediately call back with the new object for a responsive UI
             callback(initialProgress);
         }
     });
@@ -495,8 +447,6 @@ export const resetDailyChallengesForStudent = async (studentId: string): Promise
     const progressRef = db.collection('studentProgress').doc(studentId);
     const todayISO = getLocalDateISOString(getBrasiliaDate());
 
-    // Use FieldValue.delete() to completely remove the fields for the current day.
-    // This will make the student's app behave as if challenges were never generated.
     await progressRef.update({
         reviewChallenge: firebase.firestore.FieldValue.delete(),
         glossaryChallenge: firebase.firestore.FieldValue.delete(),
@@ -505,8 +455,7 @@ export const resetDailyChallengesForStudent = async (studentId: string): Promise
     });
 };
 
-
-// --- Messages / Announcements ---
+// --- Messages ---
 export const addMessage = async (
     data: { senderId: string, teacherId: string, studentId: string | null, message: string }
 ): Promise<void> => {
@@ -538,16 +487,15 @@ export const createReportNotification = async (
 
     const newNotification: Omit<TeacherMessage, 'id'> = {
         teacherId,
-        studentId: null, // System notifications are treated like broadcasts
+        studentId: null,
         message,
         timestamp,
-        acknowledgedBy: [], // No one has seen it yet
-        replies: [], // Added missing mandatory property to fix TS2739
-        lastReplyTimestamp: timestamp, // Added missing mandatory property to fix TS2739
-        deletedBy: [], // Added missing mandatory property to fix TS2739
+        acknowledgedBy: [],
+        replies: [],
+        lastReplyTimestamp: timestamp,
+        deletedBy: [],
         type: 'system',
         context: {
-            // FIX: Explicitly cast studentDisplayName and other properties to string to ensure 'unknown' is not assigned to 'string' parameter.
             studentName: studentDisplayName as string,
             subjectName: subjectName as string,
             topicName: topicName as string,
@@ -561,8 +509,6 @@ export const addReplyToMessage = async (messageId: string, reply: Omit<MessageRe
     const messageRef = db.collection('messages').doc(messageId);
     const newReply = { ...reply, timestamp: Date.now() };
 
-    // When a reply is sent, the conversation is restored for all participants.
-    // Also, reset read receipts to just the sender.
     await messageRef.update({
         replies: firebase.firestore.FieldValue.arrayUnion(newReply),
         lastReplyTimestamp: newReply.timestamp,
@@ -589,26 +535,20 @@ export const listenToMessagesForTeachers = (teacherIds: string[], callback: (mes
     
     return q.onSnapshot((querySnapshot) => {
         const allMessages = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as TeacherMessage));
-        
         const filteredMessages = allMessages.filter(msg => !msg.deletedBy?.includes(teacherId));
-        
         const sortedMessages = filteredMessages.sort((a, b) => {
             const timeA = a.lastReplyTimestamp || a.timestamp;
             const timeB = b.lastReplyTimestamp || b.timestamp;
             return timeB - timeA;
         });
-
         callback(sortedMessages);
     });
 };
 
 export const listenToMessagesForStudent = (studentId: string, teacherIds: string[], callback: (messages: TeacherMessage[]) => void): Unsubscribe => {
     const messagesRef = db.collection('messages');
-    
-    // Listener for direct messages to the student
     const studentMessagesQ = messagesRef.where('studentId', '==', studentId);
 
-    // Chunking logic for broadcast messages
     const chunks: string[][] = [];
     if (teacherIds.length > 0) {
         for (let i = 0; i < teacherIds.length; i += 10) {
@@ -624,13 +564,11 @@ export const listenToMessagesForStudent = (studentId: string, teacherIds: string
         const combined = [...studentMessages, ...allBroadcasts];
         const unique = Array.from(new Map(combined.map(m => [m.id, m])).values());
         const filtered = unique.filter(msg => !msg.deletedBy?.includes(studentId) && msg.type !== 'system');
-        
         const sorted = filtered.sort((a, b) => {
             const timeA = a.lastReplyTimestamp || a.timestamp;
             const timeB = b.lastReplyTimestamp || b.timestamp;
             return timeB - timeA;
         });
-
         callback(sorted);
     };
 
@@ -647,7 +585,6 @@ export const listenToMessagesForStudent = (studentId: string, teacherIds: string
         });
     });
     
-    // If there are no teachers, we still need to process student DMs
     if (chunks.length === 0) {
         processAndCallback();
     }
@@ -658,43 +595,31 @@ export const listenToMessagesForStudent = (studentId: string, teacherIds: string
     };
 };
 
-
 export const deleteMessageForUser = async (messageId: string, userId: string): Promise<void> => {
     const messageRef = db.collection('messages').doc(messageId);
-    
     const doc = await messageRef.get();
     if (!doc.exists) return;
 
     const message = doc.data() as TeacherMessage;
     const { studentId, teacherId, deletedBy = [] } = message;
-
-    // In a broadcast (studentId is null), there's no "other party" to check for permanent deletion.
     const otherPartyId = studentId ? (userId === teacherId ? studentId : teacherId) : null;
 
     if (otherPartyId && deletedBy.includes(otherPartyId)) {
-        // The other party has already deleted their copy. Permanent delete.
         await messageRef.delete();
     } else {
-        // Soft delete for the current user.
         await messageRef.update({
             deletedBy: firebase.firestore.FieldValue.arrayUnion(userId)
         });
     }
 };
 
-
 // --- Study Plan ---
 export const saveStudyPlanForStudent = async (plan: StudyPlan): Promise<void> => {
     const planRef = db.collection('studyPlans').doc(plan.studentId);
-    
-    // Firestore não aceita valores 'undefined'. Precisamos limpar o objeto antes de salvar.
     const sanitizedPlan = JSON.parse(JSON.stringify(plan));
-    
-    // Garantir que activePlanId nunca seja undefined se presente
     if (sanitizedPlan.activePlanId === undefined) {
-        sanitizedPlan.activePlanId = ""; // Ou simplesmente não incluir a chave
+        sanitizedPlan.activePlanId = "";
     }
-    
     await planRef.set(sanitizedPlan);
 };
 
@@ -704,7 +629,6 @@ export const listenToStudyPlanForStudent = (studentId: string, callback: (plan: 
         if(doc.exists) {
             callback(doc.data() as StudyPlan);
         } else {
-            // FIX: Added missing 'plans' property to satisfy StudyPlan type requirement.
             callback({ studentId, plans: [] });
         }
     });
@@ -738,6 +662,7 @@ export const listenToStudyPlansForTeacher = (studentIds: string[], callback: (pl
                 querySnapshot.docs.forEach(doc => {
                     chunkPlans[doc.id] = doc.data() as StudyPlan;
                 });
+                // FIX: Use plansByChunk instead of progressByChunk to resolve the 'Cannot find name' error.
                 plansByChunk[chunkIndex] = chunkPlans;
                 processAndCallback();
             }, (error) => {
