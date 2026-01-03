@@ -79,12 +79,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         const geminiKey = process.env.API_KEY;
         const ai = new GoogleGenAI({ apiKey: geminiKey! });
 
-        // --- PORTUGUÊS (Rigor: Quantidade) ---
+        // --- PORTUGUÊS (Rigor: Quantidade + Contexto de Concursos) ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Português", "topicName": "Geral"}]`,
+                contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. 
+                Foque em temas de alta complexidade como: Concordância, Regência, Crase ou Pontuação.
+                Para cada questão, inclua um campo "mnemonicTopic" com o tema central para futura geração de imagem.
+                JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Português", "topicName": "Geral", "mnemonicTopic": string}]`,
                 config: { responseMimeType: "application/json" }
             });
             const items = cleanJsonResponse(response.text || '[]').map((it: any, idx: number) => ({
@@ -142,18 +145,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
             let pool: any[] = [];
             subjects.forEach(subject => {
-                // Filtro de Disciplina
                 if (selSubIds.length > 0 && !selSubIds.includes(subject.id)) return;
-                
                 subject.topics.forEach((topic: any) => {
                     const processT = (t: any) => {
-                        // Filtro de Tópico (se houver seleção específica)
                         const hasTopicSelection = selTopIds.length > 0;
                         if (hasTopicSelection && !selTopIds.includes(t.id)) return;
-
                         const qs = [
-                            ...(t.questions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name })),
-                            ...(t.tecQuestions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name }))
+                            ...(t.questions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name, mnemonicTopic: t.name })),
+                            ...(t.tecQuestions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name, mnemonicTopic: t.name }))
                         ];
                         pool.push(...qs);
                     };
@@ -168,7 +167,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             else if (filterType === 'unanswered') filtered = pool.filter(q => !allAnsweredIds.has(q.id));
             else filtered = pool;
 
-            // Se for rigoroso "Misto" ou se o filtro não retornar o suficiente, completamos até a meta se permitido ou retornamos o que tem
             const final = shuffleArray(filtered).slice(0, targetCount);
             return res.status(200).json(final);
         }
@@ -186,7 +184,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 s.topics.forEach((t: any) => {
                     const processGloss = (item: any, parent: any) => {
                         if (selTopIds.length > 0 && !selTopIds.includes(item.id)) return;
-                        (item.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: item.name }));
+                        (item.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: item.name, mnemonicTopic: g.term }));
                     };
                     processGloss(t, null);
                     (t.subtopics || []).forEach((st: any) => processGloss(st, t));
@@ -200,7 +198,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             for (const g of selectedTerms) {
                 const gen = await ai.models.generateContent({
                     model: 'gemini-3-flash-preview',
-                    contents: `Termo: "${g.term}", Definição: "${g.definition}". Gere 1 questão de múltipla escolha. JSON: {"statement": string, "options": string[], "correctAnswer": string, "justification": string}`,
+                    contents: `Termo: "${g.term}", Definição: "${g.definition}". Gere 1 questão de múltipla escolha extremamente focada em conceitos que caem em provas de concursos federais.
+                    JSON: {"statement": string, "options": string[], "correctAnswer": string, "justification": string, "mnemonicTopic": "${g.term}"}`,
                     config: { responseMimeType: "application/json" }
                 });
                 const q = cleanJsonResponse(gen.text || '{}');
