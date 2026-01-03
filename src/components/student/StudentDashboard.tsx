@@ -1,6 +1,5 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
-// FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
@@ -62,6 +61,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [dailyChallengeResults, setDailyChallengeResults] = useState<{ questions: Question[], sessionAttempts: QuestionAttempt[] } | null>(null);
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
+    const [challengeGenerationStatus, setChallengeGenerationStatus] = useState<string>('');
 
     const {
         isLoading,
@@ -312,30 +312,39 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         if (isPreview || !studentProgress) return;
     
         setIsGeneratingAllChallenges(true);
+        setChallengeGenerationStatus('Sincronizando com o QG...');
         try {
             const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
             const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
             
             const results: Record<string, any[]> = {};
             
-            // Alterado de paralelo (Promise.all) para sequencial para evitar 429
+            const statusMap = {
+                review: 'Preparando Protocolo de Revisão...',
+                glossary: 'Indexando Nomenclatura Técnica...',
+                portuguese: 'Sorteando Alvos de Português...'
+            };
+
             for (const type of types) {
+                setChallengeGenerationStatus(statusMap[type]);
                 const res = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
+                
                 if (!res.ok) {
                     const errorBody = await res.text();
-                    // Tratamento amigável para limite de cota
-                    if (res.status === 500 && errorBody.includes('quota')) {
-                        throw new Error(`Limite de requisições excedido. Aguarde 30 segundos e tente novamente.`);
+                    if (res.status === 429 || errorBody.includes('quota') || errorBody.includes('429')) {
+                        throw new Error(`O sistema de IA está congestionado. O QG tentou 5 vezes, mas o Gemini pediu uma pausa. Aguarde 60 segundos e tente novamente.`);
                     }
-                    throw new Error(`Falha ao gerar desafio de ${type}: ${res.status}`);
+                    throw new Error(`Erro operacional em ${type}: ${res.status}`);
                 }
+                
                 results[type] = await res.json();
-                // Pequeno delay entre requisições para maior segurança
-                await new Promise(r => setTimeout(r, 500));
+                
+                // Intervalo de segurança maior entre chamadas para evitar burst de requisições
+                setChallengeGenerationStatus('Aguardando liberação do sistema...');
+                await new Promise(r => setTimeout(r, 3000));
             }
             
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-    
             const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: results['review'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: results['glossary'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: results['portuguese'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
@@ -348,12 +357,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             };
             
             await handleUpdateStudentProgress(newProgress, studentProgress);
+            setChallengeGenerationStatus('Missões ativadas!');
     
         } catch (error: any) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(error.message || `Não foi possível gerar todos os desafios. Por favor, tente novamente.`);
+            alert(error.message || `Ocorreu uma falha na comunicação com a IA. Tente gerar novamente em um minuto.`);
         } finally {
             setIsGeneratingAllChallenges(false);
+            setChallengeGenerationStatus('');
         }
     };
 
@@ -462,7 +473,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    /* ADDED missing handleGameError prop fix to resolve TS error */
                     handleGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)}
                     onReportQuestion={(subjectId, topicId, questionId, isTec, reason) => {
                         FirebaseService.updateSubjectQuestion(subjectId, topicId, questionId, isTec, { reason, studentId: user.id });

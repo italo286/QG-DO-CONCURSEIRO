@@ -1,8 +1,6 @@
 
-
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
-// FIX: Added GenerateContentResponse to imports to properly type AI responses
 import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 interface QuestionAttempt {
@@ -26,14 +24,19 @@ interface StudentProgress {
     studentId: string;
 }
 
-// Helper para retry com backoff exponencial
-async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 3, delay = 2000): Promise<T> {
+// Helper para retry com backoff exponencial mais agressivo (ajustado para limites Gemini Free)
+async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 5, delay = 5000): Promise<T> {
     try {
         return await fn();
     } catch (error: any) {
-        if (retries > 0 && (error.status === 429 || error.message?.includes('429'))) {
+        const isQuotaError = error.status === 429 || 
+                           error.message?.includes('429') || 
+                           error.message?.includes('Quota exceeded') ||
+                           error.message?.includes('RESOURCE_EXHAUSTED');
+
+        if (retries > 0 && isQuotaError) {
+            console.warn(`[Gemini Quota] Limite atingido. Tentando novamente em ${delay}ms... (${retries} restantes)`);
             await new Promise(resolve => setTimeout(resolve, delay));
-            // FIX: Pass generic type T to recursive call to ensure return type safety
             return retryWithBackoff<T>(fn, retries - 1, delay * 2);
         }
         throw error;
@@ -92,20 +95,18 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!studentDoc.exists) throw new Error('Progresso não encontrado');
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        // FIX: Initializing GoogleGenAI with process.env.API_KEY directly as per guidelines
         const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
 
         // --- PORTUGUÊS ---
         if (challengeType === 'portuguese') {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
-            // FIX: Added explicit type parameter <GenerateContentResponse> to retryWithBackoff call to resolve 'unknown' type error
             const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Português", "topicName": "Geral"}]`,
+                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos federais. Retorne um array JSON. Campos: statement, options, correctAnswer, justification, mnemonicTopic.`,
                 config: { responseMimeType: "application/json" }
             }));
             const items = cleanJsonResponse(response.text || '[]').map((it: any, idx: number) => ({
-                ...it, id: `port-${Date.now()}-${idx}`
+                ...it, id: `port-${Date.now()}-${idx}`, subjectName: "Português", topicName: "Geral"
             }));
             return res.status(200).json(items.slice(0, targetCount));
         }
@@ -210,9 +211,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             
             if (selectedTerms.length === 0) return res.status(200).json([]);
 
-            // OTIMIZAÇÃO: Gerar todas as questões de uma vez só para poupar cota de IA
             const termsPrompt = selectedTerms.map(g => `Termo: "${g.term}", Definição: "${g.definition}"`).join('; ');
-            // FIX: Added explicit type parameter <GenerateContentResponse> to retryWithBackoff call to resolve 'unknown' type error
             const gen = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
                 contents: `Baseado nos seguintes pares de termos técnicos e definições de concurso, gere exatamente uma questão de múltipla escolha para CADA par. Retorne um array JSON. 
@@ -237,7 +236,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
         return res.status(400).json({ error: 'Tipo inválido' });
     } catch (e: any) {
-        console.error("Server Error:", e);
-        return res.status(500).json({ error: e.message });
+        console.error("Server Error Detail:", e);
+        return res.status(500).json({ error: e.message || 'Erro desconhecido no servidor' });
     }
 }
