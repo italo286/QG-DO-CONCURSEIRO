@@ -3,6 +3,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { Question, QuestionAttempt, StudentProgress } from '../../types';
 import { markdownToHtml } from '../../utils';
 import { Spinner, Button, Card } from '../ui';
+import { CheckCircleIcon, XCircleIcon } from '../Icons';
 
 export const QuizView: React.FC<{
     questions: Question[];
@@ -19,7 +20,7 @@ export const QuizView: React.FC<{
     hideBackButtonOnResults?: boolean;
 }> = ({ 
     questions, initialAttempts, onSaveAttempt, onComplete, onBack, quizTitle, durationInSeconds, studentProgress,
-    subjectName
+    subjectName: manualSubjectName
 }) => {
     const [sessionAttempts, setSessionAttempts] = useState<QuestionAttempt[]>([]);
     const [selectedOption, setSelectedOption] = useState<string | null>(null);
@@ -28,6 +29,11 @@ export const QuizView: React.FC<{
 
     const [timeLeft, setTimeLeft] = useState(durationInSeconds);
     const [currentIndex, setCurrentIndex] = useState(0);
+
+    // Reseta a seleção sempre que mudar de questão para evitar o bug de alternativas presas
+    useEffect(() => {
+        setSelectedOption(null);
+    }, [currentIndex]);
 
     const questionHistory = useMemo(() => {
         const correct = new Set<string>();
@@ -44,7 +50,7 @@ export const QuizView: React.FC<{
         );
         (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(process));
         (studentProgress.customQuizzes || []).forEach(s => (s.attempts || []).forEach(process));
-        (studentProgress.simulados || []).forEach(s => (s.attempts || []).forEach(process));
+        if (studentProgress.simulados) studentProgress.simulados.forEach(s => (s.attempts || []).forEach(process));
 
         return { correct, incorrect };
     }, [studentProgress]);
@@ -66,7 +72,7 @@ export const QuizView: React.FC<{
                 setShowResults(true);
                 return;
             }
-            const timer = setInterval(() => setTimeLeft(prev => (prev ? prev - 1 : 0)), 1000);
+            const timer = setInterval(() => setTimeLeft(prev => (prev && prev > 0 ? prev - 1 : 0)), 1000);
             return () => clearInterval(timer);
         }
     }, [timeLeft, durationInSeconds, showResults, hasCompleted]);
@@ -78,14 +84,13 @@ export const QuizView: React.FC<{
         const updatedAttempts = [...sessionAttempts, newAttempt];
         setSessionAttempts(updatedAttempts);
         onSaveAttempt(newAttempt);
-        if (isLastQuestion) {
+        if (isLastQuestion && updatedAttempts.length === questions.length) {
             onComplete(updatedAttempts);
             setHasCompleted(true);
         }
     };
 
     const handleNext = () => {
-        setSelectedOption(null);
         if (!isLastQuestion) setCurrentIndex(prev => prev + 1);
         else setShowResults(true);
     };
@@ -93,10 +98,10 @@ export const QuizView: React.FC<{
     if (showResults) {
         const correctCount = sessionAttempts.filter(a => a.isCorrect).length;
         return (
-            <Card className="p-6 text-center">
+            <Card className="p-6 text-center animate-fade-in">
                 <h2 className="text-2xl font-bold mb-4">{quizTitle} Finalizado!</h2>
                 <p className="text-xl mb-6">Você acertou {correctCount} de {questions.length} questões.</p>
-                <Button onClick={onBack}>Voltar</Button>
+                <Button onClick={onBack}>Voltar ao Painel</Button>
             </Card>
         );
     }
@@ -105,55 +110,88 @@ export const QuizView: React.FC<{
 
     const isPrevCorrect = questionHistory.correct.has(questionToDisplay.id);
     const isPrevIncorrect = questionHistory.incorrect.has(questionToDisplay.id);
+    const displaySubject = questionToDisplay.subjectName || manualSubjectName;
+    const displayTopic = questionToDisplay.topicName;
 
     return (
-        <Card className="p-6 relative">
-            <div className="flex justify-between items-center mb-4">
-                <div className="flex flex-col gap-1">
-                    <h2 className="text-xl font-bold">{quizTitle}</h2>
-                    {subjectName && <p className="text-sm text-cyan-400 font-bold">{subjectName}</p>}
-                    <div className="flex gap-2">
-                        {isPrevCorrect && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-0.5 rounded border border-green-500/30">Já Acertada</span>}
-                        {isPrevIncorrect && <span className="text-[10px] bg-red-500/20 text-red-400 px-2 py-0.5 rounded border border-red-500/30">Já Errada</span>}
-                        {(isPrevCorrect || isPrevIncorrect) && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-2 py-0.5 rounded border border-blue-500/30">Já Respondida</span>}
+        <Card className="p-6 relative max-w-4xl mx-auto shadow-2xl">
+            <div className="flex justify-between items-start mb-6">
+                <div className="flex flex-col gap-1 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                        <span className="text-[10px] bg-cyan-900/50 text-cyan-400 px-2 py-0.5 rounded font-bold uppercase tracking-wider border border-cyan-700/50">Questão {currentIndex + 1}/{questions.length}</span>
+                        {timeLeft !== undefined && <span className="text-[10px] bg-gray-700 text-white px-2 py-0.5 rounded font-mono border border-gray-600">Tempo: {Math.floor(timeLeft/60)}:{(timeLeft%60).toString().padStart(2,'0')}</span>}
+                    </div>
+                    {displaySubject && (
+                        <h3 className="text-xs font-black text-gray-500 uppercase tracking-tighter truncate">
+                            {displaySubject} {displayTopic && <span className="text-cyan-600/60 mx-1">•</span>} {displayTopic}
+                        </h3>
+                    )}
+                    <h2 className="text-lg font-bold text-white truncate">{quizTitle}</h2>
+                    <div className="flex gap-2 mt-1">
+                        {isPrevCorrect && <span className="text-[9px] bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded border border-green-500/20">✓ Já Acertada</span>}
+                        {isPrevIncorrect && <span className="text-[9px] bg-red-500/10 text-red-400 px-1.5 py-0.5 rounded border border-red-500/20">✗ Já Errada</span>}
                     </div>
                 </div>
-                <p className="font-semibold">{currentIndex + 1} / {questions.length}</p>
             </div>
 
-            <div className="w-full bg-gray-700 rounded-full h-2 mb-6">
-                <div className="bg-cyan-500 h-2 rounded-full transition-all" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}></div>
+            <div className="w-full bg-gray-700 rounded-full h-1.5 mb-8 overflow-hidden">
+                <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-full transition-all duration-500" style={{ width: `${((currentIndex + 1) / questions.length) * 100}%` }}></div>
             </div>
 
-            <div className="prose prose-invert max-w-none mb-6" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.statement) }}></div>
+            <div className="prose prose-invert max-w-none mb-8 text-gray-200 leading-relaxed" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.statement) }}></div>
 
             <div className="space-y-3">
                 {questionToDisplay.options.map((option, i) => {
                     const isSelected = isCurrentQuestionAnswered ? attemptForCurrentQuestion?.selectedAnswer === option : selectedOption === option;
                     const isCorrectAnswer = questionToDisplay.correctAnswer === option;
-                    let labelClass = 'bg-gray-700 hover:bg-gray-600';
+                    
+                    let btnClass = 'bg-gray-800 border-gray-700 hover:bg-gray-700 hover:border-gray-600';
                     if (isCurrentQuestionAnswered) {
-                        if (isCorrectAnswer) labelClass = 'bg-green-600';
-                        else if (isSelected) labelClass = 'bg-red-600';
-                        else labelClass = 'bg-gray-700 opacity-60';
+                        if (isCorrectAnswer) btnClass = 'bg-green-600/20 border-green-500 text-green-100';
+                        else if (isSelected) btnClass = 'bg-red-600/20 border-red-500 text-red-100';
+                        else btnClass = 'bg-gray-800/40 border-gray-800 opacity-40 text-gray-500';
                     } else if (isSelected) {
-                        labelClass = 'bg-cyan-600 border-cyan-400';
+                        btnClass = 'bg-cyan-900/40 border-cyan-500 ring-1 ring-cyan-500/50 text-white';
                     }
 
                     return (
-                        <button key={i} onClick={() => !isCurrentQuestionAnswered && setSelectedOption(option)} className={`w-full text-left p-4 rounded-lg transition-all border border-transparent ${labelClass} flex items-start`}>
-                            <span className="font-bold mr-3">{String.fromCharCode(65 + i)}.</span>
-                            <span dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }}></span>
+                        <button 
+                            key={`${currentIndex}-${i}`} 
+                            onClick={() => !isCurrentQuestionAnswered && setSelectedOption(option)} 
+                            className={`w-full text-left p-4 rounded-xl transition-all border-2 flex items-start group ${btnClass}`}
+                            disabled={isCurrentQuestionAnswered}
+                        >
+                            <span className={`font-black mr-4 w-6 h-6 rounded-full flex items-center justify-center text-xs flex-shrink-0 transition-colors ${isSelected ? 'bg-cyan-500 text-white' : 'bg-gray-700 text-gray-400 group-hover:text-white'}`}>
+                                {String.fromCharCode(65 + i)}
+                            </span>
+                            <span className="flex-grow pt-0.5" dangerouslySetInnerHTML={{ __html: markdownToHtml(option) }}></span>
                         </button>
                     );
                 })}
             </div>
 
-            <div className="mt-8 flex justify-center">
+            {isCurrentQuestionAnswered && (
+                <div className="mt-8 p-5 bg-gray-900/60 rounded-2xl border border-gray-700 animate-fade-in">
+                    <div className="flex items-center gap-3 mb-3">
+                        {attemptForCurrentQuestion.isCorrect ? (
+                            <div className="p-1.5 bg-green-500/20 rounded-full"><CheckCircleIcon className="h-6 w-6 text-green-400" /></div>
+                        ) : (
+                            <div className="p-1.5 bg-red-500/20 rounded-full"><XCircleIcon className="h-6 w-6 text-red-400" /></div>
+                        )}
+                        <h4 className="font-black text-white tracking-tight text-lg">{attemptForCurrentQuestion.isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta'}</h4>
+                    </div>
+                    <div className="space-y-3">
+                        <p className="text-xs font-black text-cyan-500 uppercase tracking-widest">Justificativa da IA</p>
+                        <div className="text-sm text-gray-300 leading-relaxed border-l-2 border-gray-700 pl-4 italic" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.justification) }}></div>
+                    </div>
+                </div>
+            )}
+
+            <div className="mt-10 flex justify-center">
                 {!isCurrentQuestionAnswered ? (
-                    <Button onClick={handleRespond} disabled={!selectedOption}>Responder</Button>
+                    <Button onClick={handleRespond} disabled={!selectedOption} className="px-12 py-4 text-lg font-black shadow-xl shadow-cyan-900/20">Responder</Button>
                 ) : (
-                    <Button onClick={handleNext}>{isLastQuestion ? 'Ver Resultado' : 'Próxima'}</Button>
+                    <Button onClick={handleNext} className="px-12 py-4 text-lg font-black bg-gray-700 border-none hover:bg-gray-600 transition-all">{isLastQuestion ? 'Finalizar e Ver Resultados' : 'Próxima Questão'}</Button>
                 )}
             </div>
         </Card>

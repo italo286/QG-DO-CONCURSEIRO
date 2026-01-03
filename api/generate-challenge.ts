@@ -29,12 +29,10 @@ interface StudentProgress {
 
 // Inicialização segura e resiliente do Firebase Admin
 const getFirestoreTools = () => {
-    // Resolve o problema de interoperabilidade entre CommonJS e ESM no runtime do Node/Vercel
     const firebaseAdmin = (admin as any).default || admin;
     
     if (!firebaseAdmin.apps.length) {
         let privateKey = process.env.FIREBASE_PRIVATE_KEY || '';
-        // Limpeza profunda da chave privada para evitar erros de caractere
         privateKey = privateKey.trim().replace(/^"/, '').replace(/"$/, '').replace(/\\n/g, '\n');
 
         firebaseAdmin.initializeApp({
@@ -47,8 +45,6 @@ const getFirestoreTools = () => {
     }
 
     const db = firebaseAdmin.firestore();
-    
-    // Tenta obter FieldPath e FieldValue de forma segura
     const FieldPath = firebaseAdmin.firestore.FieldPath;
     const FieldValue = firebaseAdmin.firestore.FieldValue;
     
@@ -95,7 +91,7 @@ const cleanJsonResponse = (text: string) => {
         }
         return JSON.parse(cleanText);
     } catch (e) {
-        throw new Error(`A IA retornou um formato de dados inválido: ${text.substring(0, 100)}...`);
+        throw new Error(`Erro de processamento da IA.`);
     }
 };
 
@@ -107,7 +103,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(401).json({ error: 'Acesso não autorizado.' });
     }
 
-    // Usamos let para poder acessar as ferramentas em blocos catch se necessário
     let firestore: any = null;
 
     try {
@@ -118,15 +113,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             studentId: studentId as string,
             challengeType: challengeType as string,
             status: 'started',
-            message: `Iniciando requisição de geração para ${challengeType}`
+            message: `Iniciando geração para ${challengeType}`
         });
 
         const geminiKey = process.env.API_KEY;
-        if (!geminiKey) throw new Error("API_KEY do Gemini não configurada no ambiente.");
+        if (!geminiKey) throw new Error("API_KEY do Gemini não configurada.");
         const ai = new GoogleGenAI({ apiKey: geminiKey });
 
         const studentDoc = await db.collection('studentProgress').doc(studentId as string).get();
-        if (!studentDoc.exists) throw new Error('Documento de progresso do aluno não existe no Firestore.');
+        if (!studentDoc.exists) throw new Error('Progresso não encontrado.');
         const studentProgress = studentDoc.data() as StudentProgress;
 
         // --- PORTUGUÊS ---
@@ -134,7 +129,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
             const response = await ai.models.generateContent({
                 model: 'gemini-3-flash-preview',
-                contents: `Gere exatamente ${targetCount} questões de múltipla escolha de Língua Portuguesa para concursos. JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string}]`,
+                contents: `Gere exatamente ${targetCount} questões inéditas de Língua Portuguesa para concursos. 
+                Cada questão DEVE ter uma "justification" detalhada explicando por que a alternativa correta é a certa e por que as outras estão erradas.
+                Formato JSON: [{"statement": string, "options": string[], "correctAnswer": string, "justification": string, "subjectName": "Língua Portuguesa", "topicName": "Gramática e Interpretação"}]`,
                 config: { responseMimeType: "application/json" }
             });
             const items = cleanJsonResponse(response.text || '[]');
@@ -143,19 +140,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
                 studentId: studentId as string,
                 challengeType: challengeType as string,
                 status: 'success',
-                message: `Sucesso: Geradas ${items.length} questões de português`,
-                metadata: { duration: Date.now() - startTime, count: items.length }
+                message: `Geradas ${items.length} questões de português com justificativas.`,
+                metadata: { duration: Date.now() - startTime }
             });
 
             return res.status(200).json(items);
         }
 
-        // --- CARREGAMENTO DE DISCIPLINAS ---
+        // --- CARREGAMENTO DE DISCIPLINAS (PARA REVISÃO/GLOSSÁRIO) ---
         const coursesSnap = await db.collection('courses').where('enrolledStudentIds', 'array-contains', studentId).get();
         const subjectIds = new Set<string>();
-        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => {
-            if (d.subjectId) subjectIds.add(d.subjectId);
-        }));
+        coursesSnap.docs.forEach(doc => (doc.data().disciplines || []).forEach((d: any) => subjectIds.add(d.subjectId)));
 
         const subjects: any[] = [];
         const subjectIdsArray = Array.from(subjectIds);
@@ -219,71 +214,51 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             else filtered = pool;
 
             const finalPool = shuffleArray(filtered).slice(0, targetCount);
-
-            await logGenerationEvent(db, FieldValue, {
-                studentId: studentId as string,
-                challengeType: challengeType as string,
-                status: 'success',
-                message: `Sucesso: Filtradas ${finalPool.length} questões do pool de ${pool.length}`,
-                metadata: { 
-                    totalPool: pool.length, 
-                    filteredPool: filtered.length, 
-                    filterType,
-                    duration: Date.now() - startTime 
-                }
-            });
-
             return res.status(200).json(finalPool);
         }
 
         // --- GLOSSÁRIO ---
         if (challengeType === 'glossary') {
-            const glossaryPool = subjects.flatMap(s => s.topics.flatMap((t: any) => {
-                const terms = [...(t.glossary || [])];
-                (t.subtopics || []).forEach((st: any) => terms.push(...(st.glossary || [])));
-                return terms;
+            const glossaryPool: any[] = [];
+            subjects.forEach(s => s.topics.forEach((t: any) => {
+                (t.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: t.name }));
+                (t.subtopics || []).forEach((st: any) => {
+                    (st.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: `${t.name} / ${st.name}` }));
+                });
             }));
 
             const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
-            const items = shuffleArray(unique).slice(0, 5).map(g => ({
-                id: `gloss-${Date.now()}-${Math.random()}`,
-                statement: `Qual a definição correta para o termo: **${g.term}**?`,
-                options: shuffleArray([g.definition, "Opção Incorreta A", "Opção Incorreta B", "Opção Incorreta C", "Opção Incorreta D"]),
-                correctAnswer: g.definition,
-                justification: `Definição correta: ${g.definition}`
-            }));
+            if (unique.length === 0) return res.status(200).json([]);
 
-            await logGenerationEvent(db, FieldValue, {
-                studentId: studentId as string,
-                challengeType: challengeType as string,
-                status: 'success',
-                message: `Sucesso: Gerado glossário com ${items.length} termos de um pool de ${unique.length}`,
-                metadata: { duration: Date.now() - startTime }
-            });
+            const selectedTerms = shuffleArray(unique).slice(0, 5);
+            const items = [];
+
+            for (const g of selectedTerms) {
+                // Usamos a IA para gerar alternativas plausíveis para o termo do glossário
+                const gen = await ai.models.generateContent({
+                    model: 'gemini-3-flash-preview',
+                    contents: `Com base no termo "${g.term}" e sua definição "${g.definition}", gere uma questão de múltipla escolha.
+                    As 4 opções incorretas devem ser termos técnicos ou conceitos plausíveis da mesma área, não use placeholders.
+                    Retorne JSON: {"statement": string, "options": string[], "correctAnswer": string, "justification": string}
+                    Onde "correctAnswer" deve ser exatamente igual à definição original fornecida.`,
+                    config: { responseMimeType: "application/json" }
+                });
+                const q = cleanJsonResponse(gen.text || '{}');
+                items.push({ 
+                    ...q, 
+                    id: `gloss-${Date.now()}-${Math.random()}`, 
+                    subjectName: g.subjectName, 
+                    topicName: g.topicName 
+                });
+            }
 
             return res.status(200).json(items);
         }
 
-        throw new Error("Tipo de desafio não reconhecido ou suportado.");
+        throw new Error("Tipo inválido.");
 
     } catch (error: any) {
-        console.error("ERRO NO HANDLER:", error);
-        
-        // Se conseguimos inicializar o firestore, gravamos o erro para o professor ver
-        if (firestore) {
-            await logGenerationEvent(firestore.db, firestore.FieldValue, {
-                studentId: studentId as string,
-                challengeType: challengeType as string,
-                status: 'error',
-                message: `Falha na geração: ${error.message}`,
-                errorDetails: error.stack,
-                metadata: { duration: Date.now() - startTime }
-            });
-        }
-
-        return res.status(500).json({ 
-            error: "Erro no processamento da requisição.", 
-            details: error.message
-        });
+        console.error("ERRO:", error);
+        return res.status(500).json({ error: error.message });
     }
 }
