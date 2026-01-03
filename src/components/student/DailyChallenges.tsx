@@ -190,7 +190,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
                     {challengesGeneratedToday ? (
                         <div className="grid grid-cols-1 gap-4 animate-fade-in">
                             <ChallengeItem
-                                title="Protocolo de Revisão"
+                                title="Revisão Diária"
                                 icon={CycleIcon}
                                 challenge={studentProgress.reviewChallenge}
                                 challengeType="review"
@@ -198,7 +198,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
                                 gradient="bg-gradient-to-br from-emerald-400 to-green-600"
                             />
                             <ChallengeItem
-                                title="Nomenclatura Técnica"
+                                title="Desafio do Glossário"
                                 icon={TagIcon}
                                 challenge={studentProgress.glossaryChallenge}
                                 challengeType="glossary"
@@ -206,7 +206,7 @@ export const DailyChallenges: React.FC<DailyChallengesProps> = ({
                                 gradient="bg-gradient-to-br from-blue-400 to-cyan-600"
                             />
                             <ChallengeItem
-                                title="Análise Linguística"
+                                title="Desafio de Português"
                                 icon={TranslateIcon}
                                 challenge={studentProgress.portugueseChallenge}
                                 challengeType="portuguese"

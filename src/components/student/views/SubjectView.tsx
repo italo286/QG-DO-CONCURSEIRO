@@ -1,7 +1,12 @@
-
 import React from 'react';
 import { StudentProgress, Subject, Topic, SubTopic, Course } from '../../../types';
-import { ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../../Icons';
+import { 
+    // FIX: Added 'BookOpenIcon' to the imports to resolve 'Cannot find name' error.
+    BookOpenIcon,
+    ChevronDownIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, 
+    FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon, CheckCircleIcon,
+    SparklesIcon
+} from '../../Icons';
 import { Button } from '../../ui';
 
 type Frequency = 'alta' | 'media' | 'baixa' | 'nenhuma';
@@ -16,35 +21,25 @@ interface SubjectViewProps {
 const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) => {
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
         let total = (getter(content) as any[])?.length || 0;
-        if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
+        if ('subtopics' in content && content.subtopics) {
             total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
     };
 
     const summaryItems = [
-        { label: 'PDFs da Aula', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
-        { label: 'PDFs de Resumo', icon: DocumentTextIcon, count: calculateTotal(c => c.summaryPdfs) },
-        { label: 'PDFs de Raio X', icon: ChartLineIcon, count: calculateTotal(c => c.raioXPdfs) },
+        { label: 'PDFs', icon: DocumentTextIcon, count: calculateTotal(c => c.fullPdfs) },
+        { label: 'Resumos', icon: TagIcon, count: calculateTotal(c => c.summaryPdfs) },
         { label: 'Vídeos', icon: VideoCameraIcon, count: calculateTotal(c => c.videoUrls) },
-        { label: 'Questões de Conteúdo', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) },
-        { label: 'Questões (TEC)', icon: ClipboardCheckIcon, count: calculateTotal(c => c.tecQuestions) },
-        { label: 'Jogos', icon: GameControllerIcon, count: calculateTotal(c => c.miniGames) },
-        { label: 'Flashcards', icon: FlashcardIcon, count: calculateTotal(c => c.flashcards) },
-        { label: 'Glossário', icon: TagIcon, count: calculateTotal(c => c.glossary) },
+        { label: 'Questões', icon: ClipboardCheckIcon, count: calculateTotal(c => c.questions) + calculateTotal(c => c.tecQuestions || []) },
     ].filter(item => item.count > 0);
 
-    if (summaryItems.length === 0) {
-        return null;
-    }
-
     return (
-        <div className="flex items-center flex-wrap gap-x-4 gap-y-1 mt-2">
+        <div className="flex items-center flex-wrap gap-3 mt-3">
             {summaryItems.map(item => (
-                <div key={item.label} className="flex items-center space-x-1.5 text-gray-400" title={item.label}>
-                    <item.icon className="h-4 w-4" />
-                    <span className="text-xs font-mono font-semibold">{item.count}</span>
-                    <span className="sr-only">{item.label}</span>
+                <div key={item.label} className="flex items-center space-x-1.5 bg-gray-900/40 px-2 py-1 rounded-lg border border-gray-700/30" title={item.label}>
+                    <item.icon className="h-3 w-3 text-gray-500" />
+                    <span className="text-[10px] font-black text-gray-400">{item.count}</span>
                 </div>
             ))}
         </div>
@@ -57,95 +52,134 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
     const courseDiscipline = course.disciplines.find(d => d.subjectId === subject.id);
     const topicFrequencies = courseDiscipline?.topicFrequencies || {};
     
-    const frequencyColors: { [key in Frequency]?: string } = {
-        'alta': '#ef4444',  // red-500
-        'media': '#f97316', // orange-500
-        'baixa': '#3b82f6', // blue-500
+    const getFrequencyConfig = (freq: Frequency) => {
+        switch(freq) {
+            case 'alta': return { label: 'ALTA INCIDÊNCIA', color: 'text-red-400', bg: 'bg-red-500/10', border: 'border-red-500/30' };
+            case 'media': return { label: 'MÉDIA INCIDÊNCIA', color: 'text-orange-400', bg: 'bg-orange-500/10', border: 'border-orange-500/30' };
+            case 'baixa': return { label: 'BAIXA INCIDÊNCIA', color: 'text-blue-400', bg: 'bg-blue-500/10', border: 'border-blue-500/30' };
+            default: return null;
+        }
     };
-    
-    const frequencyTitles: { [key in Frequency]?: string } = {
-        'alta': 'Alta Frequência em Provas',
-        'media': 'Média Frequência em Provas',
-        'baixa': 'Baixa Frequência em Provas',
-    };
+
+    const renderProgressBar = (score: number) => (
+        <div className="w-16 h-1.5 bg-gray-700 rounded-full overflow-hidden">
+            <div 
+                className={`h-full transition-all ${score >= 0.7 ? 'bg-green-500' : score >= 0.5 ? 'bg-yellow-500' : 'bg-red-500'}`}
+                style={{ width: `${score * 100}%` }}
+            ></div>
+        </div>
+    );
 
     return (
-        <div className="space-y-4">
-            <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+        <div className="space-y-8 animate-fade-in">
+            {/* Header Disciplina */}
+            <div className="bg-gray-800/40 rounded-3xl p-6 border border-gray-700/50 flex items-center gap-6">
                 <div 
-                    className="w-4 h-8 rounded"
-                    style={{ backgroundColor: subject.color || 'transparent' }}
-                ></div>
-                {subject.name}
-            </h2>
-            <p className="text-gray-400">{subject.description}</p>
-            <ul className="space-y-3">
+                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-xl flex-shrink-0"
+                    style={{ backgroundColor: subject.color || '#4B5563', boxShadow: `0 8px 20px ${subject.color}40` }}
+                >
+                    <BookOpenIcon className="h-8 w-8" />
+                </div>
+                <div>
+                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{subject.name}</h2>
+                    <p className="text-sm text-gray-400 mt-1 max-w-2xl">{subject.description}</p>
+                </div>
+            </div>
+
+            <ul className="space-y-4">
                 {subject.topics.map(topic => {
                     const topicProgress = subjectProgressData?.[topic.id];
-                    const score = topicProgress?.score !== undefined ? `${Math.round(topicProgress.score * 100)}%` : 'N/A';
-                    const frequency = topicFrequencies[topic.id] as Frequency;
-                    const topicStyle = {
-                        borderLeftColor: topic.color || frequencyColors[frequency] || 'transparent'
-                    };
+                    const score = topicProgress?.score || 0;
+                    const isCompleted = topicProgress?.completed;
+                    const freqConfig = getFrequencyConfig(topicFrequencies[topic.id] as Frequency);
 
                     return (
-                        <li key={topic.id}>
-                            <details className="bg-gray-800 rounded-lg border border-gray-700/50 border-l-4" style={topicStyle} title={frequencyTitles[frequency]}>
-                                <summary className="p-4 cursor-pointer list-none">
-                                    <div className="flex justify-between items-center">
+                        <li key={topic.id} className="group">
+                            <details className="bg-gray-800/30 rounded-2xl border border-gray-700/50 group-hover:border-cyan-500/30 transition-all duration-300">
+                                <summary className="p-5 cursor-pointer list-none">
+                                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                                         <div className="flex-grow min-w-0">
-                                            <h3 className="font-semibold text-lg text-cyan-400 flex items-center">
-                                                {topic.name}
-                                            </h3>
+                                            <div className="flex items-center gap-3 mb-2">
+                                                {isCompleted && <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />}
+                                                <h3 className={`font-black text-lg tracking-tight uppercase transition-colors ${isCompleted ? 'text-gray-400' : 'text-white group-hover:text-cyan-400'}`}>
+                                                    {topic.name}
+                                                </h3>
+                                                {freqConfig && (
+                                                    <span className={`px-2 py-0.5 rounded-md text-[8px] font-black border ${freqConfig.bg} ${freqConfig.color} ${freqConfig.border} hidden sm:inline`}>
+                                                        {freqConfig.label}
+                                                    </span>
+                                                )}
+                                            </div>
                                             <MaterialSummary content={topic} />
                                         </div>
-                                        <div className="flex items-center space-x-4 flex-shrink-0 ml-4">
-                                            <span className="text-sm text-gray-400">Score: {score}</span>
+                                        
+                                        <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-gray-700/50 pt-3 md:pt-0">
+                                            <div className="flex flex-col items-center md:items-end">
+                                                <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">Performance</span>
+                                                <div className="flex items-center gap-3">
+                                                    {renderProgressBar(score)}
+                                                    <span className={`text-xs font-black font-mono ${score >= 0.7 ? 'text-green-400' : 'text-gray-400'}`}>
+                                                        {Math.round(score * 100)}%
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            
                                             <Button 
                                                 onClick={(e) => { e.preventDefault(); onTopicSelect(topic); }} 
-                                                className="text-sm py-1 px-3"
+                                                className="text-xs font-black py-2.5 px-6 uppercase tracking-widest shadow-lg shadow-black/20"
                                                 style={topic.color ? { backgroundColor: topic.color } : undefined}
                                             >
                                                 Estudar
                                             </Button>
-                                            <ChevronDownIcon className="h-5 w-5 transition-transform details-open:rotate-180" />
+                                            
+                                            <ChevronDownIcon className="h-5 w-5 text-gray-600 transition-transform details-open:rotate-180" />
                                         </div>
                                     </div>
                                 </summary>
-                                <div className="border-t border-gray-700 px-4 pb-4">
+
+                                <div className="border-t border-gray-700/30 bg-gray-900/20 p-5 rounded-b-2xl">
                                     {topic.subtopics.length > 0 ? (
-                                        <ul className="space-y-2 pt-3">
+                                        <div className="space-y-3 pl-4 border-l-2 border-gray-800">
                                             {topic.subtopics.map(subtopic => {
-                                                const subtopicProgress = subjectProgressData?.[subtopic.id];
-                                                const subtopicScore = subtopicProgress?.score !== undefined ? `${Math.round(subtopicProgress.score * 100)}%` : 'N/A';
-                                                const subtopicFrequency = topicFrequencies[subtopic.id] as Frequency;
-                                                const subtopicStyle = {
-                                                    borderLeftColor: subtopic.color || frequencyColors[subtopicFrequency] || 'transparent'
-                                                };
+                                                const stProgress = subjectProgressData?.[subtopic.id];
+                                                const stScore = stProgress?.score || 0;
+                                                const stIsCompleted = stProgress?.completed;
+                                                const stFreq = getFrequencyConfig(topicFrequencies[subtopic.id] as Frequency);
 
                                                 return (
-                                                     <li key={subtopic.id} className="p-2 pl-4 bg-gray-700/50 rounded-md border-l-4" style={subtopicStyle} title={frequencyTitles[subtopicFrequency]}>
-                                                        <div className="flex justify-between items-center">
-                                                            <div className="flex-grow min-w-0">
-                                                                <span className="text-sm text-gray-300 flex items-center">{subtopic.name}</span>
+                                                     <div key={subtopic.id} className="relative group/sub">
+                                                        <div className="flex items-center justify-between bg-gray-800/40 p-4 rounded-xl border border-transparent hover:border-gray-700 transition-all">
+                                                            <div className="flex-grow">
+                                                                <div className="flex items-center gap-2 mb-1">
+                                                                    {stIsCompleted && <CheckCircleIcon className="h-3 w-3 text-green-500" />}
+                                                                    <span className={`text-sm font-bold tracking-tight uppercase ${stIsCompleted ? 'text-gray-500' : 'text-gray-200'}`}>
+                                                                        {subtopic.name}
+                                                                    </span>
+                                                                    {stFreq && <span className={`text-[7px] font-black ${stFreq.color} opacity-70`}>● {stFreq.label}</span>}
+                                                                </div>
                                                                 <MaterialSummary content={subtopic} />
                                                             </div>
-                                                            <div className="flex items-center space-x-2 flex-shrink-0 ml-2">
-                                                                <span className="text-xs text-gray-400">Score: {subtopicScore}</span>
-                                                                <Button 
-                                                                    onClick={() => onTopicSelect(subtopic, topic)} 
-                                                                    className="text-xs py-1 px-2"
-                                                                    style={subtopic.color ? { backgroundColor: subtopic.color } : undefined}
+                                                            <div className="flex items-center gap-4">
+                                                                <div className="hidden sm:flex flex-col items-end opacity-60">
+                                                                    {renderProgressBar(stScore)}
+                                                                </div>
+                                                                <button 
+                                                                    onClick={() => onTopicSelect(subtopic, topic)}
+                                                                    className="p-2 rounded-lg bg-gray-700 text-gray-400 hover:text-cyan-400 hover:bg-cyan-500/10 transition-all"
                                                                 >
-                                                                    Estudar
-                                                                </Button>
+                                                                    <SparklesIcon className="h-4 w-4" />
+                                                                </button>
                                                             </div>
                                                         </div>
-                                                     </li>
+                                                     </div>
                                                 )
                                             })}
-                                        </ul>
-                                    ) : <p className="text-sm text-gray-500 pt-3">Nenhum subtópico.</p>}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-4">
+                                            <p className="text-xs text-gray-600 font-bold uppercase italic tracking-widest">Foco total no tópico principal</p>
+                                        </div>
+                                    )}
                                 </div>
                             </details>
                         </li>
