@@ -146,33 +146,53 @@ export const CourseView: React.FC<CourseViewProps> = ({
                             const theme = getSubjectTheme(subject.name);
                             return (
                                 <button key={subject.id} onClick={() => onSubjectSelect(subject)} className="group text-left">
-                                    <div className={`h-full min-h-[350px] rounded-[2.5rem] ${theme.bg} ${theme.glow} p-9 flex flex-col relative overflow-hidden transition-all duration-500 group-hover:translate-y-[-8px] group-hover:brightness-110 border border-white/10`}>
+                                    <div className={`h-full min-h-[260px] rounded-[2.5rem] ${theme.bg} ${theme.glow} p-8 flex flex-col relative overflow-hidden transition-all duration-500 group-hover:translate-y-[-8px] group-hover:brightness-110 border border-white/10`}>
+                                        
+                                        {/* Background Decor */}
                                         <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-700">
-                                            <SubjectIcon subjectName={subject.name} className="h-48 w-48 text-white rotate-12" />
+                                            <SubjectIcon subjectName={subject.name} className="h-40 w-40 text-white rotate-12" />
                                         </div>
-                                        <div className="absolute top-8 right-8">
-                                            <div className={`${theme.scoreBg} backdrop-blur-xl border border-white/10 px-5 py-3 rounded-2xl flex flex-col items-center min-w-[90px] shadow-2xl`}>
+
+                                        {/* Score Badge */}
+                                        <div className="absolute top-7 right-7">
+                                            <div className={`${theme.scoreBg} backdrop-blur-xl border border-white/10 px-4 py-2.5 rounded-2xl flex flex-col items-center min-w-[85px] shadow-2xl`}>
                                                 <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">Score Médio</span>
-                                                <span className="text-xl font-black text-white">{percent > 0 ? `${percent}%` : '--'}</span>
+                                                <span className="text-lg font-black text-white">{percent > 0 ? `${percent}%` : '--'}</span>
                                             </div>
                                         </div>
-                                        <div className="mb-10 relative">
-                                            <div className={`w-20 h-20 rounded-3xl bg-black/30 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-2xl transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-                                                <SubjectIcon subjectName={subject.name} className={`h-11 w-11 text-white ${theme.iconGlow}`} />
+
+                                        {/* Icon Container */}
+                                        <div className="mb-6 relative">
+                                            <div className={`w-16 h-16 rounded-2xl bg-black/30 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-2xl transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
+                                                <SubjectIcon subjectName={subject.name} className={`h-9 w-9 text-white ${theme.iconGlow}`} />
                                             </div>
                                         </div>
+                                        
                                         <div className="flex-grow">
-                                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-none mb-4 group-hover:translate-x-1 transition-transform drop-shadow-lg">{subject.name}</h4>
-                                            <p className="text-sm text-white/70 font-medium leading-relaxed line-clamp-2 pr-6">{subject.description || 'Domine esta disciplina com teoria completa e questões comentadas.'}</p>
+                                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-tight group-hover:translate-x-1 transition-transform drop-shadow-lg">
+                                                {subject.name}
+                                            </h4>
                                         </div>
-                                        <div className="mt-10 flex justify-between items-center">
+
+                                        {/* Card Footer */}
+                                        <div className="mt-8 flex justify-between items-center">
+                                            {/* Progress Segments */}
                                             <div className="flex gap-2.5 items-center">
                                                 {Array.from({length: 6}).map((_, i) => (
-                                                    <div key={i} className={`h-2 rounded-full transition-all duration-700 ${i < dots ? `w-8 ${theme.dotActive}` : 'w-2.5 bg-black/40'}`}></div>
+                                                    <div 
+                                                        key={i} 
+                                                        className={`h-2 rounded-full transition-all duration-700 
+                                                            ${i < dots 
+                                                                ? `w-8 ${theme.dotActive}` 
+                                                                : 'w-2.5 bg-black/40'
+                                                            }`}
+                                                    ></div>
                                                 ))}
                                             </div>
-                                            <div className={`bg-gradient-to-r ${theme.btnGrad} ${theme.btnGlow} px-7 py-3.5 rounded-full flex items-center gap-3 text-white text-[10px] font-black uppercase tracking-[0.2em] shadow-2xl transition-all`}>
-                                                Acessar <ArrowRightIcon className="h-3 w-3" />
+                                            
+                                            {/* Neon Button */}
+                                            <div className={`bg-gradient-to-r ${theme.btnGrad} ${theme.btnGlow} px-6 py-3 rounded-full flex items-center gap-3 text-white text-[9px] font-black uppercase tracking-[0.2em] shadow-2xl transition-all`}>
+                                                Acessar <ArrowRightIcon className="h-2.5 w-2.5" />
                                             </div>
                                         </div>
                                     </div>
