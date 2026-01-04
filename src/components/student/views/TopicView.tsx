@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Subject, Topic, SubTopic, PdfFile, StudentProgress, MiniGame, QuestionAttempt, VideoFile, BankProfilePdf
 } from '../../../types';
-import { convertMediaUrlToEmbed } from '../../../utils';
+import { convertMediaUrlToEmbed, getYoutubeVideoId } from '../../../utils';
 import { Card, Button } from '../../ui';
 import { 
     DocumentTextIcon, LightBulbIcon, VideoCameraIcon,
@@ -28,7 +28,6 @@ interface TopicViewProps {
     onNoteSave: (contentId: string, content: string) => void;
     saveQuizProgress: (subjectId: string, topicId: string, attempt: QuestionAttempt) => void;
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
-    // FIX: Removed duplicate 'onPlayGame' identifier.
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onToggleSplitView: () => void;
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
@@ -48,7 +47,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
     onNoteSave,
     saveQuizProgress,
     handleTopicQuizComplete,
-    // FIX: Removed duplicate 'onPlayGame' from destructuring.
     onPlayGame,
     onToggleSplitView,
     onSetIsSidebarCollapsed,
@@ -56,7 +54,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
     onAddBonusXp,
     onReportQuestion
 }) => {
-    // Single View State
     const [activeTopicTab, setActiveTopicTab] = useState('');
     const [activeFullPdf, setActiveFullPdf] = useState<PdfFile | null>(null);
     const [activeSummaryPdf, setActiveSummaryPdf] = useState<PdfFile | null>(null);
@@ -65,8 +62,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const [activeBankPdf, setActiveBankPdf] = useState<BankProfilePdf | null>(null);
     const notesEditorRef = useRef<HTMLDivElement>(null);
 
-    
-    // Split View State
     const [splitLeftTab, setSplitLeftTab] = useState('pdf');
     const [splitRightTab, setSplitRightTab] = useState('notes');
     const [splitLeftActivePdf, setSplitLeftActivePdf] = useState<PdfFile | null>(null);
@@ -79,7 +74,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
     const [splitRightActiveVideo, setSplitRightActiveVideo] = useState<VideoFile | null>(null);
     const [splitLeftActiveBankPdf, setSplitLeftActiveBankPdf] = useState<BankProfilePdf | null>(null);
     const [splitRightActiveBankPdf, setSplitRightActiveBankPdf] = useState<BankProfilePdf | null>(null);
-
 
     const currentContent = selectedSubtopic || selectedTopic;
     const parentTopic = selectedTopic;
@@ -177,13 +171,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         );
                     }
                 }
-                return (
-                    <div className={pdfContainerClass}>
-                        <div className="p-4 flex-grow flex items-center justify-center text-gray-400">
-                            <p>Nenhum PDF de aula disponível.</p>
-                        </div>
-                    </div>
-                );
+                return null;
             }
             case 'summary': {
                 const summaryContainerClass = 'h-full flex flex-col';
@@ -232,13 +220,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         );
                     }
                 }
-                return (
-                    <div className={summaryContainerClass}>
-                        <div className="p-4 flex-grow flex items-center justify-center text-gray-400">
-                            <p>Nenhum PDF de resumo disponível.</p>
-                        </div>
-                    </div>
-                );
+                return null;
             }
             case 'raiox': {
                 const containerClass = 'h-full flex flex-col';
@@ -287,55 +269,108 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         );
                     }
                 }
-                return (
-                    <div className={containerClass}>
-                        <div className="p-4 flex-grow flex items-center justify-center text-gray-400">
-                            <p>Nenhum PDF de Raio X disponível.</p>
-                        </div>
-                    </div>
-                );
+                return null;
             }
             case 'videos':
                 if (activeVideo) {
                     return (
-                        <div className="p-4 space-y-4 max-h-full overflow-y-auto">
-                            <button onClick={() => setActiveVideo(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-sm mb-2">
-                                <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" />
-                                Voltar para a lista de vídeos
-                            </button>
-                            <h3 className="text-xl font-bold">{activeVideo.name}</h3>
-                            <div className="aspect-video">
-                                <iframe 
-                                    src={convertMediaUrlToEmbed(activeVideo.url)} 
-                                    title={activeVideo.name}
-                                    frameBorder="0" 
-                                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                    allowFullScreen
-                                    className="w-full h-full rounded-lg"
-                                ></iframe>
+                        <div className="p-6 space-y-6 max-h-full overflow-y-auto animate-fade-in bg-gray-900/40 rounded-xl">
+                            <div className="flex items-center justify-between">
+                                <button onClick={() => setActiveVideo(null)} className="text-cyan-400 hover:text-white transition-colors flex items-center font-black text-[10px] uppercase tracking-widest bg-gray-800 px-4 py-2 rounded-full border border-gray-700 shadow-lg">
+                                    <ArrowRightIcon className="h-3 w-3 mr-2 transform rotate-180" />
+                                    Lista de Vídeos
+                                </button>
+                                <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em] bg-gray-800/50 px-3 py-1 rounded-full border border-gray-700">Reproduzindo Agora</span>
+                            </div>
+                            
+                            <div className="space-y-4">
+                                <h3 className="text-2xl font-black text-white tracking-tighter uppercase leading-tight italic">{activeVideo.name}</h3>
+                                <div className="relative aspect-video rounded-3xl overflow-hidden shadow-[0_0_50px_-12px_rgba(34,211,238,0.3)] border border-cyan-500/20 bg-black group">
+                                    <iframe 
+                                        src={convertMediaUrlToEmbed(activeVideo.url)} 
+                                        title={activeVideo.name}
+                                        frameBorder="0" 
+                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                                        allowFullScreen
+                                        className="w-full h-full"
+                                    ></iframe>
+                                </div>
                             </div>
                         </div>
                     );
                 }
                 return (
-                    <div className="p-4 space-y-4">
-                        <h3 className="text-xl font-bold">Vídeos da Aula</h3>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                            {(currentContent.videoUrls || []).map((video) => (
-                                <Card key={video.url} onClick={() => setActiveVideo(video)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                    <div className="flex items-center space-x-3">
-                                        <VideoCameraIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
-                                        <span className="truncate">{video.name}</span>
+                    <div className="p-8 space-y-8 animate-fade-in">
+                        <div className="flex items-center gap-3">
+                            <div className="w-2 h-8 bg-cyan-500 rounded-full shadow-[0_0_12px_rgba(6,182,212,0.6)]"></div>
+                            <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic">Galeria de Vídeo</h3>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                            {(currentContent.videoUrls || []).map((video) => {
+                                const youtubeId = getYoutubeVideoId(video.url);
+                                const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/mqdefault.jpg` : null;
+
+                                return (
+                                    <div 
+                                        key={video.url} 
+                                        onClick={() => setActiveVideo(video)} 
+                                        className="group relative cursor-pointer"
+                                    >
+                                        {/* Card Principal */}
+                                        <Card className="!p-0 overflow-hidden bg-gray-900/60 border-gray-700/50 hover:border-cyan-500/50 transition-all duration-500 rounded-[1.5rem] shadow-2xl flex flex-col h-full hover:translate-y-[-4px] hover:shadow-cyan-500/10">
+                                            
+                                            {/* Thumbnail Container */}
+                                            <div className="relative aspect-video overflow-hidden bg-gray-800">
+                                                {thumbnailUrl ? (
+                                                    <img src={thumbnailUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
+                                                ) : (
+                                                    <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-gray-800 to-gray-900">
+                                                        <VideoCameraIcon className="h-10 w-10 text-gray-700" />
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Overlay de Brilho */}
+                                                <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-transparent opacity-60"></div>
+                                                
+                                                {/* Play Button Central (Padrão Elite) */}
+                                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-300 transform scale-75 group-hover:scale-100">
+                                                    <div className="w-14 h-14 rounded-full bg-cyan-500 text-white flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.6)]">
+                                                        <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M4.516 7.548c.436-1.146 1.943-1.146 2.378 0l3.158 8.271c.436 1.146-.667 2.181-1.66 2.181H2.607c-.993 0-2.096-1.035-1.66-2.181l3.569-8.271z" transform="rotate(90 10 10)" /></svg>
+                                                    </div>
+                                                </div>
+
+                                                {/* Badge de Aula */}
+                                                <div className="absolute top-3 left-3 px-2 py-1 rounded-lg bg-gray-900/80 backdrop-blur-md border border-gray-700/50">
+                                                    <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">AULA</span>
+                                                </div>
+                                            </div>
+
+                                            {/* Footer Info */}
+                                            <div className="p-5 flex-grow flex flex-col justify-center">
+                                                <h4 className="text-sm font-bold text-white group-hover:text-cyan-400 transition-colors leading-snug line-clamp-2 uppercase tracking-tight">
+                                                    {video.name}
+                                                </h4>
+                                                <div className="mt-3 flex items-center justify-between">
+                                                    <div className="flex gap-1">
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/40"></div>
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-cyan-500/40"></div>
+                                                        <div className="w-1.5 h-1.5 rounded-full bg-gray-700"></div>
+                                                    </div>
+                                                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest flex items-center gap-1 group-hover:text-cyan-400 transition-colors">
+                                                        ASSISTIR <ArrowRightIcon className="h-2 w-2" />
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </Card>
                                     </div>
-                                    <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
-                                </Card>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 );
             case 'quiz': {
                 const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
-                // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                 return <QuizView 
                     questions={currentContent.questions} 
                     initialAttempts={attempts} 
@@ -349,7 +384,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
             case 'tec_questions_quiz': {
                 const tecQuizId = `${currentContent.id}-tec`;
                 const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
-                // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
                 return <QuizView
                     questions={currentContent.tecQuestions || []}
                     initialAttempts={tecAttempts}
@@ -436,25 +470,19 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {(currentContent.bankProfilePdfs || []).map((pdf) => (
                                 <Card key={pdf.id} onClick={() => setActiveBankPdf(pdf)} className="p-4 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                    <div className="flex items-center space-x-3">
-                                        <BriefcaseIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
-                                        <span className="truncate font-semibold">{pdf.bankName}</span>
-                                    </div>
-                                    <ArrowRightIcon className="h-5 w-5 text-gray-400 flex-shrink-0"/>
+                                    <BriefcaseIcon className="h-6 w-6 text-cyan-400 flex-shrink-0" />
+                                    <span className="truncate font-semibold">{pdf.bankName}</span>
                                 </Card>
                             ))}
                         </div>
                     </div>
                 );
             default:
-                return <div className="flex items-center justify-center h-full">Selecione uma aba.</div>;
+                return null;
         }
     };
     
-    const renderTopicPanel = (
-        side: 'left' | 'right',
-        tabValue: string,
-    ) => {
+    const renderTopicPanel = (side: 'left' | 'right', tabValue: string) => {
         const activePdf = side === 'left' ? splitLeftActivePdf : splitRightActivePdf;
         const setActivePdf = side === 'left' ? setSplitLeftActivePdf : setSplitRightActivePdf;
         const activeSummaryPdf = side === 'left' ? splitLeftActiveSummaryPdf : splitRightActiveSummaryPdf;
@@ -468,251 +496,85 @@ export const TopicView: React.FC<TopicViewProps> = ({
     
         const containerClass = "aspect-[4/5] w-full";
         
-        const renderPanelContent = () => {
-            switch (tabValue) {
-                case 'pdf': {
-                    if (currentContent.fullPdfs?.length === 1) {
-                        return (
-                            <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.fullPdfs[0]} /></div>
-                            </div>
-                        );
-                    }
-                    if (currentContent.fullPdfs?.length > 1) {
-                        if (activePdf) {
-                            return (
-                                <div className="flex flex-col h-full">
-                                    <div className="p-1 flex-shrink-0"><button onClick={() => setActivePdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div>
-                                    <div className={containerClass}><PdfViewer file={activePdf} /></div>
-                                </div>
-                            );
-                        } else {
-                            return (
-                                <div className="p-2 space-y-2">
-                                    <h3 className="text-lg font-bold">Aulas em PDF</h3>
-                                    {currentContent.fullPdfs.map((pdf, i) => (
-                                        <Card key={i} onClick={() => setActivePdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                            <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
-                                            <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
-                                        </Card>
-                                    ))}
-                                </div>
-                            );
-                        }
-                    }
-                    return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum PDF.</p></div>);
+        switch (tabValue) {
+            case 'pdf': {
+                if (currentContent.fullPdfs?.length === 1) {
+                    return <div className={containerClass}><PdfViewer file={currentContent.fullPdfs[0]} /></div>;
                 }
-                case 'summary': {
-                    if (currentContent.summaryPdfs?.length === 1) {
-                        return (
-                             <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.summaryPdfs[0]} /></div>
-                            </div>
-                        );
+                if (currentContent.fullPdfs?.length > 1) {
+                    if (activePdf) {
+                        return <div className="flex flex-col h-full"><div className="p-1 flex-shrink-0"><button onClick={() => setActivePdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div><div className={containerClass}><PdfViewer file={activePdf} /></div></div>;
+                    } else {
+                        return <div className="p-2 space-y-2"><h3 className="text-lg font-bold">Aulas em PDF</h3>{currentContent.fullPdfs.map((pdf, i) => <Card key={i} onClick={() => setActivePdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer"><DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" /><span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span><ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/></Card>)}</div>;
                     }
-                    if (currentContent.summaryPdfs?.length > 1) {
-                        if (activeSummaryPdf) {
-                             return (
-                                <div className="flex flex-col h-full">
-                                    <div className="p-1 flex-shrink-0"><button onClick={() => setActiveSummaryPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div>
-                                    <div className={containerClass}><PdfViewer file={activeSummaryPdf} /></div>
-                                </div>
-                            );
-                        } else {
-                            return (
-                                <div className="p-2 space-y-2">
-                                    <h3 className="text-lg font-bold">Resumos em PDF</h3>
-                                    {currentContent.summaryPdfs.map((pdf, i) => (
-                                        <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                            <DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
-                                            <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
-                                        </Card>
-                                    ))}
-                                </div>
-                            );
-                        }
-                    }
-                    return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum resumo.</p></div>);
                 }
-                case 'raiox': {
-                    if ((currentContent.raioXPdfs || []).length === 1) {
-                        return (
-                            <div className="flex flex-col h-full">
-                                <div className={containerClass}><PdfViewer file={currentContent.raioXPdfs![0]} /></div>
-                            </div>
-                        );
-                    }
-                    if ((currentContent.raioXPdfs || []).length > 1) {
-                        if (activeRaioXPdf) {
-                            return (
-                                <div className="flex flex-col h-full">
-                                    <div className="p-1 flex-shrink-0"><button onClick={() => setActiveRaioXPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div>
-                                    <div className={containerClass}><PdfViewer file={activeRaioXPdf} /></div>
-                                </div>
-                            );
-                        } else {
-                            return (
-                                <div className="p-2 space-y-2">
-                                    <h3 className="text-lg font-bold">PDFs de Raio X</h3>
-                                    {(currentContent.raioXPdfs || []).map((pdf, i) => (
-                                        <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                            <ChartLineIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                            <span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span>
-                                            <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
-                                        </Card>
-                                    ))}
-                                </div>
-                            );
-                        }
-                    }
-                    return (<div className="p-2"><p className="text-sm text-gray-400">Nenhum Raio X.</p></div>);
-                }
-                case 'notes':
-                    const noteContent = studentProgress?.notesByTopic[currentContent.id] || '';
-                    return <div className={containerClass}><NotesEditor ref={notesEditorRef} initialContent={noteContent} onSave={(content) => onNoteSave(currentContent.id, content)} isReadOnly={isPreview} /></div>;
-                case 'quiz': {
-                    const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
-                    // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
-                    return <QuizView 
-                        questions={currentContent.questions} 
-                        initialAttempts={attempts} 
-                        onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, currentContent.id, attempt)}
-                        onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)}
-                        onBack={() => {}}
-                        quizTitle="Questões (Conteúdo)"
-                        studentProgress={studentProgress}
-                    />;
-                }
-                case 'tec_questions_quiz': {
-                    const tecQuizId = `${currentContent.id}-tec`;
-                    const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
-                    // FIX: Added studentProgress to QuizView and removed subjectName, onAddBonusXp, onReportQuestion props from QuizView calls as they are not supported by the component.
-                    return <QuizView
-                        questions={currentContent.tecQuestions || []}
-                        initialAttempts={tecAttempts}
-                        onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, tecQuizId, attempt)}
-                        onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, tecQuizId, attempts)}
-                        onBack={() => {}}
-                        quizTitle="Questões Extraídas"
-                        studentProgress={studentProgress}
-                    />;
-                }
-                case 'videos': {
-                    if (activeVideo) {
-                        return (
-                            <div className="p-2 space-y-2 h-full flex flex-col">
-                                <button onClick={() => setActiveVideo(null)} className="flex-shrink-0 text-cyan-400 hover:text-cyan-300 flex items-center text-xs mb-1">
-                                    <ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180" />
-                                    Voltar
-                                </button>
-                                <h4 className="font-bold text-sm truncate flex-shrink-0">{activeVideo.name}</h4>
-                                <div className="aspect-video flex-grow min-h-0">
-                                    <iframe 
-                                        src={convertMediaUrlToEmbed(activeVideo.url)} 
-                                        title={activeVideo.name}
-                                        frameBorder="0" 
-                                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
-                                        allowFullScreen
-                                        className="w-full h-full rounded-md"
-                                    ></iframe>
-                                </div>
-                            </div>
-                        );
-                    }
-                    return (
-                        <div className="p-2 space-y-2">
-                             <h3 className="text-lg font-bold">Vídeos</h3>
-                            {(currentContent.videoUrls || []).map((video) => (
-                                <Button key={video.url} onClick={() => setActiveVideo(video)} className="w-full text-sm py-2 justify-start">
-                                    <VideoCameraIcon className="h-4 w-4 mr-2" />
-                                    <span className="truncate">{video.name}</span>
-                                </Button>
-                            ))}
-                             {(currentContent.videoUrls || []).length === 0 && <p className="text-xs text-gray-500 text-center pt-2">Nenhum vídeo.</p>}
-                        </div>
-                    );
-                }
-                case 'tec_caderno':
-                    return (
-                        <div className="p-4 flex flex-col items-center justify-center h-full text-center">
-                            <h3 className="text-lg font-bold">Caderno de Questões</h3>
-                            <p className="text-gray-400 my-2 text-sm">Pratique com questões no site do TEC Concursos.</p>
-                            <Button onClick={() => window.open(currentContent.tecUrl, '_blank', 'noopener,noreferrer')} className="text-sm py-2">
-                                Abrir TEC <ArrowRightIcon className="h-4 w-4 ml-1" />
-                            </Button>
-                        </div>
-                    );
-                case 'games':
-                    return (
-                        <div className="p-2 grid grid-cols-1 gap-2">
-                            {currentContent.miniGames.map(game => (
-                                <button key={game.id} onClick={() => onPlayGame(game, currentContent.id)} className="p-2 bg-gray-700 hover:bg-cyan-600 rounded-lg transition-colors text-left">
-                                <GameControllerIcon className="h-6 w-6 mb-1 text-cyan-400" />
-                                <p className="font-bold text-sm">{game.name}</p>
-                            </button>
-                            ))}
-                        </div>
-                    );
-                case 'flashcards':
-                    return <FlashcardPlayer flashcards={currentContent.flashcards || []} />;
-                case 'glossary':
-                    return (
-                        <div className="p-4 space-y-2">
-                            <h3 className="text-lg font-bold">Glossário</h3>
-                            <div className="divide-y divide-gray-700 max-h-full overflow-y-auto">
-                                {(currentContent.glossary || []).map((item, index) => (
-                                    <div key={index} className="py-2">
-                                        <p className="font-bold text-cyan-400 text-sm">{item.term}</p>
-                                        <p className="text-gray-300 mt-1 text-sm">{item.definition}</p>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-                    );
-                case 'medals':
-                     return <TopicMedalDisplay studentProgress={studentProgress} content={currentContent} />;
-                case 'mindMap':
-                    return (
-                        <div className="p-2 flex items-center justify-center h-full">
-                            {currentContent.mindMapUrl ? (
-                                <img src={currentContent.mindMapUrl} alt={`Mapa mental para ${currentContent.name}`} className="max-w-full max-h-full object-contain rounded-lg" />
-                            ) : (
-                                <p className="text-sm text-gray-500">Nenhum mapa mental.</p>
-                            )}
-                        </div>
-                    );
-                case 'bankProfile':
-                    if (activeBankPdf) {
-                        return (
-                            <div className="flex flex-col h-full">
-                                <div className="p-1 flex-shrink-0"><button onClick={() => setActiveBankPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div>
-                                <div className="flex-grow min-h-0 w-full aspect-[4/5]"><PdfViewer file={{ id: activeBankPdf.id, fileName: `Análise - ${activeBankPdf.bankName}`, url: activeBankPdf.url }} /></div>
-                            </div>
-                        );
-                    }
-                    return (
-                        <div className="p-2 space-y-2">
-                            <h3 className="text-lg font-bold">Bancas</h3>
-                            {(currentContent.bankProfilePdfs || []).map((pdf) => (
-                                <Card key={pdf.id} onClick={() => setActiveBankPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer">
-                                    <BriefcaseIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" />
-                                    <span className="truncate text-sm mx-2 flex-grow font-semibold">{pdf.bankName}</span>
-                                    <ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/>
-                                </Card>
-                            ))}
-                            {(currentContent.bankProfilePdfs || []).length === 0 && <p className="text-xs text-gray-500 text-center pt-2">Nenhuma análise de banca.</p>}
-                        </div>
-                    );
-                default:
-                    return <div className="p-4 text-center text-gray-500">Selecione o conteúdo.</div>;
+                return null;
             }
-        };
-    
-        return <div className="h-full">{renderPanelContent()}</div>;
+            case 'summary': {
+                if (currentContent.summaryPdfs?.length === 1) {
+                    return <div className={containerClass}><PdfViewer file={currentContent.summaryPdfs[0]} /></div>;
+                }
+                if (currentContent.summaryPdfs?.length > 1) {
+                    if (activeSummaryPdf) {
+                         return <div className="flex flex-col h-full"><div className="p-1 flex-shrink-0"><button onClick={() => setActiveSummaryPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div><div className={containerClass}><PdfViewer file={activeSummaryPdf} /></div></div>;
+                    } else {
+                        return <div className="p-2 space-y-2"><h3 className="text-lg font-bold">Resumos em PDF</h3>{currentContent.summaryPdfs.map((pdf, i) => <Card key={i} onClick={() => setActiveSummaryPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer"><DocumentTextIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" /><span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span><ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/></Card>)}</div>;
+                    }
+                }
+                return null;
+            }
+            case 'raiox': {
+                if ((currentContent.raioXPdfs || []).length === 1) {
+                    return <div className={containerClass}><PdfViewer file={currentContent.raioXPdfs![0]} /></div>;
+                }
+                if ((currentContent.raioXPdfs || []).length > 1) {
+                    if (activeRaioXPdf) {
+                        return <div className="flex flex-col h-full"><div className="p-1 flex-shrink-0"><button onClick={() => setActiveRaioXPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div><div className={containerClass}><PdfViewer file={activeRaioXPdf} /></div></div>;
+                    } else {
+                        return <div className="p-2 space-y-2"><h3 className="text-lg font-bold">PDFs de Raio X</h3>{(currentContent.raioXPdfs || []).map((pdf, i) => <Card key={i} onClick={() => setActiveRaioXPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer"><ChartLineIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" /><span className="truncate text-sm mx-2 flex-grow">{pdf.fileName}</span><ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/></Card>)}</div>;
+                    }
+                }
+                return null;
+            }
+            case 'notes':
+                const noteContent = studentProgress?.notesByTopic[currentContent.id] || '';
+                return <div className={containerClass}><NotesEditor ref={notesEditorRef} initialContent={noteContent} onSave={(content) => onNoteSave(currentContent.id, content)} isReadOnly={isPreview} /></div>;
+            case 'quiz': {
+                const attempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[currentContent.id]?.lastAttempt || [];
+                return <QuizView questions={currentContent.questions} initialAttempts={attempts} onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, currentContent.id, attempt)} onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, currentContent.id, attempts)} onBack={() => {}} quizTitle="Questões (Conteúdo)" studentProgress={studentProgress} />;
+            }
+            case 'tec_questions_quiz': {
+                const tecQuizId = `${currentContent.id}-tec`;
+                const tecAttempts = studentProgress?.progressByTopic[selectedSubject!.id]?.[tecQuizId]?.lastAttempt || [];
+                return <QuizView questions={currentContent.tecQuestions || []} initialAttempts={tecAttempts} onSaveAttempt={(attempt) => saveQuizProgress(selectedSubject!.id, tecQuizId, attempt)} onComplete={(attempts) => handleTopicQuizComplete(selectedSubject!.id, tecQuizId, attempts)} onBack={() => {}} quizTitle="Questões Extraídas" studentProgress={studentProgress} />;
+            }
+            case 'videos': {
+                if (activeVideo) {
+                    return <div className="p-2 space-y-2 h-full flex flex-col"><button onClick={() => setActiveVideo(null)} className="flex-shrink-0 text-cyan-400 hover:text-cyan-300 flex items-center text-xs mb-1"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180" />Voltar</button><h4 className="font-bold text-sm truncate flex-shrink-0">{activeVideo.name}</h4><div className="aspect-video flex-grow min-h-0"><iframe src={convertMediaUrlToEmbed(activeVideo.url)} title={activeVideo.name} frameBorder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowFullScreen className="w-full h-full rounded-md"></iframe></div></div>;
+                }
+                return <div className="p-2 space-y-2"><h3 className="text-lg font-bold">Vídeos</h3>{(currentContent.videoUrls || []).map((video) => <Button key={video.url} onClick={() => setActiveVideo(video)} className="w-full text-sm py-2 justify-start"><VideoCameraIcon className="h-4 w-4 mr-2" /><span className="truncate">{video.name}</span></Button>)}{(currentContent.videoUrls || []).length === 0 && <p className="text-xs text-gray-500 text-center pt-2">Nenhum vídeo.</p>}</div>;
+            }
+            case 'tec_caderno':
+                return <div className="p-4 flex flex-col items-center justify-center h-full text-center"><h3 className="text-lg font-bold">Caderno de Questões</h3><p className="text-gray-400 my-2 text-sm">Pratique com questões no site do TEC Concursos.</p><Button onClick={() => window.open(currentContent.tecUrl, '_blank', 'noopener,noreferrer')} className="text-sm py-2">Abrir TEC <ArrowRightIcon className="h-4 w-4 ml-1" /></Button></div>;
+            case 'games':
+                return <div className="p-2 grid grid-cols-1 gap-2">{currentContent.miniGames.map(game => <button key={game.id} onClick={() => onPlayGame(game, currentContent.id)} className="p-2 bg-gray-700 hover:bg-cyan-600 rounded-lg transition-colors text-left"><GameControllerIcon className="h-6 w-6 mb-1 text-cyan-400" /><p className="font-bold text-sm">{game.name}</p></button>)}</div>;
+            case 'flashcards':
+                return <FlashcardPlayer flashcards={currentContent.flashcards || []} />;
+            case 'glossary':
+                return <div className="p-4 space-y-2"><h3 className="text-lg font-bold">Glossário</h3><div className="divide-y divide-gray-700 max-h-full overflow-y-auto">{(currentContent.glossary || []).map((item, index) => <div key={index} className="py-2"><p className="font-bold text-cyan-400 text-sm">{item.term}</p><p className="text-gray-300 mt-1 text-sm">{item.definition}</p></div>)}</div></div>;
+            case 'medals':
+                 return <TopicMedalDisplay studentProgress={studentProgress} content={currentContent} />;
+            case 'mindMap':
+                return <div className="p-2 flex items-center justify-center h-full">{currentContent.mindMapUrl ? <img src={currentContent.mindMapUrl} alt="" className="max-w-full max-h-full object-contain rounded-lg" /> : <p className="text-sm text-gray-500">Nenhum mapa mental.</p>}</div>;
+            case 'bankProfile':
+                if (activeBankPdf) {
+                    return <div className="flex flex-col h-full"><div className="p-1 flex-shrink-0"><button onClick={() => setActiveBankPdf(null)} className="text-cyan-400 hover:text-cyan-300 flex items-center text-xs"><ArrowRightIcon className="h-3 w-3 mr-1 transform rotate-180"/>Voltar</button></div><div className={containerClass}><PdfViewer file={{ id: activeBankPdf.id, fileName: `Análise - ${activeBankPdf.bankName}`, url: activeBankPdf.url }} /></div></div>;
+                }
+                return <div className="p-2 space-y-2"><h3 className="text-lg font-bold">Bancas</h3>{(currentContent.bankProfilePdfs || []).map((pdf) => <Card key={pdf.id} onClick={() => setActiveBankPdf(pdf)} className="p-2 flex items-center justify-between hover:bg-gray-700 cursor-pointer"><BriefcaseIcon className="h-5 w-5 text-cyan-400 flex-shrink-0" /><span className="truncate text-sm mx-2 flex-grow font-semibold">{pdf.bankName}</span><ArrowRightIcon className="h-4 w-4 text-gray-400 flex-shrink-0"/></Card>)}{(currentContent.bankProfilePdfs || []).length === 0 && <p className="text-xs text-gray-500 text-center pt-2">Nenhuma análise de banca.</p>}</div>;
+            default:
+                return null;
+        }
     };
-
 
     if(isSplitView) {
         const uniqueTabs = ['notes', 'quiz', 'flashcards', 'tec_questions_quiz'];
@@ -738,41 +600,21 @@ export const TopicView: React.FC<TopicViewProps> = ({
                     Gire o dispositivo para o modo paisagem para melhor visualização.
                 </div>
                 <div className="flex gap-4 flex-grow">
-                    {/* Left Panel */}
                     <div className="w-1/2 flex flex-col bg-gray-800 rounded-lg border border-gray-700/50">
                         <div className="flex-shrink-0 border-b border-gray-700">
                             <div className="flex space-x-1 p-1 overflow-x-auto" role="tablist">
                                 {tabs.map(tab => (
-                                    <button 
-                                        key={tab.value} 
-                                        onClick={() => setSplitLeftTab(tab.value)}
-                                        className={`flex-shrink-0 p-2 rounded-md text-xs flex items-center gap-1 ${splitLeftTab === tab.value ? 'bg-cyan-600' : 'hover:bg-gray-700'} ${isTabDisabled(tab.value, splitRightTab) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={isTabDisabled(tab.value, splitRightTab)}
-                                        role="tab"
-                                        aria-selected={splitLeftTab === tab.value}
-                                    >
-                                        <tab.icon className="h-4 w-4" /> {tab.label}
-                                    </button>
+                                    <button key={tab.value} onClick={() => setSplitLeftTab(tab.value)} className={`flex-shrink-0 p-2 rounded-md text-xs flex items-center gap-1 ${splitLeftTab === tab.value ? 'bg-cyan-600' : 'hover:bg-gray-700'} ${isTabDisabled(tab.value, splitRightTab) ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isTabDisabled(tab.value, splitRightTab)} role="tab" aria-selected={splitLeftTab === tab.value}><tab.icon className="h-4 w-4" /> {tab.label}</button>
                                 ))}
                             </div>
                         </div>
                         <div className="flex-grow overflow-y-auto">{renderTopicPanel('left', splitLeftTab)}</div>
                     </div>
-                    {/* Right Panel */}
                     <div className="w-1/2 flex flex-col bg-gray-800 rounded-lg border border-gray-700/50">
                         <div className="flex-shrink-0 border-b border-gray-700">
                             <div className="flex space-x-1 p-1 overflow-x-auto" role="tablist">
                                {tabs.map(tab => (
-                                    <button 
-                                        key={tab.value} 
-                                        onClick={() => setSplitRightTab(tab.value)}
-                                        className={`flex-shrink-0 p-2 rounded-md text-xs flex items-center gap-1 ${splitRightTab === tab.value ? 'bg-cyan-600' : 'hover:bg-gray-700'} ${isTabDisabled(tab.value, splitLeftTab) ? 'opacity-50 cursor-not-allowed' : ''}`}
-                                        disabled={isTabDisabled(tab.value, splitLeftTab)}
-                                        role="tab"
-                                        aria-selected={splitRightTab === tab.value}
-                                    >
-                                        <tab.icon className="h-4 w-4" /> {tab.label}
-                                    </button>
+                                    <button key={tab.value} onClick={() => setSplitRightTab(tab.value)} className={`flex-shrink-0 p-2 rounded-md text-xs flex items-center gap-1 ${splitRightTab === tab.value ? 'bg-cyan-600' : 'hover:bg-gray-700'} ${isTabDisabled(tab.value, splitLeftTab) ? 'opacity-50 cursor-not-allowed' : ''}`} disabled={isTabDisabled(tab.value, splitLeftTab)} role="tab" aria-selected={splitRightTab === tab.value}><tab.icon className="h-4 w-4" /> {tab.label}</button>
                                 ))}
                             </div>
                         </div>
@@ -783,7 +625,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
         );
     }
 
-    // Default Single View
     return (
         <Card className="h-full flex flex-col">
             <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0 flex-wrap gap-2">
