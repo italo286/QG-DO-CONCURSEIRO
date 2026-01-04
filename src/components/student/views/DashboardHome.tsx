@@ -25,7 +25,8 @@ interface DashboardHomeProps {
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
     onDeleteMessage: (messageId: string) => void;
-    setView: (view: any) => void; // Adicionado para permitir navegação
+    setView: (view: any) => void;
+    onSaveFullPlan: (fullPlan: StudyPlan) => Promise<void>;
 }
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
@@ -45,7 +46,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     onToggleTopicCompletion,
     onOpenNewMessageModal,
     onDeleteMessage,
-    setView
+    setView,
+    onSaveFullPlan
 }) => {
     const broadcasts = useMemo(() => messages.filter(m => m.studentId === null), [messages]);
 
@@ -65,6 +67,24 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         }
         return null;
     }, [studentProgress, allSubjects]);
+
+    const handleUpdateQuickRoutine = async (day: number, time: string, content: string | null) => {
+        const activePlanId = fullStudyPlan.activePlanId;
+        if (!activePlanId) return;
+
+        const newPlans = fullStudyPlan.plans.map(p => {
+            if (p.id === activePlanId) {
+                const routine = { ...p.weeklyRoutine };
+                if (!routine[day]) routine[day] = {};
+                if (content !== null) routine[day][time] = content;
+                else delete routine[day][time];
+                return { ...p, weeklyRoutine: routine };
+            }
+            return p;
+        });
+        
+        await onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
+    };
 
     const renderAnnouncementsView = () => (
         <div className="space-y-6">
@@ -257,6 +277,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         onNavigateToTopic={onNavigateToTopic} 
                         onToggleTopicCompletion={onToggleTopicCompletion}
                         onViewFullSchedule={() => setView('schedule')}
+                        onUpdateRoutine={handleUpdateQuickRoutine}
                     />
                 )}
 
