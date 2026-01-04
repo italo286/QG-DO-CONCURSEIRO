@@ -76,7 +76,6 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
         if (hasContent(topic)) {
             onTopicSelect(topic);
         } else {
-            // Tópico vazio: abre a lista de subtópicos
             setOpenTopics(prev => ({ ...prev, [topic.id]: !prev[topic.id] }));
         }
     };
@@ -153,7 +152,6 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                             <Button 
                                                 onClick={(e) => handleTopicAction(e, topic)} 
                                                 className={`text-xs font-black py-2.5 px-6 uppercase tracking-widest shadow-lg shadow-black/20 transition-all active:scale-95 ${!contentAvailable ? 'bg-gray-700 hover:bg-gray-600 border-gray-600' : ''}`}
-                                                style={contentAvailable && topic.color ? { backgroundColor: topic.color } : undefined}
                                             >
                                                 {contentAvailable ? 'Estudar' : 'Ver Subtópicos'}
                                             </Button>

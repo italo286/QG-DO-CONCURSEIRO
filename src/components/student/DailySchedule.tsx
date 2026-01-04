@@ -30,12 +30,12 @@ export const DailySchedule: React.FC<{
     const now = getBrasiliaDate();
     const todayIndex = now.getUTCDay();
 
-    const getTopicInfo = (topicId: string): { name: string; subjectName: string; subjectId: string; color?: string } | null => {
+    const getTopicInfo = (topicId: string): { name: string; subjectName: string; subjectId: string } | null => {
         for (const subject of subjects) {
             for (const topic of (subject.topics || [])) {
-                if (topic.id === topicId) return { name: topic.name, subjectName: subject.name, subjectId: subject.id, color: topic.color };
+                if (topic.id === topicId) return { name: topic.name, subjectName: subject.name, subjectId: subject.id };
                 const subtopic = (topic.subtopics || []).find(st => st.id === topicId);
-                if (subtopic) return { name: subtopic.name, subjectName: subject.name, subjectId: subject.id, color: subtopic.color };
+                if (subtopic) return { name: subtopic.name, subjectName: subject.name, subjectId: subject.id };
             }
         }
         return null;
@@ -91,7 +91,6 @@ export const DailySchedule: React.FC<{
                         const isPast = currentMinutes >= itemMinutes;
                         const isCircleActive = isPast || isCompletedManually;
 
-                        // Lógica da linha: só fica azul se o PRÓXIMO horário já foi atingido
                         const nextTime = sortedTimes[index + 1];
                         const isLineActive = nextTime ? (currentMinutes >= timeToMinutes(nextTime)) : false;
 
@@ -99,12 +98,10 @@ export const DailySchedule: React.FC<{
 
                         return (
                             <div key={time} className="relative pl-10 group">
-                                {/* Linha Vertical Segmentada */}
                                 {!isLast && (
                                     <div className={`absolute left-3.5 top-7 w-0.5 h-full z-0 transition-colors duration-700 ${isLineActive ? 'bg-cyan-500' : 'bg-gray-700'}`} />
                                 )}
 
-                                {/* Círculo da Timeline */}
                                 <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-4 border-gray-900 flex items-center justify-center z-10 transition-all duration-700 ${isCircleActive ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'bg-gray-700 group-hover:bg-gray-600'}`}>
                                     {isCompletedManually ? (
                                         <CheckIcon className="h-3 w-3 text-white" />
@@ -120,7 +117,6 @@ export const DailySchedule: React.FC<{
                                     
                                     <div 
                                         className={`p-3 rounded-xl border transition-all duration-300 ${isCircleActive ? 'bg-cyan-500/5 border-cyan-500/30' : 'bg-gray-900/40 border-gray-700 hover:border-gray-600'}`}
-                                        style={(!isCircleActive && topicInfo?.color) ? { borderLeft: `3px solid ${topicInfo.color}` } : {}}
                                     >
                                         {topicInfo ? (
                                             <div className="flex justify-between items-start gap-2">
@@ -142,6 +138,7 @@ export const DailySchedule: React.FC<{
                                                     </button>
                                                     {!isCompletedManually && (
                                                         <button 
+                                                            /* FIX: Changed handleNavigateToTopic to onNavigateToTopic as per reported error */
                                                             onClick={() => onNavigateToTopic(content)}
                                                             className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isCircleActive ? 'bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600' : 'bg-gray-800 text-gray-500 hover:bg-cyan-600'} hover:text-white`}
                                                             title="Ir para aula"

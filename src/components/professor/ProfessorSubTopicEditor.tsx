@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { SubTopic, Question, MiniGame } from '../../types';
-import { Modal, Button, ColorPalettePicker } from '../ui';
+import { Modal, Button } from '../ui';
 import { GeminiIcon, GameControllerIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon, CheckBadgeIcon } from '../Icons';
 import { AiQuestionGeneratorModal } from './AiQuestionGeneratorModal';
 import { ProfessorGameEditorModal } from './ProfessorGameEditorModal';
@@ -21,7 +22,6 @@ export const ProfessorSubTopicEditor: React.FC<{
     const [localName, setLocalName] = useState('');
     const [localDescription, setLocalDescription] = useState('');
     const [localMindMapUrl, setLocalMindMapUrl] = useState('');
-    const [localColor, setLocalColor] = useState<string | undefined>('');
 
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
     const [isTecModalOpen, setIsTecModalOpen] = useState(false);
@@ -39,7 +39,6 @@ export const ProfessorSubTopicEditor: React.FC<{
             setLocalName(initialSubTopic.name);
             setLocalDescription(initialSubTopic.description || '');
             setLocalMindMapUrl(initialSubTopic.mindMapUrl || '');
-            setLocalColor(initialSubTopic.color);
         } else {
             setEditingSubTopic(null);
         }
@@ -56,7 +55,6 @@ export const ProfessorSubTopicEditor: React.FC<{
                 name: localName,
                 description: localDescription,
                 mindMapUrl: localMindMapUrl,
-                color: localColor,
                 id: editingSubTopic.id || `st${Date.now()}` 
             };
             onSave(finalSubTopic);
@@ -106,8 +104,6 @@ export const ProfessorSubTopicEditor: React.FC<{
             if (!prev) return null;
             
             const updatedSubTopic = { ...prev };
-    
-            // Process `questions`
             updatedSubTopic.questions = updatedSubTopic.questions.map(q => {
                 if (q.id === questionId) {
                     const { reportInfo, ...rest } = q;
@@ -116,7 +112,6 @@ export const ProfessorSubTopicEditor: React.FC<{
                 return q;
             });
     
-            // Process `tecQuestions` only if it exists
             if (updatedSubTopic.tecQuestions) {
                 updatedSubTopic.tecQuestions = updatedSubTopic.tecQuestions.map(q => {
                     if (q.id === questionId) {
@@ -186,15 +181,9 @@ export const ProfessorSubTopicEditor: React.FC<{
         <Modal isOpen={isOpen} onClose={onClose} title={subtopic?.id ? "Editar Subtópico" : "Novo Subtópico"} size="4xl">
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <ColorPalettePicker 
-                            currentColor={localColor}
-                            onColorSelect={setLocalColor}
-                        />
-                        <div className="flex-grow">
-                            <label htmlFor="subtopic-name" className="block text-sm font-medium text-gray-300">Nome do Subtópico</label>
-                            <input id="subtopic-name" type="text" value={localName} onChange={e => setLocalName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"/>
-                        </div>
+                    <div>
+                        <label htmlFor="subtopic-name" className="block text-sm font-medium text-gray-300">Nome do Subtópico</label>
+                        <input id="subtopic-name" type="text" value={localName} onChange={e => setLocalName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"/>
                     </div>
                      <div>
                         <label htmlFor="subtopic-desc" className="block text-sm font-medium text-gray-300">Descrição</label>

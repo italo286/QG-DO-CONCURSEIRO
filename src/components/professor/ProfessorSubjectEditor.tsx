@@ -12,7 +12,7 @@ import { ProfessorSubTopicEditor } from './ProfessorSubTopicEditor';
 const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) => {
     const calculateTotal = (getter: (item: Topic | SubTopic) => any[] | undefined) => {
         let total = (getter(content) as any[])?.length || 0;
-        if ('subtopics' in content && content.subtopics) { // Check if it's a Topic
+        if ('subtopics' in content && content.subtopics) {
             total += content.subtopics.reduce((sum, subtopic) => sum + ((getter(subtopic) as any[])?.length || 0), 0);
         }
         return total;
@@ -376,27 +376,6 @@ export const ProfessorSubjectEditor: React.FC<{
         e.stopPropagation();
     };
 
-    const handleTopicColorChange = (topicId: string, color: string | undefined) => {
-        const updatedTopics = currentSubject.topics.map(t => 
-            t.id === topicId ? { ...t, color } : t
-        );
-        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
-    };
-
-    const handleSubtopicColorChange = (parentTopicId: string, subtopicId: string, color: string | undefined) => {
-        const updatedTopics = currentSubject.topics.map(t => {
-            if (t.id === parentTopicId) {
-                const updatedSubtopics = t.subtopics.map(st => 
-                    st.id === subtopicId ? { ...st, color } : st
-                );
-                return { ...t, subtopics: updatedSubtopics };
-            }
-            return t;
-        });
-        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
-    };
-
-
     return (
         <div className="max-w-4xl mx-auto">
             <ConfirmModal 
@@ -504,13 +483,7 @@ export const ProfessorSubjectEditor: React.FC<{
                         >
                             <summary className="p-4 list-none cursor-pointer">
                                 <div className="flex justify-between items-center">
-                                    <div className="flex items-center gap-3">
-                                        <ColorPalettePicker 
-                                            currentColor={topic.color}
-                                            onColorSelect={(color) => handleTopicColorChange(topic.id, color)}
-                                        />
-                                        <span className="font-semibold text-gray-200">{topic.name}</span>
-                                    </div>
+                                    <span className="font-semibold text-gray-200">{topic.name}</span>
                                     <div className="flex items-center space-x-2">
                                         <div className="flex bg-gray-700 rounded-md overflow-hidden border border-gray-600">
                                             <button 
@@ -556,13 +529,7 @@ export const ProfessorSubjectEditor: React.FC<{
                                                 className={`p-2 pl-4 bg-gray-700/50 rounded-md transition-opacity ${draggedSubtopicInfo !== null ? 'cursor-grabbing' : 'cursor-grab'} ${draggedSubtopicInfo?.parentIndex === index && draggedSubtopicInfo?.subtopicIndex === subIndex ? 'opacity-30' : 'opacity-100'}`}
                                             >
                                                 <div className="flex justify-between items-center">
-                                                    <div className="flex items-center gap-3">
-                                                        <ColorPalettePicker 
-                                                            currentColor={subtopic.color}
-                                                            onColorSelect={(color) => handleSubtopicColorChange(topic.id, subtopic.id, color)}
-                                                        />
-                                                        <span className="text-sm text-gray-300">{subtopic.name}</span>
-                                                    </div>
+                                                    <span className="text-sm text-gray-300">{subtopic.name}</span>
                                                     <div className="flex space-x-2">
                                                         <button onClick={() => handleOpenSubTopicModal(subtopic, topic)} className="p-1 text-gray-400 hover:text-cyan-400" aria-label={`Editar subtópico ${subtopic.name}`}><PencilIcon className="h-4 w-4"/></button>
                                                         <button onClick={() => setConfirmDeleteSubtopicData({ id: subtopic.id, name: subtopic.name, parent: topic })} className="p-1 text-gray-400 hover:text-red-500" aria-label={`Apagar subtópico ${subtopic.name}`}><TrashIcon className="h-4 w-4" /></button>

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Topic, Question, MiniGame, SubTopic } from '../../types';
-import { Modal, Button, ColorPalettePicker } from '../ui';
+import { Modal, Button } from '../ui';
 import { GeminiIcon, GameControllerIcon, PencilIcon, TrashIcon, ExclamationTriangleIcon, CheckBadgeIcon } from '../Icons';
 import { AiQuestionGeneratorModal } from './AiQuestionGeneratorModal';
 import { ProfessorGameEditorModal } from './ProfessorGameEditorModal';
@@ -23,7 +23,6 @@ export const ProfessorTopicEditor: React.FC<{
     const [localName, setLocalName] = useState('');
     const [localDescription, setLocalDescription] = useState('');
     const [localMindMapUrl, setLocalMindMapUrl] = useState('');
-    const [localColor, setLocalColor] = useState<string | undefined>('');
 
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
     const [isTecModalOpen, setIsTecModalOpen] = useState(false);
@@ -42,7 +41,6 @@ export const ProfessorTopicEditor: React.FC<{
             setLocalName(initialTopic.name);
             setLocalDescription(initialTopic.description || '');
             setLocalMindMapUrl(initialTopic.mindMapUrl || '');
-            setLocalColor(initialTopic.color);
         } else {
             setEditingTopic(null);
         }
@@ -59,7 +57,6 @@ export const ProfessorTopicEditor: React.FC<{
                 name: localName,
                 description: localDescription,
                 mindMapUrl: localMindMapUrl,
-                color: localColor,
                 id: editingTopic.id || `t${Date.now()}` 
             };
             onSave(finalTopic);
@@ -109,8 +106,6 @@ export const ProfessorTopicEditor: React.FC<{
             if (!prev) return null;
             
             const updatedTopic = { ...prev };
-
-            // Process `questions`
             updatedTopic.questions = updatedTopic.questions.map(q => {
                 if (q.id === questionId) {
                     const { reportInfo, ...rest } = q;
@@ -119,7 +114,6 @@ export const ProfessorTopicEditor: React.FC<{
                 return q;
             });
     
-            // Process `tecQuestions` only if it exists
             if (updatedTopic.tecQuestions) {
                 updatedTopic.tecQuestions = updatedTopic.tecQuestions.map(q => {
                     if (q.id === questionId) {
@@ -201,15 +195,9 @@ export const ProfessorTopicEditor: React.FC<{
         <Modal isOpen={isOpen} onClose={onClose} title={topic?.id ? "Editar Tópico" : "Novo Tópico"} size="4xl">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                 <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                        <ColorPalettePicker 
-                            currentColor={localColor}
-                            onColorSelect={setLocalColor}
-                        />
-                        <div className="flex-grow">
-                            <label htmlFor="topic-name" className="block text-sm font-medium text-gray-300">Nome do Tópico</label>
-                            <input id="topic-name" type="text" value={localName} onChange={e => setLocalName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"/>
-                        </div>
+                    <div>
+                        <label htmlFor="topic-name" className="block text-sm font-medium text-gray-300">Nome do Tópico</label>
+                        <input id="topic-name" type="text" value={localName} onChange={e => setLocalName(e.target.value)} className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white"/>
                     </div>
                      <div>
                         <label htmlFor="topic-desc" className="block text-sm font-medium text-gray-300">Descrição</label>

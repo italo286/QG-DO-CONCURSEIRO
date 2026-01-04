@@ -11,7 +11,6 @@ interface WeeklyStudyGridProps {
     onOpenPicker: (day: number, time: string) => void;
     selectedTopicId: string | null;
     getTopicName: (id: string) => string;
-    getTopicColor: (id: string) => string | undefined;
     readOnly?: boolean;
 }
 
@@ -33,7 +32,6 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
     onAddTime,
     onOpenPicker,
     getTopicName,
-    getTopicColor,
     readOnly = false
 }) => {
     const [activeSelectionCell, setActiveSelectionCell] = useState<{ day: number, time: string } | null>(null);
@@ -52,7 +50,6 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
         if (!hasContent) {
             setActiveSelectionCell({ day: dayId, time });
         } else {
-            // Se já tem conteúdo e é tópico, talvez queira trocar
             const content = weeklyRoutine[dayId]?.[time] || '';
             if (content.startsWith('t') || content.startsWith('st')) {
                 setActiveSelectionCell({ day: dayId, time });
@@ -121,7 +118,6 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                     const content = weeklyRoutine[day.id]?.[time] || '';
                                     const isTopicId = content.startsWith('t') || content.startsWith('st');
                                     const topicName = isTopicId ? getTopicName(content) : null;
-                                    const topicColor = isTopicId ? getTopicColor(content) : null;
                                     const isSelected = activeSelectionCell?.day === day.id && activeSelectionCell?.time === time;
                                     const isEditingManual = manualEditCell?.day === day.id && manualEditCell?.time === time;
                                     
@@ -131,7 +127,6 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
                                             onClick={() => !isEditingManual && handleCellClick(day.id, time, !!content)}
                                             className={`p-1 border-r border-gray-800/50 last:border-0 h-20 min-w-[110px] relative group transition-colors ${readOnly ? '' : 'hover:bg-gray-800/20 cursor-pointer'}`}
                                         >
-                                            {/* Modo de Escolha: Texto ou Conteúdo */}
                                             {isSelected && !readOnly && (
                                                 <div className="absolute inset-0 z-10 bg-gray-900/95 flex flex-col items-center justify-center gap-2 p-1 animate-fade-in shadow-2xl">
                                                     <button 
@@ -157,8 +152,7 @@ export const WeeklyStudyGrid: React.FC<WeeklyStudyGridProps> = ({
 
                                             {isTopicId ? (
                                                 <div 
-                                                    className="w-full h-full rounded-md p-2 flex flex-col justify-between overflow-hidden shadow-inner animate-fade-in relative group/topic"
-                                                    style={{ backgroundColor: topicColor ? `${topicColor}15` : '#0ea5e915', borderLeft: `3px solid ${topicColor || '#0ea5e9'}` }}
+                                                    className="w-full h-full rounded-md p-2 flex flex-col justify-between overflow-hidden shadow-inner animate-fade-in relative group/topic bg-cyan-900/10 border-l-2 border-cyan-500"
                                                 >
                                                     <div className="flex items-center justify-between gap-1 mb-0.5">
                                                         <span className="text-[7px] uppercase font-black text-white/40 tracking-tighter">AULA</span>

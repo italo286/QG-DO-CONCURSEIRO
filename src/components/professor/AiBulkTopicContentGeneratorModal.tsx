@@ -2,7 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import * as GeminiService from '../../services/geminiService';
 import { Topic, SubTopic } from '../../types';
-import { Modal, Button, Spinner, ColorPalettePicker, Card } from '../ui';
+import { Modal, Button, Spinner, Card } from '../ui';
 import { GeminiIcon, TrashIcon, PlusIcon } from '../Icons';
 
 interface TopicBlock {
@@ -10,7 +10,6 @@ interface TopicBlock {
     topicName: string;
     genericSubtopicName: string;
     rawLinks: string;
-    selectedColor: string | undefined;
     generationMode: 'standard' | 'replication';
 }
 
@@ -30,7 +29,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
     const isSubtopicMode = mode === 'subtopic';
     
     const [blocks, setBlocks] = useState<TopicBlock[]>([
-        { id: '1', topicName: '', genericSubtopicName: '', rawLinks: '', selectedColor: undefined, generationMode: 'standard' }
+        { id: '1', topicName: '', genericSubtopicName: '', rawLinks: '', generationMode: 'standard' }
     ]);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
@@ -38,7 +37,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
 
     useEffect(() => {
         if (!isOpen) {
-            setBlocks([{ id: '1', topicName: '', genericSubtopicName: '', rawLinks: '', selectedColor: undefined, generationMode: 'standard' }]);
+            setBlocks([{ id: '1', topicName: '', genericSubtopicName: '', rawLinks: '', generationMode: 'standard' }]);
             setError('');
             setIsLoading(false);
             setPreviewData(null);
@@ -51,7 +50,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
             topicName: '', 
             genericSubtopicName: '', 
             rawLinks: '', 
-            selectedColor: undefined, 
             generationMode: 'standard' 
         }]);
     };
@@ -95,7 +93,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
         const timestamp = Date.now();
         
         if (isSubtopicMode) {
-            // No modo subtópico, retornamos apenas a lista plana de subtópicos do primeiro bloco
             const block = blocks[0];
             const data = previewData[0].items;
             const subtopics = data.map((item, i) => {
@@ -105,7 +102,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                     id,
                     name: extractedName,
                     description: `Conteúdo de ${extractedName}`,
-                    color: block.selectedColor,
                     fullPdfs: item.fullPdf ? [{ id: `pdf-f-${id}`, fileName: item.fullPdf.name, url: item.fullPdf.url }] : [],
                     summaryPdfs: item.summaryPdf ? [{ id: `pdf-s-${id}`, fileName: item.summaryPdf.name, url: item.summaryPdf.url }] : [],
                     videoUrls: item.video ? [{ id: `vid-${id}`, name: item.video.name, url: item.video.url }] : [],
@@ -119,7 +115,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
             });
             onSave(subtopics);
         } else {
-            // No modo tópico, retornamos uma lista de Tópicos, cada um com seus subtópicos dentro
             const topics: Topic[] = blocks.map((block, blockIdx) => {
                 const topicId = `t-bulk-${timestamp}-${blockIdx}`;
                 const blockData = previewData.find(p => p.blockId === block.id)?.items || [];
@@ -128,7 +123,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                     id: topicId,
                     name: block.topicName,
                     description: `Aulas de ${block.topicName}`,
-                    color: block.selectedColor,
                     fullPdfs: [],
                     summaryPdfs: [],
                     raioXPdfs: [],
@@ -145,7 +139,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                             id: subId,
                             name: extractedName,
                             description: `Conteúdo de ${extractedName}`,
-                            color: block.selectedColor,
                             fullPdfs: item.fullPdf ? [{ id: `pdf-f-${subId}`, fileName: item.fullPdf.name, url: item.fullPdf.url }] : [],
                             summaryPdfs: item.summaryPdf ? [{ id: `pdf-s-${subId}`, fileName: item.summaryPdf.name, url: item.summaryPdf.url }] : [],
                             videoUrls: item.video ? [{ id: `vid-${subId}`, name: item.video.name, url: item.video.url }] : [],
@@ -212,15 +205,8 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                     </div>
 
                                     <div className="mt-4 flex flex-wrap gap-6 items-center bg-gray-800/50 p-3 rounded-lg">
-                                        <div className="flex flex-col items-center">
-                                            <label className="text-[10px] font-bold text-gray-500 uppercase mb-1">Cor</label>
-                                            <ColorPalettePicker 
-                                                currentColor={block.selectedColor}
-                                                onColorSelect={(c) => updateBlock(block.id, 'selectedColor', c)}
-                                            />
-                                        </div>
                                         <div className="flex flex-col">
-                                            <label className="text-[10px] font-bold text-gray-500 uppercase mb-1">Modo</label>
+                                            <label className="text-[10px] font-bold text-gray-500 uppercase mb-1">Modo de Geração</label>
                                             <div className="flex gap-4">
                                                 <label className="flex items-center space-x-2 cursor-pointer">
                                                     <input type="radio" checked={block.generationMode === 'standard'} onChange={() => updateBlock(block.id, 'generationMode', 'standard')} className="text-cyan-500" />
@@ -228,7 +214,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                                 </label>
                                                 <label className="flex items-center space-x-2 cursor-pointer">
                                                     <input type="radio" checked={block.generationMode === 'replication'} onChange={() => updateBlock(block.id, 'generationMode', 'replication')} className="text-cyan-500" />
-                                                    <span className="text-xs text-gray-300">Replicação</span>
+                                                    <span className="text-xs text-gray-300">Replicação de PDFs</span>
                                                 </label>
                                             </div>
                                         </div>
@@ -276,7 +262,6 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                     <div key={block.id} className="bg-gray-800/50 rounded-xl p-4 border border-gray-700">
                                         {!isSubtopicMode && (
                                             <div className="flex items-center gap-3 mb-4 border-b border-gray-700 pb-2">
-                                                <div className="w-3 h-6 rounded" style={{ backgroundColor: block.selectedColor || '#4b5563' }}></div>
                                                 <h4 className="font-bold text-white uppercase text-sm">{block.topicName}</h4>
                                             </div>
                                         )}
