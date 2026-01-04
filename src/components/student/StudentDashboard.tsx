@@ -174,7 +174,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const handleCourseSelect = (course: Course) => { setSelectedCourse(course); setView('course'); };
     const handleSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); setView('subject'); };
     
-    // ATUALIZADO: Salva o lastAccessedTopicId ao selecionar um tópico
     const handleTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
         if ('subtopics' in topic) { 
             setSelectedTopic(topic); 
@@ -185,7 +184,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedSubtopic(topic); 
         }
         
-        // Persiste histórico
         if (studentProgress) {
             const newProgress = { ...studentProgress, lastAccessedTopicId: topic.id };
             handleUpdateStudentProgress(newProgress, studentProgress);
@@ -197,9 +195,32 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const handleNavigateToTopic = (topicId: string) => {
         for (const subject of allSubjects) {
             for (const topic of subject.topics) {
-                if (topic.id === topicId) { setSelectedSubject(subject); setSelectedTopic(topic); setSelectedSubtopic(null); setView('topic'); return; }
-                const subtopic = topic.subtopics.find(st => st.id === topicId);
-                if (subtopic) { setSelectedSubject(subject); setSelectedTopic(topic); setSelectedSubtopic(subtopic); setView('topic'); return; }
+                const foundTopic = topic.id === topicId;
+                const foundSubtopic = topic.subtopics.find(st => st.id === topicId);
+
+                if (foundTopic || foundSubtopic) {
+                    // Localiza a qual curso essa disciplina pertence
+                    const associatedCourse = enrolledCourses.find(c => 
+                        c.disciplines.some(d => d.subjectId === subject.id)
+                    );
+
+                    if (associatedCourse) {
+                        setSelectedCourse(associatedCourse);
+                    }
+
+                    setSelectedSubject(subject);
+                    setSelectedTopic(topic);
+                    setSelectedSubtopic(foundSubtopic || null);
+                    
+                    // Persiste o histórico ao navegar
+                    if (studentProgress) {
+                        const newProgress = { ...studentProgress, lastAccessedTopicId: topicId };
+                        handleUpdateStudentProgress(newProgress, studentProgress);
+                    }
+
+                    setView('topic');
+                    return;
+                }
             }
         }
     };
@@ -581,7 +602,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
                 </div>
             )}
-            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={() => setIsCustomQuizCreatorOpen(false)} onSave={(quiz) => {
+            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={setIsCustomQuizCreatorOpen.bind(null, false)} onSave={(quiz) => {
                 const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }}/>
