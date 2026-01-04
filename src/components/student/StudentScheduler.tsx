@@ -1,8 +1,8 @@
-
 import React, { useState, useMemo, useEffect } from 'react';
-import { StudyPlan, StudyPlanItem, Subject } from '../../types';
+import { StudyPlan, StudyPlanItem, Subject, SubTopic } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, GeminiIcon, BellIcon, CycleIcon, DownloadIcon } from '../Icons';
+// Added SubjectIcon to the imports
+import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, GeminiIcon, BellIcon, CycleIcon, DownloadIcon, SubjectIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -37,12 +37,12 @@ export const StudentScheduler: React.FC<{
     }, [isPickerOpen]);
 
     const allTopicsAndSubtopics = useMemo(() => {
-        const items: {id: string, name: string, subjectId: string, subjectName: string, color?: string}[] = [];
+        const items: {id: string, name: string, subjectId: string, subjectName: string}[] = [];
         subjects.forEach(s => {
             s.topics.forEach(t => {
-                items.push({ id: t.id, name: t.name, subjectId: s.id, subjectName: s.name, color: t.color });
+                items.push({ id: t.id, name: t.name, subjectId: s.id, subjectName: s.name });
                 t.subtopics.forEach(st => {
-                    items.push({ id: st.id, name: st.name, subjectId: s.id, subjectName: `${s.name} > ${t.name}`, color: st.color });
+                    items.push({ id: st.id, name: st.name, subjectId: s.id, subjectName: `${s.name} > ${t.name}` });
                 })
             })
         });
@@ -62,10 +62,6 @@ export const StudentScheduler: React.FC<{
     const getTopicName = (topicId: string) => {
         return allTopicsAndSubtopics.find(t => t.id === topicId)?.name || 'Tópico inválido';
     };
-
-    const getTopicColor = (topicId: string) => {
-        return allTopicsAndSubtopics.find(t => t.id === topicId)?.color;
-    }
 
     const handleCreatePlan = async () => {
         if (!newPlanName.trim()) return;
@@ -307,7 +303,6 @@ export const StudentScheduler: React.FC<{
                             onOpenPicker={handleOpenPicker}
                             selectedTopicId={null}
                             getTopicName={getTopicName}
-                            getTopicColor={getTopicColor}
                             readOnly={isReadOnly}
                         />
                     </div>
@@ -319,7 +314,9 @@ export const StudentScheduler: React.FC<{
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 animate-fade-in">
                                 {subjects.map(subject => (
                                     <button key={subject.id} onClick={() => setSelectedSubjectForPicker(subject.id)} className="text-left p-4 rounded-xl bg-gray-800 border border-gray-700 hover:border-cyan-500 hover:bg-gray-700 transition-all flex items-center gap-4 group">
-                                        <div className="w-3 h-8 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: subject.color || '#4B5563' }} />
+                                        <div className="w-10 h-10 rounded-xl bg-gray-900 flex items-center justify-center border border-gray-700 shadow-sm flex-shrink-0">
+                                            <SubjectIcon subjectName={subject.name} className="h-5 w-5 text-cyan-400" />
+                                        </div>
                                         <div className="min-w-0">
                                             <p className="font-bold text-white group-hover:text-cyan-400 transition-colors truncate">{subject.name}</p>
                                             <p className="text-[10px] text-gray-500 uppercase font-bold tracking-wider">{subject.topics.length} Tópicos</p>
@@ -349,7 +346,7 @@ export const StudentScheduler: React.FC<{
                                                     <p className="text-[9px] uppercase font-bold text-cyan-500/70 mb-0.5 truncate">{item.subjectName}</p>
                                                     <p className="font-bold text-white group-hover:text-cyan-400 transition-colors text-sm truncate">{item.name}</p>
                                                 </div>
-                                                <div className="w-2.5 h-2.5 rounded-full shadow-sm flex-shrink-0" style={{ backgroundColor: item.color || '#0ea5e9' }} />
+                                                <div className="w-2 h-2 rounded-full bg-cyan-500 shadow-[0_0_8px_cyan] flex-shrink-0" />
                                             </div>
                                         </button>
                                     ))}

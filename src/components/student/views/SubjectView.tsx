@@ -91,17 +91,24 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {/* Header Disciplina */}
-            <div className="bg-gray-800/40 rounded-3xl p-6 border border-gray-700/50 flex items-center gap-6">
-                <div 
-                    className="w-16 h-16 rounded-2xl flex items-center justify-center text-white shadow-xl flex-shrink-0"
-                    style={{ backgroundColor: subject.color || '#4B5563', boxShadow: `0 8px 25px ${subject.color || '#4B5563'}40` }}
-                >
-                    <SubjectIcon subjectName={subject.name} className="h-8 w-8 filter drop-shadow-md" />
+            {/* Header Disciplina Padronizado */}
+            <div className="bg-gray-800/40 rounded-[2rem] p-8 border border-gray-700/50 flex items-center gap-8 relative overflow-hidden shadow-2xl">
+                <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
+                
+                <div className="relative">
+                    <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full opacity-50"></div>
+                    <div className="relative w-20 h-20 rounded-2xl bg-gray-900 flex items-center justify-center border border-gray-700 shadow-2xl">
+                        <SubjectIcon subjectName={subject.name} className="h-10 w-10 text-cyan-400" />
+                    </div>
                 </div>
+
                 <div>
-                    <h2 className="text-3xl font-black text-white tracking-tighter uppercase">{subject.name}</h2>
-                    <p className="text-sm text-gray-400 mt-1 max-w-2xl">{subject.description}</p>
+                    <h2 className="text-4xl font-black text-white tracking-tighter uppercase leading-none mb-3 italic">
+                        {subject.name}
+                    </h2>
+                    <p className="text-sm text-gray-400 max-w-2xl font-medium leading-relaxed opacity-80">
+                        {subject.description || 'Domine esta disciplina através de teoria sólida, prática intensiva e revisões dinâmicas.'}
+                    </p>
                 </div>
             </div>
 

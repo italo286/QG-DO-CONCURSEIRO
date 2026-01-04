@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback, DragEvent, TouchEvent } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { Subject, Topic, SubTopic } from '../../types';
-import { Card, Button, Spinner, ColorPalettePicker, ConfirmModal } from '../ui';
-import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon } from '../Icons';
+import { Card, Button, Spinner, ConfirmModal } from '../ui';
+import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon, SubjectIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { AiBulkTopicContentGeneratorModal } from './AiBulkTopicContentGeneratorModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
@@ -55,7 +55,6 @@ export const ProfessorSubjectEditor: React.FC<{
     const [currentSubject, setCurrentSubject] = useState(subject);
     const [localName, setLocalName] = useState(subject.name);
     const [localDescription, setLocalDescription] = useState(subject.description);
-    const [localColor, setLocalColor] = useState(subject.color);
 
     const [isSaving, setIsSaving] = useState(false);
     
@@ -82,7 +81,6 @@ export const ProfessorSubjectEditor: React.FC<{
         setCurrentSubject(subject);
         setLocalName(subject.name);
         setLocalDescription(subject.description);
-        setLocalColor(subject.color);
     }, [subject]);
 
     const updateSubjectStateAndDb = useCallback(async (updatedSubject: Subject) => {
@@ -95,7 +93,7 @@ export const ProfessorSubjectEditor: React.FC<{
 
     const handleDetailsBlur = () => {
         if (localName !== subject.name || localDescription !== subject.description) {
-            const updatedSubject = { ...currentSubject, name: localName, description: localDescription, color: localColor };
+            const updatedSubject = { ...currentSubject, name: localName, description: localDescription };
             updateSubjectStateAndDb(updatedSubject);
             setToastMessage("Detalhes da disciplina salvos.");
         }
@@ -412,24 +410,21 @@ export const ProfessorSubjectEditor: React.FC<{
                  {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
                  <div className="flex justify-between items-start">
                     <div className="flex items-center gap-4">
-                        <ColorPalettePicker 
-                            currentColor={localColor}
-                            onColorSelect={(color) => {
-                                setLocalColor(color);
-                                const updatedSubject = { ...currentSubject, name: localName, description: localDescription, color: color };
-                                updateSubjectStateAndDb(updatedSubject);
-                                setToastMessage("Cor da disciplina atualizada.");
-                            }}
-                        />
-                        <label htmlFor="subject-name-editor" className="sr-only">Nome da disciplina</label>
-                        <input 
-                            id="subject-name-editor"
-                            type="text" 
-                            value={localName}
-                            onChange={e => setLocalName(e.target.value)}
-                            onBlur={handleDetailsBlur}
-                            className="text-2xl font-bold text-white bg-transparent border-b-2 border-transparent focus:border-cyan-500 focus:outline-none" 
-                        />
+                        <div className="w-12 h-12 rounded-xl bg-gray-900 flex items-center justify-center border border-gray-700">
+                             <SubjectIcon subjectName={localName} className="h-6 w-6 text-cyan-400" />
+                        </div>
+                        <div className="flex-grow">
+                            <label htmlFor="subject-name-editor" className="sr-only">Nome da disciplina</label>
+                            <input 
+                                id="subject-name-editor"
+                                type="text" 
+                                value={localName}
+                                onChange={e => setLocalName(e.target.value)}
+                                onBlur={handleDetailsBlur}
+                                placeholder="Nome da Disciplina"
+                                className="text-2xl font-bold text-white bg-transparent border-b-2 border-transparent focus:border-cyan-500 focus:outline-none w-full" 
+                            />
+                        </div>
                     </div>
                     <Button onClick={() => setConfirmDeleteSubject(true)} className="text-sm py-2 px-4 bg-red-600 hover:bg-red-700" aria-label={`Apagar disciplina ${currentSubject.name}`}>
                         <TrashIcon className="h-4 w-4" />
@@ -443,7 +438,7 @@ export const ProfessorSubjectEditor: React.FC<{
                     onBlur={handleDetailsBlur}
                     rows={2} 
                     placeholder="Adicione uma descrição para a disciplina..."
-                    className="mt-2 block w-full bg-gray-700/50 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" />
+                    className="mt-4 block w-full bg-gray-700/50 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" />
             </Card>
 
             <section className="mt-8" aria-labelledby="topics-heading">
