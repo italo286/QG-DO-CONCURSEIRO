@@ -341,6 +341,7 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
         2. Identifique todos os links de VÍDEO. Cada vídeo representa uma nova aula individual.
         3. Para CADA vídeo encontrado, gere um item no array.
         4. No modo replicação, você deve REPLICAR (repetir) os PDFs base em TODOS os itens gerados.
+        5. IMPORTANTE: Para o campo 'name' de vídeos e PDFs, limpe os nomes originais removendo extensões (.mp4, .pdf) e prefixos redundantes de organização como "Vídeo 1 - ", "Video 02 -", "Aula 3:", etc. Deixe apenas o título descritivo do assunto (ex: de "Vídeo 1 - Sílaba Tônica.mp4" para "Sílaba Tônica").
         
         Retorne um array JSON de objetos ordenado crescentemente pela ordem dos vídeos.
         O formato deve ser rigorosamente: 
@@ -352,6 +353,7 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
         prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
         Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
         Agrupe os arquivos logicamente.
+        IMPORTANTE: Para o campo 'name' de vídeos e PDFs, limpe os nomes originais removendo extensões (.mp4, .pdf) e prefixos redundantes de organização como "Vídeo 1 - ", "Video 02 -", "Aula 3:", etc. Deixe apenas o título descritivo do assunto (ex: de "Vídeo 1 - Sílaba Tônica.mp4" para "Sílaba Tônica").
         Retorne um array JSON de objetos ordenado crescentemente com base na numeração detectada nos nomes originais.
         O formato deve ser rigorosamente: 
         { "originalAulaNumber": number, "fullPdf": { "name": string, "url": string } | null, "video": { "name": string, "url": string } | null }

@@ -100,11 +100,11 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
             const data = previewData[0].items;
             const subtopics = data.map((item, i) => {
                 const id = `st-bulk-${timestamp}-${i}`;
-                const aulaSequence = String(i + 1).padStart(2, '0');
+                const extractedName = item.video?.name || item.fullPdf?.name || `${block.genericSubtopicName} - Aula ${String(i + 1).padStart(2, '0')}`;
                 return {
                     id,
-                    name: `${block.genericSubtopicName} - Aula ${aulaSequence}`,
-                    description: `Conteúdo da Aula ${i + 1} sobre ${block.genericSubtopicName}`,
+                    name: extractedName,
+                    description: `Conteúdo de ${extractedName}`,
                     color: block.selectedColor,
                     fullPdfs: item.fullPdf ? [{ id: `pdf-f-${id}`, fileName: item.fullPdf.name, url: item.fullPdf.url }] : [],
                     summaryPdfs: item.summaryPdf ? [{ id: `pdf-s-${id}`, fileName: item.summaryPdf.name, url: item.summaryPdf.url }] : [],
@@ -140,11 +140,11 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                     glossary: [],
                     subtopics: blockData.map((item, subIdx) => {
                         const subId = `st-bulk-${timestamp}-${blockIdx}-${subIdx}`;
-                        const aulaSequence = String(subIdx + 1).padStart(2, '0');
+                        const extractedName = item.video?.name || item.fullPdf?.name || `${block.genericSubtopicName} - Aula ${String(subIdx + 1).padStart(2, '0')}`;
                         return {
                             id: subId,
-                            name: `${block.genericSubtopicName} - Aula ${aulaSequence}`,
-                            description: `Conteúdo da Aula ${subIdx + 1} sobre ${block.genericSubtopicName}`,
+                            name: extractedName,
+                            description: `Conteúdo de ${extractedName}`,
                             color: block.selectedColor,
                             fullPdfs: item.fullPdf ? [{ id: `pdf-f-${subId}`, fileName: item.fullPdf.name, url: item.fullPdf.url }] : [],
                             summaryPdfs: item.summaryPdf ? [{ id: `pdf-s-${subId}`, fileName: item.summaryPdf.name, url: item.summaryPdf.url }] : [],
@@ -170,7 +170,7 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                 {!previewData && (
                     <>
                         <p className="text-gray-400 text-sm">
-                            Configure os blocos de conteúdo abaixo. Cada tópico principal conterá os subtópicos gerados a partir dos links.
+                            Configure os blocos de conteúdo abaixo. A IA irá detectar e limpar automaticamente o nome das aulas a partir dos links colados.
                         </p>
 
                         <div className="space-y-8">
@@ -194,18 +194,18 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                                     type="text" 
                                                     value={block.topicName} 
                                                     onChange={e => updateBlock(block.id, 'topicName', e.target.value)} 
-                                                    placeholder="Ex: Noções de Windows 10"
+                                                    placeholder="Ex: Noções de Gramática"
                                                     className="w-full bg-gray-800 border border-gray-700 rounded-md py-2 px-3 text-white focus:ring-cyan-500" 
                                                 />
                                             </div>
                                         )}
                                         <div>
-                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Nome Genérico (Subtópicos)</label>
+                                            <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Assunto Base (Backup de Nome)</label>
                                             <input 
                                                 type="text" 
                                                 value={block.genericSubtopicName} 
                                                 onChange={e => updateBlock(block.id, 'genericSubtopicName', e.target.value)} 
-                                                placeholder="Ex: Windows 10"
+                                                placeholder="Ex: Fonética"
                                                 className="w-full bg-gray-800 border border-gray-700 rounded-md py-2 px-3 text-white focus:ring-cyan-500" 
                                             />
                                         </div>
@@ -235,12 +235,12 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                     </div>
 
                                     <div className="mt-4">
-                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Lista de Links</label>
+                                        <label className="block text-xs font-bold text-gray-400 uppercase mb-1">Lista de Links com Nomes</label>
                                         <textarea 
                                             value={block.rawLinks} 
                                             onChange={e => updateBlock(block.id, 'rawLinks', e.target.value)} 
                                             rows={5}
-                                            placeholder="Cole os links aqui..."
+                                            placeholder="Cole aqui: Vídeo 1 - Nome da Aula https://link..."
                                             className="w-full bg-gray-800 border border-gray-700 rounded-md py-2 px-3 text-white font-mono text-xs focus:ring-cyan-500" 
                                         />
                                     </div>
@@ -281,15 +281,18 @@ export const AiBulkTopicContentGeneratorModal: React.FC<AiBulkTopicContentGenera
                                             </div>
                                         )}
                                         <div className="space-y-2">
-                                            {data.map((item, idx) => (
-                                                <div key={idx} className="p-2 pl-4 bg-gray-900/50 rounded border-l-2 border-cyan-500/30 text-xs">
-                                                    <p className="font-bold text-gray-200">{block.genericSubtopicName} - Aula {String(idx + 1).padStart(2, '0')}</p>
-                                                    <div className="flex gap-4 mt-1 opacity-60">
-                                                        <span>PDF: {item.fullPdf ? '✓' : '✗'}</span>
-                                                        <span>Vídeo: {item.video ? '✓' : '✗'}</span>
+                                            {data.map((item, idx) => {
+                                                const aulaTitle = item.video?.name || item.fullPdf?.name || `${block.genericSubtopicName} - Aula ${idx + 1}`;
+                                                return (
+                                                    <div key={idx} className="p-2 pl-4 bg-gray-900/50 rounded border-l-2 border-cyan-500/30 text-xs">
+                                                        <p className="font-bold text-gray-200">{aulaTitle}</p>
+                                                        <div className="flex gap-4 mt-1 opacity-60">
+                                                            <span>PDF: {item.fullPdf ? '✓' : '✗'}</span>
+                                                            <span>Vídeo: {item.video ? '✓' : '✗'}</span>
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 );
