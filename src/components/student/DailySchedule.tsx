@@ -48,7 +48,7 @@ export const DailySchedule: React.FC<{
 
     if (!activePlan) {
         return (
-            <Card className="p-6 bg-gray-800/40 border-gray-700/50 text-center">
+            <Card className="p-6 bg-gray-800/40 border-gray-700/50 text-center rounded-[2rem]">
                 <CalendarIcon className="h-10 w-10 text-gray-600 mx-auto mb-3"/>
                 <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Cronograma</h3>
                 <p className="text-gray-500 text-xs mt-2 leading-relaxed">Nenhum planejamento ativo.<br/>Configure em "Cronograma".</p>
@@ -60,7 +60,7 @@ export const DailySchedule: React.FC<{
     const sortedTimes = Object.keys(todayItems).sort();
 
     return (
-        <Card className="p-8 bg-[#0a0f1d]/60 border-white/5 shadow-2xl relative overflow-hidden rounded-[2.5rem]">
+        <Card className="p-8 bg-[#0a0f1d]/60 border-white/5 shadow-2xl relative overflow-hidden rounded-[2.5rem] backdrop-blur-md">
             <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12 pointer-events-none">
                 <CalendarIcon className="h-24 w-24" />
             </div>
@@ -68,7 +68,7 @@ export const DailySchedule: React.FC<{
             <div className="mb-10">
                 <div className="flex items-center gap-3 mb-1">
                     <div className="w-2.5 h-7 bg-cyan-500 rounded-full shadow-[0_0_15px_cyan]"></div>
-                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic">Agenda do Dia</h3>
+                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda do Dia</h3>
                 </div>
                 <p className="text-[10px] text-cyan-400/50 font-black uppercase tracking-[0.3em] ml-6">
                     {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
@@ -81,75 +81,71 @@ export const DailySchedule: React.FC<{
                 </div>
             ) : (
                 <div className="relative ml-2">
-                    {/* LINHA DA TIMELINE */}
-                    <div className="absolute left-[13px] top-4 bottom-4 w-0.5 bg-cyan-950/50" />
+                    {/* LINHA DE FUNDO DA TIMELINE */}
+                    <div className="absolute left-[13px] top-4 bottom-4 w-0.5 bg-gray-800/50" />
 
                     <div className="space-y-10">
                         {sortedTimes.map((time, index) => {
                             const content = todayItems[time];
                             const isTopicId = content.startsWith('t') || content.startsWith('st');
                             const topicInfo = isTopicId ? getTopicInfo(content) : null;
-                            const isCompleted = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
                             
                             const itemMinutes = timeToMinutes(time);
                             const isNext = index < sortedTimes.length - 1 && currentMinutes >= timeToMinutes(sortedTimes[index+1]);
                             const isActive = currentMinutes >= itemMinutes && !isNext;
+                            const isPast = currentMinutes > itemMinutes;
 
                             return (
                                 <div key={time} className="relative pl-12 group">
-                                    {/* LINHA ATIVA */}
-                                    {index < sortedTimes.length - 1 && currentMinutes >= itemMinutes && (
-                                        <div className="absolute left-[13px] top-4 h-full w-0.5 bg-cyan-500 shadow-[0_0_10px_cyan]" />
+                                    {/* LINHA ATIVA BRILHANTE */}
+                                    {index < sortedTimes.length - 1 && isPast && (
+                                        <div className="absolute left-[13px] top-4 h-full w-0.5 bg-cyan-500 shadow-[0_0_10px_cyan] z-0" />
                                     )}
 
-                                    {/* CÍRCULO DA TIMELINE */}
-                                    <div className={`absolute left-0 top-0.5 w-7 h-7 rounded-full border-4 border-gray-900 z-10 transition-all duration-700 flex items-center justify-center 
+                                    {/* CÍRCULO DA TIMELINE ESTILIZADO */}
+                                    <div className={`absolute left-0 top-0.5 w-7 h-7 rounded-full border-4 border-[#0a0f1d] z-10 transition-all duration-700 flex items-center justify-center 
                                         ${isActive ? 'bg-cyan-500 shadow-[0_0_20px_cyan] scale-110' : 
-                                          currentMinutes > itemMinutes ? 'bg-cyan-700 border-cyan-500' : 'bg-gray-800 border-gray-700'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white animate-ping' : 'bg-transparent'}`} />
+                                          isPast ? 'bg-cyan-900 border-cyan-500/50' : 'bg-gray-800 border-gray-700'}`}>
+                                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
                                     </div>
 
-                                    <div className="space-y-3">
+                                    <div className="space-y-2">
                                         <div className="flex items-center gap-3">
-                                            <span className={`text-xs font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                            <span className={`text-xs font-black font-mono tracking-tight uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-600' : 'text-gray-500'}`}>
                                                 {time}
                                             </span>
-                                            {isActive && <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded font-black uppercase tracking-widest animate-pulse">AGORA</span>}
+                                            {isActive && <span className="text-[8px] bg-cyan-500 text-white px-2 py-0.5 rounded font-black uppercase tracking-widest animate-pulse">ATUAL</span>}
                                         </div>
                                         
-                                        <div className={`p-5 rounded-2xl border transition-all duration-500 relative overflow-hidden bg-[#111827]/40
-                                            ${isActive ? 'border-cyan-500/40 shadow-2xl bg-cyan-500/5' : 'border-white/5 hover:border-white/10'}`}>
+                                        <div className={`p-4 rounded-2xl border transition-all duration-500 relative overflow-hidden
+                                            ${isActive ? 'border-cyan-500/40 shadow-[0_0_30px_-5px_rgba(6,182,212,0.2)] bg-cyan-500/10' : 
+                                              isPast ? 'border-gray-800 bg-gray-900/40 opacity-60' : 'border-white/5 bg-gray-900/20'}`}>
                                             
-                                            {topicInfo ? (
-                                                <div className="flex justify-between items-center gap-4">
-                                                    <div className="flex gap-4 items-center min-w-0">
-                                                        <div className={`p-2 rounded-lg ${isActive ? 'bg-cyan-500 text-white shadow-[0_0_10px_cyan]' : 'bg-gray-800 text-gray-500'}`}>
-                                                            <PencilIcon className="h-4 w-4" />
-                                                        </div>
-                                                        <div className="min-w-0">
-                                                            <p className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
-                                                                "{topicInfo.name}"
-                                                            </p>
-                                                            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1">
-                                                                {topicInfo.subjectName}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                    <button 
-                                                        onClick={() => onNavigateToTopic(content)}
-                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-500 text-white shadow-xl' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
-                                                    >
-                                                        <ArrowRightIcon className="h-4 w-4" />
-                                                    </button>
-                                                </div>
-                                            ) : (
-                                                <div className="flex items-center gap-4">
-                                                    <div className="p-2 rounded-lg bg-gray-800/50 text-gray-600">
+                                            <div className="flex justify-between items-center gap-4">
+                                                <div className="flex gap-3 items-center min-w-0">
+                                                    <div className={`p-2 rounded-lg flex-shrink-0 ${isActive ? 'bg-cyan-500 text-white shadow-[0_0_10px_cyan]' : 'bg-gray-800 text-gray-500'}`}>
                                                         <PencilIcon className="h-4 w-4" />
                                                     </div>
-                                                    <p className={`text-sm font-bold italic truncate ${isActive ? 'text-cyan-200' : 'text-gray-500'}`}>"{content}"</p>
+                                                    <div className="min-w-0">
+                                                        <p className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                                                            "{topicInfo?.name || content}"
+                                                        </p>
+                                                        {topicInfo && (
+                                                            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-0.5">
+                                                                {topicInfo.subjectName}
+                                                            </p>
+                                                        )}
+                                                    </div>
                                                 </div>
-                                            )}
+                                                {topicInfo && (
+                                                    <button 
+                                                        onClick={() => onNavigateToTopic(content)}
+                                                        className={`p-2.5 rounded-xl transition-all ${isActive ? 'bg-cyan-500 text-white shadow-lg scale-105' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
+                                                    >
+                                                        <ArrowRightIcon className="h-3.5 w-3.5" />
+                                                    </button>
+                                                )}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -160,8 +156,8 @@ export const DailySchedule: React.FC<{
             )}
             
             <div className="mt-12 flex justify-center">
-                 <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
-                    Visualizar Protocolo Completo
+                 <button className="px-8 py-2.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all shadow-xl">
+                    Protocolo de Estudo Completo
                  </button>
             </div>
         </Card>
