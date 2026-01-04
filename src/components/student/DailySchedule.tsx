@@ -65,8 +65,8 @@ export const DailySchedule: React.FC<{
 
     if (!activePlan) {
         return (
-            <Card className="p-4 bg-gray-800/40 border-gray-700/50 text-center rounded-[1rem]">
-                <CalendarIcon className="h-6 w-6 text-gray-600 mx-auto mb-1"/>
+            <Card className="p-4 bg-gray-800/40 border-gray-700/50 text-center rounded-[1.5rem]">
+                <CalendarIcon className="h-8 w-8 text-gray-600 mx-auto mb-2"/>
                 <p className="text-gray-500 text-xs leading-relaxed">Nenhum planejamento ativo.</p>
             </Card>
         );
@@ -76,31 +76,31 @@ export const DailySchedule: React.FC<{
     const sortedTimes = Object.keys(todayItems).sort();
 
     return (
-        <Card className="p-4 bg-[#0a0f1d]/85 border-white/5 shadow-2xl relative overflow-hidden rounded-[1.8rem] backdrop-blur-xl">
-            <div className="absolute top-0 right-0 p-3 opacity-5 pointer-events-none">
-                <CalendarIcon className="h-16 w-16" />
+        <Card className="p-5 bg-[#0a0f1d]/90 border-white/5 shadow-2xl relative overflow-hidden rounded-[2rem] backdrop-blur-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <CalendarIcon className="h-20 w-20" />
             </div>
 
             <div className="mb-6">
-                <div className="flex items-center gap-2 mb-1">
-                    <div className="w-1.5 h-6 bg-cyan-500 rounded-full shadow-[0_0_8px_cyan]"></div>
-                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
+                <div className="flex items-center gap-3 mb-1">
+                    <div className="w-1.5 h-7 bg-cyan-500 rounded-full shadow-[0_0_12px_cyan]"></div>
+                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
                 </div>
-                <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-4 opacity-60">
+                <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-5 opacity-70">
                     {now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                 </p>
             </div>
 
             {sortedTimes.length === 0 ? (
-                <div className="py-6 text-center border border-dashed border-gray-800 rounded-[1.2rem]">
-                    <p className="text-gray-600 text-xs font-black uppercase tracking-widest italic">Folga</p>
+                <div className="py-8 text-center border-2 border-dashed border-gray-800 rounded-[1.5rem]">
+                    <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest italic">Folga Programada</p>
                 </div>
             ) : (
-                <div className="relative ml-0.5">
+                <div className="relative ml-1">
                     {/* LINHA DE FUNDO DA TIMELINE */}
-                    <div className="absolute left-[9px] top-3 bottom-3 w-[1px] bg-cyan-500/10" />
+                    <div className="absolute left-[11px] top-4 bottom-4 w-[1px] bg-cyan-500/10" />
 
-                    <div className="space-y-4">
+                    <div className="space-y-6">
                         {sortedTimes.map((time, index) => {
                             const content = todayItems[time];
                             const isTopicId = content.startsWith('t') || content.startsWith('st');
@@ -110,39 +110,40 @@ export const DailySchedule: React.FC<{
                             const nextTime = sortedTimes[index + 1];
                             const nextItemMinutes = nextTime ? timeToMinutes(nextTime) : 1440;
                             
+                            // LÓGICA CORRIGIDA: Só é active se o relógio já bateu o tempo do item E ainda não chegou no próximo
                             const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
                             const isPast = currentMinutes >= nextItemMinutes;
 
                             return (
-                                <div key={time} className="relative pl-8 group">
-                                    {/* LINHA DE CONEXÃO: SÓ BRILHA SE O ITEM JÁ PASSOU */}
+                                <div key={time} className="relative pl-10 group">
+                                    {/* LINHA DE CONEXÃO: SÓ BRILHA SE O ITEM JÁ FOI COMPLETADO (PASSO PASSADO) */}
                                     {index < sortedTimes.length - 1 && (
-                                        <div className={`absolute left-[9px] top-4 h-[calc(100%+1rem)] w-[1px] transition-all duration-700 
-                                            ${isPast ? 'bg-cyan-400 shadow-[0_0_6px_cyan]' : 'bg-cyan-500/10'}`} 
+                                        <div className={`absolute left-[11px] top-6 h-[calc(100%+1.5rem)] w-[1px] transition-all duration-700 
+                                            ${isPast ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-cyan-500/10'}`} 
                                         />
                                     )}
 
-                                    {/* CÍRCULO DA TIMELINE COMPACTO */}
-                                    <div className={`absolute left-0 top-0.5 w-5 h-5 rounded-full border-[3px] border-[#0a0f1d] z-10 transition-all duration-500 flex items-center justify-center 
-                                        ${isActive ? 'bg-cyan-400 shadow-[0_0_12px_cyan] scale-110' : 
-                                          isPast ? 'bg-cyan-800 border-cyan-400/40' : 'bg-gray-800 border-gray-700'}`}>
-                                        <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
+                                    {/* CÍRCULO DA TIMELINE */}
+                                    <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-[#0a0f1d] z-10 transition-all duration-500 flex items-center justify-center 
+                                        ${isActive ? 'bg-cyan-400 shadow-[0_0_20px_cyan] scale-110' : 
+                                          isPast ? 'bg-cyan-800 border-cyan-400/50' : 'bg-gray-800 border-gray-700'}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
                                     </div>
 
-                                    <div className="space-y-1.5">
-                                        <div className="flex items-center gap-2.5">
-                                            <span className={`text-sm font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-800' : 'text-gray-600'}`}>
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-base font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-800' : 'text-gray-600'}`}>
                                                 {time}
                                             </span>
-                                            {isActive && <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">LIVE</span>}
+                                            {isActive && <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">EM ANDAMENTO</span>}
                                         </div>
                                         
-                                        <div className={`p-3.5 rounded-xl border transition-all duration-300 relative overflow-hidden
-                                            ${isActive ? 'border-cyan-400/30 bg-cyan-400/5 shadow-xl' : 
-                                              isPast ? 'border-gray-800 bg-gray-900/30 opacity-40' : 'border-white/5 bg-gray-900/10'}`}>
+                                        <div className={`p-4 rounded-2xl border transition-all duration-500 relative overflow-hidden
+                                            ${isActive ? 'border-cyan-400/40 bg-cyan-400/5 shadow-2xl' : 
+                                              isPast ? 'border-gray-800 bg-gray-900/40 opacity-40' : 'border-white/5 bg-gray-900/10'}`}>
                                             
-                                            <div className="flex justify-between items-center gap-2">
-                                                <div className="flex gap-3 items-center min-w-0 flex-grow">
+                                            <div className="flex justify-between items-center gap-3">
+                                                <div className="flex gap-4 items-center min-w-0 flex-grow">
                                                     {editingSlot === time ? (
                                                         <div className="flex items-center gap-2 w-full">
                                                             <input 
@@ -151,30 +152,30 @@ export const DailySchedule: React.FC<{
                                                                 value={editValue} 
                                                                 onChange={(e) => setEditValue(e.target.value)}
                                                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(time)}
-                                                                className="bg-gray-800 border border-cyan-500/50 rounded px-2 py-1 text-sm text-white w-full outline-none"
+                                                                className="bg-gray-800 border border-cyan-500/50 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:ring-2 focus:ring-cyan-500/30"
                                                             />
-                                                            <button onClick={() => handleSaveEdit(time)} className="text-green-400 hover:text-green-300">
-                                                                <CheckIcon className="h-5 w-5" />
+                                                            <button onClick={() => handleSaveEdit(time)} className="p-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30">
+                                                                <CheckIcon className="h-4 w-4" />
                                                             </button>
-                                                            <button onClick={() => setEditingSlot(null)} className="text-red-400 hover:text-red-300">
-                                                                <XCircleIcon className="h-5 w-5" />
+                                                            <button onClick={() => setEditingSlot(null)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
+                                                                <XCircleIcon className="h-4 w-4" />
                                                             </button>
                                                         </div>
                                                     ) : (
                                                         <>
                                                             <button 
                                                                 onClick={() => handleStartEdit(time, topicInfo?.name || content)}
-                                                                className={`p-2 rounded-lg flex-shrink-0 transition-all ${isActive ? 'bg-cyan-400 text-black shadow-md' : 'bg-gray-800 text-gray-500 hover:text-cyan-400'}`}
-                                                                title="Editar item"
+                                                                className={`p-2.5 rounded-xl flex-shrink-0 transition-all ${isActive ? 'bg-cyan-400 text-black shadow-lg scale-105' : 'bg-gray-800 text-gray-500 hover:text-cyan-400'}`}
+                                                                title="Editar este compromisso"
                                                             >
                                                                 <PencilIcon className="h-4 w-4" />
                                                             </button>
                                                             <div className="min-w-0">
-                                                                <p className={`text-sm font-black truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                                                                <p className={`text-base font-black truncate leading-tight ${isActive ? 'text-white' : 'text-gray-400'}`}>
                                                                     "{topicInfo?.name || content}"
                                                                 </p>
                                                                 {topicInfo && (
-                                                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mt-1 truncate">
+                                                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1 truncate">
                                                                         {topicInfo.subjectName}
                                                                     </p>
                                                                 )}
@@ -185,7 +186,7 @@ export const DailySchedule: React.FC<{
                                                 {topicInfo && editingSlot !== time && (
                                                     <button 
                                                         onClick={() => onNavigateToTopic(content)}
-                                                        className={`p-2 rounded-lg transition-all ${isActive ? 'bg-cyan-400 text-black shadow-lg scale-105' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
+                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-400 text-black shadow-xl scale-110' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
                                                     >
                                                         <ArrowRightIcon className="h-4 w-4" />
                                                     </button>
