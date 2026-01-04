@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Course, StudentProgress, Subject, User, CourseDiscipline } from '../../../types';
 import { Card } from '../../ui';
-import { BookOpenIcon, TrophyIcon, ChartBarIcon, CheckBadgeIcon, SubjectIcon, ArrowRightIcon } from '../../Icons';
+import { BookOpenIcon, ChartBarIcon, SubjectIcon, ArrowRightIcon } from '../../Icons';
 import { WeeklyLeaderboard } from '../WeeklyLeaderboard';
 
 interface CourseViewProps {
@@ -28,7 +28,6 @@ export const CourseView: React.FC<CourseViewProps> = ({
 }) => {
     const courseSubjects = allSubjects.filter(s => course.disciplines.some((d: CourseDiscipline) => d.subjectId === s.id));
 
-    // Cálculo de progresso global do curso
     const courseStats = useMemo(() => {
         let totalTopics = 0;
         let completedTopics = 0;
@@ -129,51 +128,55 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {courseSubjects.map(subject => {
-                            const subjectProgress = studentProgress?.progressByTopic[subject.id] || {};
-                            const completedCount = Object.values(subjectProgress).filter((p: any) => p.completed).length;
-                            
                             return (
                                 <button 
                                     key={subject.id}
                                     onClick={() => onSubjectSelect(subject)}
                                     className="group text-left"
                                 >
-                                    <Card className="h-full border-gray-800 hover:border-cyan-500/50 bg-gray-900/60 backdrop-blur-xl transition-all duration-500 relative overflow-hidden flex flex-col rounded-[2rem] shadow-xl group-hover:translate-y-[-6px] group-hover:shadow-cyan-500/5">
-                                        {/* Ícone de Fundo Estilizado */}
-                                        <div className="absolute -top-4 -right-4 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-500 rotate-12 group-hover:rotate-6">
-                                            <SubjectIcon subjectName={subject.name} className="h-32 w-32" />
+                                    {/* Card Cor Padronizada: Deep Navy (#1e293b) para destacar do fundo #111827 */}
+                                    <Card className="h-full border border-gray-700/50 bg-[#1e293b] hover:bg-[#253249] transition-all duration-500 relative overflow-hidden flex flex-col rounded-[2rem] shadow-2xl group-hover:translate-y-[-6px] group-hover:shadow-cyan-500/10 group-hover:border-cyan-500/40">
+                                        
+                                        {/* Brilho Superior sutil */}
+                                        <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-cyan-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                                        
+                                        {/* Ícone de Fundo Marca d'água */}
+                                        <div className="absolute -top-6 -right-6 p-4 opacity-[0.02] group-hover:opacity-[0.05] transition-opacity duration-700 rotate-12 group-hover:rotate-0">
+                                            <SubjectIcon subjectName={subject.name} className="h-40 w-40 text-cyan-400" />
                                         </div>
                                         
-                                        <div className="p-7 flex-grow">
-                                            <div className="flex items-start justify-between mb-6">
+                                        <div className="p-8 flex-grow relative z-10">
+                                            <div className="flex items-start justify-between mb-8">
                                                 <div className="relative">
-                                                    <div className="absolute inset-0 bg-cyan-500 blur-xl opacity-0 group-hover:opacity-20 transition-opacity"></div>
-                                                    <div className="relative w-14 h-14 rounded-2xl bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center border border-gray-700 shadow-xl">
-                                                        <SubjectIcon subjectName={subject.name} className="h-7 w-7 text-cyan-400" />
+                                                    {/* Glow de fundo no ícone */}
+                                                    <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+                                                    <div className="relative w-16 h-16 rounded-2xl bg-gray-900 flex items-center justify-center border border-gray-700 shadow-2xl transform group-hover:scale-110 transition-transform duration-500">
+                                                        <SubjectIcon subjectName={subject.name} className="h-8 w-8 text-cyan-400" />
                                                     </div>
                                                 </div>
-                                                <div className="bg-gray-950/50 px-3 py-2 rounded-xl border border-gray-800 flex flex-col items-end">
-                                                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em]">Score Médio</span>
-                                                    <span className="text-sm font-black text-cyan-400">--</span>
+                                                <div className="bg-gray-900/80 px-4 py-2 rounded-2xl border border-gray-700 flex flex-col items-end shadow-lg">
+                                                    <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.25em]">Score Médio</span>
+                                                    <span className="text-base font-black text-cyan-400">--</span>
                                                 </div>
                                             </div>
                                             
-                                            <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors line-clamp-2 uppercase tracking-tighter leading-tight mb-3">
+                                            <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors line-clamp-2 uppercase tracking-tighter leading-tight mb-4 drop-shadow-md">
                                                 {subject.name}
                                             </h4>
-                                            <p className="text-xs text-gray-500 font-medium leading-relaxed line-clamp-2">
-                                                {subject.description || 'Domine este conteúdo com exercícios focados e materiais de elite.'}
+                                            
+                                            <p className="text-xs text-gray-400 font-medium leading-relaxed line-clamp-2 opacity-80 group-hover:opacity-100">
+                                                {subject.description || 'Aprimore sua base com mnemônicos, questões filtradas e revisões automatizadas.'}
                                             </p>
                                         </div>
 
-                                        <div className="mt-auto p-6 bg-gray-950/30 border-t border-gray-800/50 flex justify-between items-center">
-                                            <div className="flex gap-1.5 items-center">
+                                        <div className="mt-auto p-6 bg-gray-900/40 border-t border-gray-700/30 flex justify-between items-center backdrop-blur-sm">
+                                            <div className="flex gap-2 items-center">
                                                 {Array.from({length: 6}).map((_, i) => (
-                                                    <div key={i} className={`h-1 rounded-full transition-all duration-500 ${i < 2 ? 'w-4 bg-cyan-500 shadow-[0_0_8px_rgba(6,182,212,0.5)]' : 'w-2 bg-gray-800'}`}></div>
+                                                    <div key={i} className={`h-1.5 rounded-full transition-all duration-700 ${i < 2 ? 'w-6 bg-cyan-500 shadow-[0_0_12px_rgba(6,182,212,0.6)]' : 'w-2 bg-gray-700'}`}></div>
                                                 ))}
                                             </div>
-                                            <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-black uppercase tracking-[0.2em] group-hover:translate-x-1 transition-transform">
-                                                Estudar <ArrowRightIcon className="h-3 w-3" />
+                                            <div className="flex items-center gap-2 text-cyan-400 text-[10px] font-black uppercase tracking-[0.2em] group-hover:translate-x-2 transition-transform">
+                                                Acessar Disciplina <ArrowRightIcon className="h-3 w-3" />
                                             </div>
                                         </div>
                                     </Card>
