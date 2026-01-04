@@ -1,7 +1,6 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import * as admin from 'firebase-admin';
-import { GoogleGenAI, GenerateContentResponse } from "@google/genai";
 
 interface QuestionAttempt {
     questionId: string;
@@ -22,24 +21,6 @@ interface StudentProgress {
     progressByTopic: { [subjectId: string]: { [topicId: string]: { lastAttempt: QuestionAttempt[], score: number } } };
     reviewSessions: { attempts?: QuestionAttempt[] }[];
     studentId: string;
-}
-
-// Helper para retry curto no servidor (máximo 8 segundos para evitar timeout da função)
-async function retryWithBackoff<T>(fn: () => Promise<T>, retries = 2, delay = 3000): Promise<T> {
-    try {
-        return await fn();
-    } catch (error: any) {
-        const isQuotaError = error.status === 429 || 
-                           error.message?.includes('429') || 
-                           error.message?.includes('Quota exceeded') ||
-                           error.message?.includes('RESOURCE_EXHAUSTED');
-
-        if (retries > 0 && isQuotaError) {
-            await new Promise(resolve => setTimeout(resolve, delay));
-            return retryWithBackoff<T>(fn, retries - 1, delay + 2000);
-        }
-        throw error;
-    }
 }
 
 const getFirestoreTools = () => {
@@ -68,19 +49,6 @@ const shuffleArray = <T>(array: T[]): T[] => {
     return newArray;
 };
 
-const cleanJsonResponse = (text: string) => {
-    try {
-        let cleanText = text.trim();
-        if (cleanText.includes('```')) {
-            const matches = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-            if (matches && matches[1]) cleanText = matches[1];
-        }
-        return JSON.parse(cleanText);
-    } catch (e) {
-        throw new Error(`Erro de parse JSON da IA: ${e instanceof Error ? e.message : 'Unknown error'}`);
-    }
-};
-
 export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { apiKey, studentId, challengeType } = req.query;
     if (!apiKey || apiKey !== process.env.VITE_DAILY_CHALLENGE_API_KEY) {
@@ -94,22 +62,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         if (!studentDoc.exists) throw new Error('Progresso não encontrado');
         const studentProgress = studentDoc.data() as StudentProgress;
 
-        const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
-        // USANDO MODELO LITE PARA MELHOR GERENCIAMENTO DE COTA
-        const MODEL = 'gemini-flash-lite-latest';
-
-        // --- PORTUGUÊS ---
+        // --- PORTUGUÊS (IA) ---
         if (challengeType === 'portuguese') {
+            const { GoogleGenAI } = await import("@google/genai");
+            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY! });
             const targetCount = studentProgress.portugueseChallengeQuestionCount || 1;
-            const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-                model: MODEL,
-                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos federais (Nível Superior). Retorne um array JSON com: statement, options (5 itens), correctAnswer (string exata), justification, mnemonicTopic.`,
+            const response = await ai.models.generateContent({
+                model: 'gemini-3-flash-preview',
+                contents: `Gere exatamente ${targetCount} questões inéditas de múltipla escolha de Língua Portuguesa para concursos federais (Nível Superior). Retorne um array JSON com: statement, options (5 itens), correctAnswer (string exata), justification.`,
                 config: { responseMimeType: "application/json" }
-            }));
-            const items = cleanJsonResponse(response.text || '[]').map((it: any, idx: number) => ({
+            });
+            const text = response.text || '[]';
+            const items = JSON.parse(text.includes('```') ? text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)?.[1] || text : text);
+            return res.status(200).json(items.map((it: any, idx: number) => ({
                 ...it, id: `port-${Date.now()}-${idx}`, subjectName: "Português", topicName: "Geral"
-            }));
-            return res.status(200).json(items.slice(0, targetCount));
+            })));
         }
 
         // --- CARREGAMENTO DE DISCIPLINAS E CONTEÚDO ---
@@ -143,103 +110,128 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             const filterType = isAdv ? (studentProgress.advancedReviewQuestionType || 'incorrect') : 'unanswered';
             const targetCount = isAdv ? (studentProgress.advancedReviewQuestionCount || 5) : 10;
 
-            const correctIds = new Set<string>();
             const incorrectIds = new Set<string>();
             const allAnsweredIds = new Set<string>();
 
             const processAttempt = (a: QuestionAttempt) => {
                 if (!a?.questionId) return;
                 allAnsweredIds.add(a.questionId);
-                if (a.isCorrect) { correctIds.add(a.questionId); incorrectIds.delete(a.questionId); }
-                else { incorrectIds.add(a.questionId); }
+                if (!a.isCorrect) incorrectIds.add(a.questionId);
+                else incorrectIds.delete(a.questionId);
             };
 
             Object.values(studentProgress.progressByTopic || {}).forEach(s => 
                 Object.values(s || {}).forEach(t => (t.lastAttempt || []).forEach(processAttempt))
             );
-            (studentProgress.reviewSessions || []).forEach(s => (s.attempts || []).forEach(processAttempt));
 
             let pool: any[] = [];
             subjects.forEach(subject => {
                 if (selSubIds.length > 0 && !selSubIds.includes(subject.id)) return;
                 subject.topics.forEach((topic: any) => {
                     const processT = (t: any) => {
-                        const hasTopicSelection = selTopIds.length > 0;
-                        if (hasTopicSelection && !selTopIds.includes(t.id)) return;
-                        const qs = [
-                            ...(t.questions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name, mnemonicTopic: t.name })),
-                            ...(t.tecQuestions || []).map((q: any) => ({ ...q, subjectId: subject.id, topicId: t.id, subjectName: subject.name, topicName: t.name, mnemonicTopic: t.name }))
-                        ];
-                        pool.push(...qs);
+                        if (selTopIds.length > 0 && !selTopIds.includes(t.id)) return;
+                        pool.push(...(t.questions || []).map((q: any) => ({ ...q, subjectName: subject.name, topicName: t.name })));
+                        pool.push(...(t.tecQuestions || []).map((q: any) => ({ ...q, subjectName: subject.name, topicName: t.name })));
                     };
                     processT(topic);
                     (topic.subtopics || []).forEach(processT);
                 });
             });
 
-            let filtered = [];
-            if (filterType === 'incorrect') filtered = pool.filter(q => incorrectIds.has(q.id));
-            else if (filterType === 'correct') filtered = pool.filter(q => correctIds.has(q.id));
-            else if (filterType === 'unanswered') filtered = pool.filter(q => !allAnsweredIds.has(q.id));
-            else filtered = pool;
-
-            const final = shuffleArray(filtered).slice(0, targetCount);
-            return res.status(200).json(final);
+            let filtered = filterType === 'incorrect' ? pool.filter(q => incorrectIds.has(q.id)) : pool.filter(q => !allAnsweredIds.has(q.id));
+            if (filtered.length === 0) filtered = pool;
+            return res.status(200).json(shuffleArray(filtered).slice(0, targetCount));
         }
 
-        // --- GLOSSÁRIO ---
+        // --- GLOSSÁRIO (LÓGICA DETERMINÍSTICA POR DISCIPLINA) ---
         if (challengeType === 'glossary') {
             const isAdv = studentProgress.glossaryChallengeMode === 'advanced';
             const selSubIds = isAdv ? (studentProgress.advancedGlossarySubjectIds || []) : [];
             const selTopIds = isAdv ? (studentProgress.advancedGlossaryTopicIds || []) : [];
             const targetCount = isAdv ? (studentProgress.glossaryChallengeQuestionCount || 5) : 5;
 
-            const glossaryPool: any[] = [];
+            // 1. Coleta todos os termos agrupados por disciplina
+            const termsBySubject: Record<string, any[]> = {};
+            const allTerms: any[] = [];
+
             subjects.forEach(s => {
                 if (selSubIds.length > 0 && !selSubIds.includes(s.id)) return;
+                if (!termsBySubject[s.id]) termsBySubject[s.id] = [];
+                
                 s.topics.forEach((t: any) => {
-                    const processGloss = (item: any) => {
+                    const collect = (item: any) => {
                         if (selTopIds.length > 0 && !selTopIds.includes(item.id)) return;
-                        (item.glossary || []).forEach((g: any) => glossaryPool.push({ ...g, subjectName: s.name, topicName: item.name }));
+                        (item.glossary || []).forEach((g: any) => {
+                            const termObj = { ...g, subjectId: s.id, subjectName: s.name, topicName: item.name };
+                            termsBySubject[s.id].push(termObj);
+                            allTerms.push(termObj);
+                        });
                     };
-                    processGloss(t);
-                    (t.subtopics || []).forEach((st: any) => processGloss(st));
+                    collect(t);
+                    (t.subtopics || []).forEach(collect);
                 });
             });
 
-            const unique = Array.from(new Map(glossaryPool.map(t => [t.term, t])).values());
-            const selectedTerms = shuffleArray(unique).slice(0, targetCount);
-            
-            if (selectedTerms.length === 0) return res.status(200).json([]);
+            if (allTerms.length === 0) return res.status(200).json([]);
 
-            const termsPrompt = selectedTerms.map(g => `Termo: "${g.term}", Definição: "${g.definition}"`).join('; ');
-            const gen = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-                model: MODEL,
-                contents: `Gere uma questão de múltipla escolha técnica para CADA um destes termos: ${termsPrompt}. Retorne um array JSON. Campos: statement, options (5 itens), correctAnswer, justification, mnemonicTopic.`,
-                config: { responseMimeType: "application/json" }
-            }));
-            
-            const questions = cleanJsonResponse(gen.text || '[]');
-            const finalItems = questions.map((q: any, idx: number) => {
-                const originalTerm = selectedTerms[idx] || selectedTerms[0];
-                return { 
-                    ...q, 
-                    id: `gloss-${Date.now()}-${idx}`, 
-                    subjectName: originalTerm.subjectName, 
-                    topicName: originalTerm.topicName 
+            // 2. Seleciona os termos alvo
+            const shuffledPool = shuffleArray(allTerms);
+            const targetTerms = shuffledPool.slice(0, targetCount);
+
+            // 3. Constrói as questões usando distratores da mesma disciplina
+            const questions = targetTerms.map((target, idx) => {
+                const sameSubjectTerms = termsBySubject[target.subjectId] || [];
+                const otherTermsInSubject = sameSubjectTerms.filter(t => t.term !== target.term);
+                
+                // Escolhe formato aleatório (Tipo A ou Tipo B)
+                const isTypeA = Math.random() > 0.5;
+                let statement = "";
+                let correctAnswer = "";
+                let distractors = [];
+
+                if (isTypeA) {
+                    // Termo -> Definição
+                    statement = `Qual das alternativas abaixo apresenta a definição correta para o termo técnico: **${target.term}**?`;
+                    correctAnswer = target.definition;
+                    // Busca outras DEFINIÇÕES da mesma matéria como distratores
+                    distractors = shuffleArray(otherTermsInSubject).slice(0, 4).map(t => t.definition);
+                } else {
+                    // Definição -> Termo
+                    statement = `"${target.definition}".\n\nO conceito descrito acima refere-se a qual termo técnico da disciplina de ${target.subjectName}?`;
+                    correctAnswer = target.term;
+                    // Busca outros NOMES de termos da mesma matéria como distratores
+                    distractors = shuffleArray(otherTermsInSubject).slice(0, 4).map(t => t.term);
+                }
+
+                // Fallback: se a disciplina tiver menos de 5 termos, busca em outras disciplinas do pool
+                if (distractors.length < 4) {
+                    const needed = 4 - distractors.length;
+                    const othersFromPool = allTerms.filter(t => t.subjectId !== target.subjectId).map(t => isTypeA ? t.definition : t.term);
+                    distractors.push(...shuffleArray(othersFromPool).slice(0, needed));
+                }
+                
+                // Fallback final: se ainda não tiver 4, usa opções genéricas (raro ocorrer se houver conteúdo)
+                while(distractors.length < 4) distractors.push(isTypeA ? "Definição não correlacionada ao tópico." : "Termo técnico genérico.");
+
+                return {
+                    id: `gloss-${Date.now()}-${idx}`,
+                    statement,
+                    options: shuffleArray([correctAnswer, ...distractors]),
+                    correctAnswer,
+                    justification: isTypeA 
+                        ? `A definição exata de **${target.term}** é: ${target.definition}.`
+                        : `O termo técnico correspondente à definição apresentada é **${target.term}**.`,
+                    subjectName: target.subjectName,
+                    topicName: target.topicName
                 };
             });
 
-            return res.status(200).json(finalItems);
+            return res.status(200).json(questions);
         }
 
         return res.status(400).json({ error: 'Tipo inválido' });
     } catch (e: any) {
-        console.error("Server Error Detail:", e);
-        // Se for erro de cota, retornar 429 explícito
-        if (e.status === 429 || e.message?.includes('429')) {
-            return res.status(429).json({ error: 'IA Temporariamente Congestionada. Tente novamente em 1 minuto.' });
-        }
-        return res.status(500).json({ error: e.message || 'Erro interno no QG' });
+        console.error("Server Error:", e);
+        return res.status(500).json({ error: e.message });
     }
 }
