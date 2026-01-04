@@ -1,7 +1,8 @@
+
 import React, { useState, useEffect } from 'react';
 import { Course, Subject, User } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
-import { Card, Button, Spinner } from '../ui';
+import { Card, Button, Spinner, ConfirmModal } from '../ui';
 import { TrashIcon, UserGroupIcon, BookOpenIcon, PencilIcon, GeminiIcon } from '../Icons';
 import { ManageSubjectsModal } from './ManageSubjectsModal';
 import { ManageStudentsModal } from './ManageStudentsModal';
@@ -27,6 +28,7 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
     const [isManageStudentsModalOpen, setIsManageStudentsModalOpen] = useState(false);
     const [isEditalModalOpen, setIsEditalModalOpen] = useState(false);
     const [isAiFrequencyModalOpen, setIsAiFrequencyModalOpen] = useState(false);
+    const [confirmDeleteCourse, setConfirmDeleteCourse] = useState(false);
 
     useEffect(() => {
         setEditedCourse(course);
@@ -62,18 +64,16 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
         }
     };
 
-    const handleDeleteCourse = async () => {
-        if (window.confirm(`Tem certeza que deseja apagar o curso "${course.name}"? Esta ação não pode ser desfeita.`)) {
-            setIsSaving(true);
-            try {
-                await FirebaseService.deleteCourse(course.id);
-                setToastMessage('Curso apagado com sucesso!');
-                onBack();
-            } catch (error) {
-                console.error("Failed to delete course:", error);
-                setToastMessage('Erro ao apagar o curso.');
-                setIsSaving(false);
-            }
+    const executeDeleteCourse = async () => {
+        setIsSaving(true);
+        try {
+            await FirebaseService.deleteCourse(course.id);
+            setToastMessage('Curso apagado com sucesso!');
+            onBack();
+        } catch (error) {
+            console.error("Failed to delete course:", error);
+            setToastMessage('Erro ao apagar o curso.');
+            setIsSaving(false);
         }
     };
     
@@ -103,6 +103,16 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
 
     return (
         <>
+            <ConfirmModal 
+                isOpen={confirmDeleteCourse}
+                onClose={() => setConfirmDeleteCourse(false)}
+                onConfirm={executeDeleteCourse}
+                title="Apagar Curso"
+                message={`Tem certeza que deseja apagar o curso "${course.name}"? Esta ação não pode ser desfeita.`}
+                variant="danger"
+                confirmLabel="Apagar Curso"
+            />
+
             <div className="max-w-4xl mx-auto">
                 <Card className="p-6 relative">
                     {isSaving && <div className="absolute inset-0 bg-gray-900/50 flex justify-center items-center z-10 rounded-xl"><Spinner /></div>}
@@ -137,7 +147,7 @@ export const ProfessorCourseEditor: React.FC<ProfessorCourseEditorProps> = ({ co
                                 />
                             </div>
                         </div>
-                        <Button onClick={handleDeleteCourse} className="text-sm py-2 px-4 bg-red-600 hover:bg-red-700">
+                        <Button onClick={() => setConfirmDeleteCourse(true)} className="text-sm py-2 px-4 bg-red-600 hover:bg-red-700">
                             <TrashIcon className="h-4 w-4" />
                         </Button>
                     </div>

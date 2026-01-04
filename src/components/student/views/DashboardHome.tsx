@@ -51,6 +51,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 }) => {
     const broadcasts = useMemo(() => messages.filter(m => m.studentId === null), [messages]);
 
+    const hasUnreadBroadcasts = useMemo(() => 
+        broadcasts.some(msg => !msg.acknowledgedBy.includes(currentUser.id)),
+        [broadcasts, currentUser.id]
+    );
+
     const lastAccessedInfo = useMemo(() => {
         if (!studentProgress?.lastAccessedTopicId) return null;
         
@@ -92,9 +97,14 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <h3 className="text-xl font-black text-white flex items-center uppercase tracking-tighter italic">
                     <div className="relative mr-3">
                         <BellIcon className="h-6 w-6 text-orange-400" aria-hidden="true"/> 
-                        <div className="absolute -top-1 -right-1 w-2 h-2 bg-red-500 rounded-full animate-ping"></div>
+                        {hasUnreadBroadcasts && (
+                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
+                        )}
+                        {hasUnreadBroadcasts && (
+                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-600 rounded-full shadow-[0_0_8px_rgba(220,38,38,0.8)] border border-white/20"></div>
+                        )}
                     </div>
-                    Mural de Inteligência
+                    Mural de Avisos
                 </h3>
                 <span className="text-[10px] font-black text-gray-500 bg-gray-900/50 px-2 py-1 rounded-md border border-gray-800">
                     {broadcasts.length} ALERTAS
@@ -232,36 +242,43 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Academia de Cursos</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        {enrolledCourses.map(course => (
-                            <Card key={course.id} onClick={() => onCourseSelect(course)} className="group hover:border-cyan-500/50 transition-all duration-500 flex flex-col !p-0 overflow-hidden bg-gray-900/60 shadow-2xl rounded-[1.5rem] hover:translate-y-[-4px]">
-                                {course.imageUrl ? (
-                                    <div className="relative h-40 overflow-hidden">
-                                        <img src={course.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
-                                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-60"></div>
-                                    </div>
-                                ) : (
-                                    <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
-                                        <BookOpenIcon className="h-10 w-10 text-gray-700"/>
-                                    </div>
-                                )}
-                                <div className="p-6 flex-grow flex flex-col">
-                                    <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors flex-grow leading-tight uppercase tracking-tight">{course.name}</h4>
-                                    <div className="mt-6 flex items-center justify-between border-t border-gray-800 pt-4">
-                                        <div className="flex items-center gap-2">
-                                            <div className="w-6 h-6 rounded-full bg-gray-700 flex items-center justify-center">
-                                                <UserCircleIcon className="h-3.5 w-3.5 text-gray-400" />
+                        {enrolledCourses.map(course => {
+                            const teacher = teacherProfiles.find(p => p.id === course.teacherId);
+                            return (
+                                <Card key={course.id} onClick={() => onCourseSelect(course)} className="group hover:border-cyan-500/50 transition-all duration-500 flex flex-col !p-0 overflow-hidden bg-gray-900/60 shadow-2xl rounded-[1.5rem] hover:translate-y-[-4px]">
+                                    {course.imageUrl ? (
+                                        <div className="relative h-40 overflow-hidden">
+                                            <img src={course.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
+                                            <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-60"></div>
+                                        </div>
+                                    ) : (
+                                        <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
+                                            <BookOpenIcon className="h-10 w-10 text-gray-700"/>
+                                        </div>
+                                    )}
+                                    <div className="p-6 flex-grow flex flex-col">
+                                        <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors flex-grow leading-tight uppercase tracking-tight">{course.name}</h4>
+                                        <div className="mt-6 flex items-center justify-between border-t border-gray-800 pt-4">
+                                            <div className="flex items-center gap-2">
+                                                {teacher?.avatarUrl ? (
+                                                    <img src={teacher.avatarUrl} alt={teacher.name} className="h-7 w-7 rounded-full object-cover ring-2 ring-gray-700 shadow-md" />
+                                                ) : (
+                                                    <div className="w-7 h-7 rounded-full bg-gray-700 flex items-center justify-center border border-gray-600">
+                                                        <UserCircleIcon className="h-4 w-4 text-gray-400" />
+                                                    </div>
+                                                )}
+                                                <span className="text-[10px] font-black uppercase text-gray-300 tracking-widest group-hover:text-cyan-400 transition-colors">
+                                                    {teacher?.name?.split(' ')[0] || 'Professor'}
+                                                </span>
                                             </div>
-                                            <span className="text-[10px] font-black uppercase text-gray-500 tracking-widest">
-                                                {teacherProfiles.find(p => p.id === course.teacherId)?.name?.split(' ')[0] || 'Professor'}
-                                            </span>
-                                        </div>
-                                        <div className="text-cyan-400 text-[10px] font-black uppercase tracking-widest flex items-center group-hover:gap-2 transition-all">
-                                            TREINAR <ArrowRightIcon className="h-3 w-3" />
+                                            <div className="text-cyan-400 text-[10px] font-black uppercase tracking-widest flex items-center group-hover:gap-2 transition-all">
+                                                TREINAR <ArrowRightIcon className="h-3 w-3" />
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            </Card>
-                        ))}
+                                </Card>
+                            )
+                        })}
                         {enrolledCourses.length === 0 && <p className="text-gray-500 md:col-span-2 text-center py-16 border-2 border-dashed border-gray-800 rounded-3xl">Inicie sua jornada matriculando-se em um curso.</p>}
                     </div>
                 </Card>

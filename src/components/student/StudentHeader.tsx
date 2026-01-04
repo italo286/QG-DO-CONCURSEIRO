@@ -35,6 +35,23 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const [currentTime, setCurrentTime] = useState(new Date());
     const [studySeconds, setStudySeconds] = useState(0);
 
+    // Fechar menu ao clicar fora
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (navRef.current && !navRef.current.contains(event.target as Node)) {
+                setIsNavOpen(false);
+            }
+        };
+        
+        if (isNavOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+        }
+        
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isNavOpen]);
+
     useEffect(() => {
         const todayStr = getLocalDateISOString(getBrasiliaDate());
         const savedDate = localStorage.getItem('study_timer_date');
@@ -99,7 +116,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* RELÓGIO ESTILIZADO CONFORME REFERÊNCIA */}
+                {/* RELÓGIO ESTILIZADO */}
                 <div className="hidden lg:flex items-center gap-0 px-1 bg-[#0f172a]/80 rounded-2xl border border-gray-800 shadow-2xl backdrop-blur-xl h-14 overflow-hidden">
                     <div className="flex flex-col items-center px-5 border-r border-gray-800">
                         <span className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] mb-0.5">Hora Atual</span>

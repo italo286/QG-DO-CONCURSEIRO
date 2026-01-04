@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import * as FirebaseService from '../services/firebaseService';
 import { User, Subject, Course } from '../types';
-import { Spinner, Button, Card, Modal, Toast } from './ui';
+import { Spinner, Button, Card, Modal, Toast, ConfirmModal } from './ui';
 import { BookOpenIcon, PlusIcon, ArrowRightIcon, LogoutIcon, UserCircleIcon, PencilIcon, ChevronDownIcon, ChartBarIcon } from './Icons';
 
 import { ProfessorAnnouncements } from './professor/ProfessorAnnouncements';
