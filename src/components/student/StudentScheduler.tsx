@@ -1,7 +1,7 @@
+
 import React, { useState, useMemo, useEffect } from 'react';
 import { StudyPlan, StudyPlanItem, Subject, SubTopic } from '../../types';
 import { Card, Button, Modal, Spinner, Toast, ConfirmModal } from '../ui';
-// Added SubjectIcon to the imports
 import { PlusIcon, TrashIcon, CheckCircleIcon, PencilIcon, SaveIcon, ArrowRightIcon, GeminiIcon, BellIcon, CycleIcon, DownloadIcon, SubjectIcon } from '../Icons';
 import { WeeklyStudyGrid } from './WeeklyStudyGrid';
 import jsPDF from 'jspdf';
@@ -144,8 +144,15 @@ export const StudentScheduler: React.FC<{
             headStyles: { fillColor: [14, 165, 233] }
         });
 
-        doc.save(`${editingPlan.name}.pdf`);
-        setToastMessage("PDF gerado com sucesso!");
+        const pdfBase64 = doc.output('datauristring').split(',')[1];
+        const fileName = `${editingPlan.name}.pdf`;
+
+        if (window.Android && typeof window.Android.downloadPdf === 'function') {
+            window.Android.downloadPdf(pdfBase64, fileName);
+        } else {
+            doc.save(fileName);
+            setToastMessage("PDF gerado com sucesso!");
+        }
     };
 
     const updatePlanSettings = (field: string, value: any) => {
