@@ -2,35 +2,58 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, GlossaryTerm } from '../types';
 
+// Modelos padronizados conforme diretrizes
+const MODEL_TEXT = 'gemini-3-flash-preview';
+const MODEL_UTILITY = 'gemini-flash-lite-latest'; // Lite é mais resiliente para tarefas simples em massa
+
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
     apiCall: () => Promise<T>,
-    maxRetries: number = 3,
-    initialDelay: number = 1000
+    maxRetries: number = 4,
+    initialDelay: number = 2000
 ): Promise<T> {
     let delay = initialDelay;
     for (let i = 0; i < maxRetries; i++) {
         try {
             return await apiCall();
         } catch (error: any) {
-            const errorMessage = error.toString().toLowerCase();
+            // Detecção robusta de erros de cota ou rede
+            const errorStr = JSON.stringify(error).toLowerCase();
+            const errorMsg = (error.message || '').toLowerCase();
+            
+            const isQuotaError = 
+                error.status === 429 || 
+                errorStr.includes('429') || 
+                errorStr.includes('quota') ||
+                errorStr.includes('exhausted') ||
+                errorMsg.includes('429') ||
+                errorMsg.includes('quota') ||
+                errorMsg.includes('exhausted');
+
             const isTransientError = 
-                errorMessage.includes('503') || 
-                errorMessage.includes('500') ||
-                errorMessage.includes('429') ||
-                errorMessage.includes('unavailable') ||
-                errorMessage.includes('overloaded');
+                isQuotaError ||
+                errorStr.includes('503') || 
+                errorStr.includes('500') ||
+                errorStr.includes('unavailable') ||
+                errorStr.includes('overloaded');
 
             if (isTransientError && i < maxRetries - 1) {
-                console.warn(`API call failed with transient error, retrying in ${delay}ms... (Attempt ${i + 1})`, error);
-                await new Promise(resolve => setTimeout(resolve, delay));
+                // Se for erro de cota (429), esperamos um pouco mais
+                const backoffDelay = isQuotaError ? delay * 2.5 : delay;
+                console.warn(`Gemini API: Erro temporário ou de cota. Tentativa ${i + 1}/${maxRetries}. Aguardando ${backoffDelay}ms...`);
+                
+                await new Promise(resolve => setTimeout(resolve, backoffDelay));
                 delay *= 2; // Exponential backoff
             } else {
-                throw error; // Re-throw if it's not a transient error or retries are exhausted
+                // Erro fatal ou limite de tentativas excedido
+                if (isQuotaError) {
+                    throw new Error("O limite de uso da IA foi atingido temporariamente. Por favor, aguarde 60 segundos e tente novamente.");
+                }
+                throw error;
             }
         }
     }
-    throw new Error('Max retries reached for API call.');
+    throw new Error('Não foi possível obter resposta da IA após várias tentativas.');
 }
 
 const questionSchema = {
@@ -61,15 +84,21 @@ const questionSchema = {
 
 const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'object'): T => {
     try {
-        let cleanJsonString = jsonString;
-        const codeBlockRegex = /```(json)?\s*([\s\S]*?)\s*```/;
-        const match = codeBlockRegex.exec(jsonString);
-        if (match && match[2]) cleanJsonString = match[2];
+        let cleanJsonString = jsonString.trim();
+        
+        // Remove markdown code blocks if present
+        if (cleanJsonString.includes('```')) {
+            const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+            const match = codeBlockRegex.exec(cleanJsonString);
+            if (match && match[1]) cleanJsonString = match[1].trim();
+        }
+        
         const parsed = JSON.parse(cleanJsonString);
-        if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error("IA response is not an array.");
+        if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error("A IA não retornou uma lista conforme esperado.");
         return parsed;
     } catch(e) {
-        throw new Error("A resposta da IA não está em um formato JSON válido.");
+        console.error("Erro ao processar JSON da IA. Conteúdo bruto:", jsonString);
+        throw new Error("A resposta da IA não está em um formato válido. Tente reduzir o volume de dados enviado.");
     }
 }
 
@@ -78,7 +107,7 @@ export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount:
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no PDF. Siga o schema.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: prompt }, pdfPart] },
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -89,7 +118,7 @@ export const generateQuestionsFromText = async (text: string, questionCount: num
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no texto: ${text}. Siga o schema.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -99,7 +128,7 @@ export const generateQuestionsFromText = async (text: string, questionCount: num
 export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Gere questões customizadas. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}.`,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -110,7 +139,7 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: "Extraia questões deste PDF do TEC Concursos." }, pdfPart] },
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -120,7 +149,7 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Extraia questões deste texto do TEC: ${text}`,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -130,7 +159,7 @@ export const extractQuestionsFromTecText = async (text: string, _generateJustifi
 export const generateSmartReview = async (progress: StudentProgress, _allSubjects: Subject[]): Promise<Question[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Crie uma revisão baseada no progresso: ${JSON.stringify(progress)}`,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -140,7 +169,7 @@ export const generateSmartReview = async (progress: StudentProgress, _allSubject
 export const generateTopicsFromText = async (text: string): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_UTILITY,
         contents: `Extraia tópicos e subtópicos deste texto: ${text}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -151,7 +180,7 @@ export const generateFlashcardsFromPdf = async (pdfBase64: string): Promise<Omit
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: "Gere flashcards deste PDF." }, pdfPart] },
         config: { responseMimeType: "application/json" }
     }));
@@ -161,7 +190,7 @@ export const generateFlashcardsFromPdf = async (pdfBase64: string): Promise<Omit
 export const analyzeStudentDifficulties = async (_questions: any[], attempts: QuestionAttempt[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Analise as dificuldades baseadas nas tentativas: ${JSON.stringify(attempts)}`,
     }));
     return response.text ?? '';
@@ -170,7 +199,7 @@ export const analyzeStudentDifficulties = async (_questions: any[], attempts: Qu
 export const getAiExplanationForText = async (text: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Explique: ${text}`,
     }));
     return response.text ?? '';
@@ -179,7 +208,7 @@ export const getAiExplanationForText = async (text: string): Promise<string> => 
 export const getAiSummaryForText = async (text: string): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Resuma: ${text}`,
     }));
     return response.text ?? '';
@@ -188,7 +217,7 @@ export const getAiSummaryForText = async (text: string): Promise<string> => {
 export const getAiQuestionForText = async (text: string): Promise<Omit<Question, 'id'>> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Crie uma questão sobre: ${text}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -198,7 +227,7 @@ export const getAiQuestionForText = async (text: string): Promise<Omit<Question,
 export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     return ai.chats.create({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         config: { systemInstruction: `Tutor de ${subject.name}. Foco no tópico ${topic.name}.` }
     });
 };
@@ -206,7 +235,7 @@ export const startTopicChat = (topic: Topic | SubTopic, subject: Subject): Chat 
 export const generateFlashcardsFromIncorrectAnswers = async (_incorrectQuestions: Question[]): Promise<Omit<Flashcard, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Gere flashcards das questões erradas.`,
         config: { responseMimeType: "application/json" }
     }));
@@ -216,7 +245,7 @@ export const generateFlashcardsFromIncorrectAnswers = async (_incorrectQuestions
 export const generateQuizFeedback = async (_questions: Question[], attempts: QuestionAttempt[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Feedback do quiz: ${JSON.stringify(attempts)}`,
     }));
     return response.text ?? '';
@@ -226,7 +255,7 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: "Analise este edital." }, pdfPart] },
         config: { responseMimeType: "application/json" }
     }));
@@ -236,7 +265,7 @@ export const analyzeEditalFromPdf = async (pdfBase64: string): Promise<EditalInf
 export const generateReviewSummaryForIncorrectQuestions = async (_incorrectQuestions: Question[]): Promise<string> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Resumo de revisão para erros.`,
     }));
     return response.text ?? '';
@@ -245,7 +274,7 @@ export const generateReviewSummaryForIncorrectQuestions = async (_incorrectQuest
 export const generateJustificationsForQuestion = async (question: any): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Justifique as alternativas da questão: ${JSON.stringify(question)}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -256,7 +285,7 @@ export const generateGameFromPdf = async (pdfBase64: string, gameType: MiniGameT
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: `Gere dados para o jogo ${gameType} baseado no PDF.` }, pdfPart] },
         config: { responseMimeType: "application/json" }
     }));
@@ -266,7 +295,7 @@ export const generateGameFromPdf = async (pdfBase64: string, gameType: MiniGameT
 export const generateGameFromText = async (text: string, gameType: MiniGameType): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Gere jogo ${gameType} do texto: ${text}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -276,7 +305,7 @@ export const generateGameFromText = async (text: string, gameType: MiniGameType)
 export const generateAllGamesFromText = async (text: string): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_UTILITY,
         contents: `Gere todos os jogos possíveis do texto: ${text}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -286,7 +315,7 @@ export const generateAllGamesFromText = async (text: string): Promise<any[]> => 
 export const generateAdaptiveStudyPlan = async (_subjects: Subject[], _progress: StudentProgress, days: number = 7): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Crie plano adaptativo de ${days} dias baseado no progresso.`,
         config: { responseMimeType: "application/json" }
     }));
@@ -297,7 +326,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: { parts: [{ text: "Gere um glossário deste PDF." }, pdfPart] },
         config: { responseMimeType: "application/json" }
     }));
@@ -307,7 +336,7 @@ export const generateGlossaryFromPdf = async (pdfBase64: string): Promise<Glossa
 export const generatePortugueseChallenge = async (questionCount: number, _errorStats?: any): Promise<any[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_TEXT,
         contents: `Gere ${questionCount} desafios de português.`,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
@@ -317,7 +346,7 @@ export const generatePortugueseChallenge = async (questionCount: number, _errorS
 export const analyzeTopicFrequencies = async (analysisText: string, topics: any[]): Promise<any> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_UTILITY,
         contents: `Analise a frequência de cobrança destes tópicos: ${JSON.stringify(topics)} baseado no texto: ${analysisText}`,
         config: { responseMimeType: "application/json" }
     }));
@@ -363,7 +392,7 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
     }
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_UTILITY,
         contents: prompt,
         config: { responseMimeType: "application/json" }
     }));
@@ -391,7 +420,7 @@ export const cleanSubtopicNames = async (rawList: string): Promise<string[]> => 
     Exemplo de saída esperada: ["Preposições", "Conjunções Coordenativas", "Crase"]`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: MODEL_UTILITY,
         contents: prompt,
         config: { responseMimeType: "application/json" }
     }));

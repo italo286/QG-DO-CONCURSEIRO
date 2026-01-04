@@ -53,7 +53,13 @@ export const AiBulkRenameModal: React.FC<AiBulkRenameModalProps> = ({ isOpen, on
 
             setPreview(previewData);
         } catch (e: any) {
-            setError(e.message || 'Erro ao processar nomes com IA.');
+            // Tratamento de erro de cota amigável
+            const msg = e.message || '';
+            if (msg.includes('limite') || msg.includes('429')) {
+                setError('O sistema de IA está congestionado no momento. Por favor, tente novamente em 60 segundos ou diminua a lista de nomes.');
+            } else {
+                setError(msg || 'Erro ao processar nomes com IA.');
+            }
         } finally {
             setIsLoading(false);
         }
