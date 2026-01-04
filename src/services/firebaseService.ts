@@ -547,7 +547,7 @@ export const listenToMessagesForTeachers = (teacherIds: string[], callback: (mes
             const timeB = b.lastReplyTimestamp || b.timestamp;
             return timeB - timeA;
         });
-        callback(sortedMessages);
+        callback(filteredMessages); // Use filteredMessages for the callback
     });
 };
 
@@ -608,6 +608,13 @@ export const deleteMessageForUser = async (messageId: string, userId: string): P
 
     const message = doc.data() as TeacherMessage;
     const { studentId, teacherId, deletedBy = [] } = message;
+
+    // For broadcasts, teachers can hard delete
+    if (studentId === null && userId === teacherId) {
+        await messageRef.delete();
+        return;
+    }
+
     const otherPartyId = studentId ? (userId === teacherId ? studentId : teacherId) : null;
 
     if (otherPartyId && deletedBy.includes(otherPartyId)) {
@@ -617,6 +624,18 @@ export const deleteMessageForUser = async (messageId: string, userId: string): P
             deletedBy: firebase.firestore.FieldValue.arrayUnion(userId)
         });
     }
+};
+
+export const deleteAllBroadcastsForTeacher = async (teacherId: string): Promise<void> => {
+    const messagesRef = db.collection('messages');
+    const q = messagesRef.where('teacherId', '==', teacherId).where('studentId', '==', null);
+    const snapshot = await q.get();
+    
+    const batch = db.batch();
+    snapshot.docs.forEach(doc => {
+        batch.delete(doc.ref);
+    });
+    await batch.commit();
 };
 
 // --- Study Plan ---

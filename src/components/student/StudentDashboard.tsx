@@ -4,7 +4,7 @@ import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession,
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
-import { Spinner } from '../ui';
+import { Spinner, ConfirmModal } from '../ui';
 import { StudentHeader } from './StudentHeader';
 import { StudentViewRouter } from './StudentViewRouter';
 import { EditProfileModal } from './EditProfileModal';
@@ -62,6 +62,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [isCustomQuizCreatorOpen, setIsCustomQuizCreatorOpen] = useState(false);
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
     const [challengeGenerationStatus, setChallengeGenerationStatus] = useState<string>('');
+    const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
 
     const {
         isLoading,
@@ -148,13 +149,14 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         });
     }, [isPreview, handleUpdateStudentProgress, setStudentProgress]);
 
-    const handleDeleteMessage = async (messageId: string) => {
-        if (window.confirm("Tem certeza que deseja descartar este aviso? Ele não aparecerá mais para você.")) {
+    const executeDeleteMessage = async () => {
+        if (confirmDeleteMessageId) {
             try {
-                await FirebaseService.deleteMessageForUser(messageId, user.id);
+                await FirebaseService.deleteMessageForUser(confirmDeleteMessageId, user.id);
             } catch (error) {
                 console.error("Erro ao descartar mensagem:", error);
             }
+            setConfirmDeleteMessageId(null);
         }
     };
 
@@ -522,7 +524,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onToggleSplitView={() => setIsSplitView(!isSplitView)}
                     onSetIsSidebarCollapsed={setIsSidebarCollapsed}
                     onOpenChatModal={() => setIsChatModalOpen(true)}
-                    onDeleteMessage={handleDeleteMessage}
+                    onDeleteMessage={(id) => setConfirmDeleteMessageId(id)}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
@@ -584,6 +586,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                 />
             </main>
+
+            <ConfirmModal 
+                isOpen={!!confirmDeleteMessageId}
+                onClose={() => setConfirmDeleteMessageId(null)}
+                onConfirm={executeDeleteMessage}
+                title="Descartar Aviso"
+                message="Tem certeza que deseja descartar este aviso? Ele não aparecerá mais para você."
+                variant="danger"
+                confirmLabel="Descartar"
+            />
 
             <XpToastDisplay toasts={xpToasts} />
             <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />

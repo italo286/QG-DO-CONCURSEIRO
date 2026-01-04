@@ -1,8 +1,9 @@
+
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as FirebaseService from '../../services/firebaseService';
 import { User, TeacherMessage, MessageReply } from '../../types';
-import { Card, Button, Spinner } from '../ui';
-import { BellIcon, ArrowRightIcon, UserCircleIcon, ExclamationTriangleIcon, XCircleIcon } from '../Icons';
+import { Card, Button, Spinner, ConfirmModal } from '../ui';
+import { BellIcon, ArrowRightIcon, UserCircleIcon, ExclamationTriangleIcon, XCircleIcon, TrashIcon } from '../Icons';
 
 export const ProfessorAnnouncements: React.FC<{ teacher: User; allStudents: User[] }> = ({ teacher, allStudents }) => {
     const [messages, setMessages] = useState<TeacherMessage[]>([]);
@@ -10,6 +11,8 @@ export const ProfessorAnnouncements: React.FC<{ teacher: User; allStudents: User
     const [isLoading, setIsLoading] = useState(true);
     const [isChatOpen, setIsChatOpen] = useState(false);
     const [selectedStudentId, setSelectedStudentId] = useState('');
+    const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    const [confirmClearAll, setConfirmClearAll] = useState(false);
     const messagesEndRef = useRef<HTMLDivElement>(null);
     
     const participants = useMemo(() => {
@@ -76,12 +79,31 @@ export const ProfessorAnnouncements: React.FC<{ teacher: User; allStudents: User
             console.error("Failed to dismiss notification:", error);
         }
     };
+
+    const handleClearAllBroadcasts = async () => {
+        try {
+            await FirebaseService.deleteAllBroadcastsForTeacher(teacher.id);
+        } catch (error) {
+            console.error("Failed to clear mural:", error);
+        }
+    };
     
     const renderAnnouncementsView = () => (
         <>
-            <div className="flex justify-between items-center">
-                 <h3 className="text-xl font-bold text-white mb-4 flex items-center"><BellIcon className="h-6 w-6 mr-3 text-cyan-400" aria-hidden="true"/> Mural de Avisos</h3>
-                 <Button onClick={() => setIsChatOpen(true)} className="text-sm py-2 px-4">Chat com Aluno</Button>
+            <div className="flex justify-between items-center mb-4">
+                 <h3 className="text-xl font-bold text-white flex items-center"><BellIcon className="h-6 w-6 mr-3 text-cyan-400" aria-hidden="true"/> Mural de Avisos</h3>
+                 <div className="flex gap-2">
+                    {announcementsAndNotifications.length > 0 && (
+                        <button 
+                            onClick={() => setConfirmClearAll(true)}
+                            className="p-2 text-red-400 hover:bg-red-400/10 rounded-lg transition-colors border border-red-400/20"
+                            title="Limpar todo o mural"
+                        >
+                            <TrashIcon className="h-4 w-4" />
+                        </button>
+                    )}
+                    <Button onClick={() => setIsChatOpen(true)} className="text-sm py-2 px-4">Chat com Aluno</Button>
+                 </div>
             </div>
             <form onSubmit={handlePostAnnouncement} className="space-y-3 mb-6">
                 <label htmlFor="new-announcement" className="sr-only">Novo aviso</label>
@@ -99,34 +121,67 @@ export const ProfessorAnnouncements: React.FC<{ teacher: User; allStudents: User
                     </Button>
                 </div>
             </form>
-            <div className="space-y-3 max-h-60 overflow-y-auto pr-2">
+            <div className="space-y-3 max-h-80 overflow-y-auto pr-2 custom-scrollbar">
                 {isLoading ? <div className="flex justify-center"><Spinner /></div>
                  : announcementsAndNotifications.length > 0 ? announcementsAndNotifications.map(msg => {
                      if (msg.type === 'system') {
                         return (
-                             <div key={msg.id} className="relative text-sm p-3 rounded-lg bg-indigo-900/50 border border-indigo-700">
+                             <div key={msg.id} className="relative text-sm p-4 rounded-lg bg-indigo-900/30 border border-indigo-700 shadow-lg group">
                                 <button
                                     onClick={() => handleDismissNotification(msg.id)}
-                                    className="absolute top-2 right-2 p-1 text-indigo-300 hover:text-white"
+                                    className="absolute top-2 right-2 p-1.5 text-indigo-300 hover:text-white hover:bg-indigo-700/50 rounded-md transition-all opacity-0 group-hover:opacity-100"
                                     aria-label="Dispensar notificação"
                                 >
                                     <XCircleIcon className="h-5 w-5" />
                                 </button>
                                 <p className="font-semibold text-indigo-300 flex items-center gap-2 pr-6"><ExclamationTriangleIcon className="h-5 w-5"/> Erro Reportado</p>
-                                <p className="text-gray-200 mt-1">{msg.message}</p>
-                                <span className="text-xs text-gray-500 mt-2 block"><time dateTime={new Date(msg.timestamp).toISOString()}>{new Date(msg.timestamp).toLocaleString('pt-BR')}</time></span>
+                                <p className="text-gray-200 mt-1 leading-relaxed">{msg.message}</p>
+                                <span className="text-[10px] text-gray-500 mt-2 block font-mono uppercase tracking-widest">{new Date(msg.timestamp).toLocaleString('pt-BR')}</span>
                             </div>
                         )
                      }
                      // Regular broadcast
                      return (
-                         <div key={msg.id} className="text-sm p-3 rounded-lg bg-gray-900/50">
-                            <p className="text-gray-200">{msg.message}</p>
-                            <span className="text-xs text-gray-500 mt-2 block"><time dateTime={new Date(msg.timestamp).toISOString()}>{new Date(msg.timestamp).toLocaleString('pt-BR')}</time></span>
+                         <div key={msg.id} className="relative text-sm p-4 rounded-lg bg-gray-900/50 border border-gray-800 hover:border-gray-700 transition-all group">
+                             <button
+                                onClick={() => setConfirmDeleteId(msg.id)}
+                                className="absolute top-2 right-2 p-1.5 text-gray-500 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-all opacity-0 group-hover:opacity-100"
+                                title="Excluir aviso"
+                            >
+                                <TrashIcon className="h-4 w-4" />
+                            </button>
+                            <p className="text-gray-200 leading-relaxed pr-6">{msg.message}</p>
+                            <span className="text-[10px] text-gray-600 mt-2 block font-mono uppercase tracking-widest">{new Date(msg.timestamp).toLocaleString('pt-BR')}</span>
                         </div>
                      );
-                 }) : <p className="text-gray-500 text-center text-sm py-4">Nenhum aviso no mural.</p>}
+                 }) : <p className="text-gray-500 text-center text-sm py-8 border-2 border-dashed border-gray-800 rounded-xl">Nenhum aviso no mural.</p>}
             </div>
+
+            <ConfirmModal 
+                isOpen={!!confirmDeleteId}
+                onClose={() => setConfirmDeleteId(null)}
+                onConfirm={() => {
+                    if (confirmDeleteId) handleDismissNotification(confirmDeleteId);
+                    setConfirmDeleteId(null);
+                }}
+                title="Excluir Aviso"
+                message="Tem certeza que deseja remover este aviso permanentemente do mural de todos os alunos?"
+                variant="danger"
+                confirmLabel="Excluir"
+            />
+
+            <ConfirmModal 
+                isOpen={confirmClearAll}
+                onClose={() => setConfirmClearAll(false)}
+                onConfirm={() => {
+                    handleClearAllBroadcasts();
+                    setConfirmClearAll(false);
+                }}
+                title="Limpar Mural"
+                message="Esta ação apagará TODOS os comunicados públicos deste mural. Deseja continuar?"
+                variant="danger"
+                confirmLabel="Limpar Tudo"
+            />
         </>
     );
 
