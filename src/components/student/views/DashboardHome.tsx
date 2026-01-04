@@ -25,6 +25,7 @@ interface DashboardHomeProps {
     onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onOpenNewMessageModal: () => void;
     onDeleteMessage: (messageId: string) => void;
+    setView: (view: any) => void; // Adicionado para permitir navegação
 }
 
 export const DashboardHome: React.FC<DashboardHomeProps> = ({
@@ -43,11 +44,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
     onNavigateToTopic,
     onToggleTopicCompletion,
     onOpenNewMessageModal,
-    onDeleteMessage
+    onDeleteMessage,
+    setView
 }) => {
     const broadcasts = useMemo(() => messages.filter(m => m.studentId === null), [messages]);
 
-    // Lógica para encontrar o último tópico acessado
     const lastAccessedInfo = useMemo(() => {
         if (!studentProgress?.lastAccessedTopicId) return null;
         
@@ -254,7 +255,8 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         subjects={allSubjects} 
                         studentProgress={studentProgress} 
                         onNavigateToTopic={onNavigateToTopic} 
-                        onToggleTopicCompletion={onToggleTopicCompletion} 
+                        onToggleTopicCompletion={onToggleTopicCompletion}
+                        onViewFullSchedule={() => setView('schedule')}
                     />
                 )}
 
