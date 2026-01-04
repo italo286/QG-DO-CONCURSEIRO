@@ -48,32 +48,32 @@ export const CourseView: React.FC<CourseViewProps> = ({
         if (lowerName.includes('português') || lowerName.includes('redação') || lowerName.includes('direito')) {
             return {
                 bg: 'bg-gradient-to-br from-[#2e026d] via-[#5b21b6] to-[#d946ef]',
-                glow: 'shadow-[0_0_50px_-10px_rgba(168,85,247,0.5)]',
+                glow: 'shadow-[0_0_40px_-10px_rgba(168,85,247,0.4)]',
                 iconGlow: 'drop-shadow-[0_0_8px_rgba(217,70,239,1)]',
                 btnGrad: 'from-[#22d3ee] to-[#d946ef]',
-                btnGlow: 'shadow-[0_0_20px_rgba(34,211,238,0.4)]',
-                dotActive: 'bg-[#22d3ee] shadow-[0_0_12px_rgba(34,211,238,0.8)]',
+                btnGlow: 'shadow-[0_0_15px_rgba(34,211,238,0.3)]',
+                dotActive: 'bg-[#22d3ee] shadow-[0_0_10px_rgba(34,211,238,0.8)]',
                 scoreBg: 'bg-white/10'
             };
         }
         if (lowerName.includes('matemática') || lowerName.includes('raciocínio') || lowerName.includes('informática')) {
             return {
                 bg: 'bg-gradient-to-br from-[#0c4a6e] via-[#0284c7] to-[#84cc16]',
-                glow: 'shadow-[0_0_50px_-10px_rgba(14,165,233,0.5)]',
+                glow: 'shadow-[0_0_40px_-10px_rgba(14,165,233,0.4)]',
                 iconGlow: 'drop-shadow-[0_0_8px_rgba(34,211,238,1)]',
                 btnGrad: 'from-[#22d3ee] to-[#bef264]',
-                btnGlow: 'shadow-[0_0_20px_rgba(34,211,238,0.4)]',
-                dotActive: 'bg-[#bef264] shadow-[0_0_12px_rgba(190,242,100,0.8)]',
+                btnGlow: 'shadow-[0_0_15px_rgba(34,211,238,0.3)]',
+                dotActive: 'bg-[#bef264] shadow-[0_0_10px_rgba(190,242,100,0.8)]',
                 scoreBg: 'bg-black/20'
             };
         }
         return {
             bg: 'bg-gradient-to-br from-[#0f172a] via-[#1e40af] to-[#06b6d4]',
-            glow: 'shadow-[0_0_50px_-10px_rgba(6,182,212,0.4)]',
+            glow: 'shadow-[0_0_40px_-10px_rgba(6,182,212,0.3)]',
             iconGlow: 'drop-shadow-[0_0_8px_rgba(34,211,238,1)]',
             btnGrad: 'from-[#06b6d4] to-[#3b82f6]',
-            btnGlow: 'shadow-[0_0_20px_rgba(6,182,212,0.4)]',
-            dotActive: 'bg-[#22d3ee] shadow-[0_0_12px_rgba(34,211,238,0.8)]',
+            btnGlow: 'shadow-[0_0_15px_rgba(6,182,212,0.3)]',
+            dotActive: 'bg-[#22d3ee] shadow-[0_0_10px_rgba(34,211,238,0.8)]',
             scoreBg: 'bg-white/5'
         };
     };
@@ -93,25 +93,22 @@ export const CourseView: React.FC<CourseViewProps> = ({
 
     return (
         <div className="space-y-12 animate-fade-in pb-20">
-            {/* HERO SECTION COMPACTA - ESTILO ALE-RR */}
+            {/* HERO SECTION COMPACTA - REMOVIDO BADGE MÓDULO DE ALTA PERFORMANCE */}
             <div className="relative overflow-hidden rounded-[2.5rem] bg-[#020617] border border-white/5 p-6 md:p-10 shadow-2xl flex flex-col md:flex-row items-center gap-10">
                 <div className="absolute top-0 right-0 -mr-20 -mt-20 w-80 h-80 bg-cyan-500/5 rounded-full blur-[100px] pointer-events-none"></div>
 
                 <div className="flex-shrink-0 relative">
                     <div className="absolute -inset-2 bg-gradient-to-r from-cyan-500 to-purple-600 rounded-[1.8rem] blur-lg opacity-20"></div>
                     {course.imageUrl ? (
-                        <img src={course.imageUrl} alt="" className="relative h-40 w-40 object-cover rounded-[1.5rem] shadow-2xl border border-white/10"/>
+                        <img src={course.imageUrl} alt="" className="relative h-32 w-32 object-cover rounded-[1.5rem] shadow-2xl border border-white/10"/>
                     ) : (
-                        <div className="relative h-40 w-40 bg-gray-900 flex items-center justify-center rounded-[1.5rem] border border-gray-800">
-                            <BookOpenIcon className="h-12 w-12 text-gray-700" />
+                        <div className="relative h-32 w-32 bg-gray-900 flex items-center justify-center rounded-[1.5rem] border border-gray-800">
+                            <BookOpenIcon className="h-10 w-10 text-gray-700" />
                         </div>
                     )}
                 </div>
 
-                <div className="flex-grow text-center md:text-left space-y-4">
-                    <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-cyan-500/5 border border-cyan-500/20 text-cyan-400 text-[9px] font-black uppercase tracking-[0.4em] shadow-sm">
-                        Módulo de Alta Performance
-                    </div>
+                <div className="flex-grow text-center md:text-left">
                     <h2 className="text-4xl md:text-6xl font-black text-white tracking-tighter leading-none drop-shadow-2xl uppercase italic">
                         {course.name}
                     </h2>
@@ -146,53 +143,49 @@ export const CourseView: React.FC<CourseViewProps> = ({
                             const theme = getSubjectTheme(subject.name);
                             return (
                                 <button key={subject.id} onClick={() => onSubjectSelect(subject)} className="group text-left">
-                                    <div className={`h-full min-h-[260px] rounded-[2.5rem] ${theme.bg} ${theme.glow} p-8 flex flex-col relative overflow-hidden transition-all duration-500 group-hover:translate-y-[-8px] group-hover:brightness-110 border border-white/10`}>
+                                    {/* ALTURA REDUZIDA PARA MIN-H-[180PX] */}
+                                    <div className={`h-full min-h-[180px] rounded-[2.5rem] ${theme.bg} ${theme.glow} p-6 flex flex-col relative overflow-hidden transition-all duration-500 group-hover:translate-y-[-5px] border border-white/10`}>
                                         
-                                        {/* Background Decor */}
-                                        <div className="absolute top-0 right-0 p-4 opacity-[0.03] group-hover:opacity-[0.07] transition-opacity duration-700">
-                                            <SubjectIcon subjectName={subject.name} className="h-40 w-40 text-white rotate-12" />
-                                        </div>
-
-                                        {/* Score Badge */}
-                                        <div className="absolute top-7 right-7">
-                                            <div className={`${theme.scoreBg} backdrop-blur-xl border border-white/10 px-4 py-2.5 rounded-2xl flex flex-col items-center min-w-[85px] shadow-2xl`}>
-                                                <span className="text-[8px] font-black text-white/50 uppercase tracking-[0.2em] mb-1">Score Médio</span>
-                                                <span className="text-lg font-black text-white">{percent > 0 ? `${percent}%` : '--'}</span>
+                                        {/* Score Badge Reduzido */}
+                                        <div className="absolute top-5 right-5">
+                                            <div className={`${theme.scoreBg} backdrop-blur-xl border border-white/10 px-3 py-1.5 rounded-xl flex flex-col items-center min-w-[70px] shadow-2xl`}>
+                                                <span className="text-[7px] font-black text-white/50 uppercase tracking-widest">Score</span>
+                                                <span className="text-sm font-black text-white">{percent > 0 ? `${percent}%` : '--'}</span>
                                             </div>
                                         </div>
 
-                                        {/* Icon Container */}
-                                        <div className="mb-6 relative">
-                                            <div className={`w-16 h-16 rounded-2xl bg-black/30 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-2xl transition-transform duration-500 group-hover:scale-110 group-hover:rotate-6`}>
-                                                <SubjectIcon subjectName={subject.name} className={`h-9 w-9 text-white ${theme.iconGlow}`} />
+                                        {/* Icon Container Reduzido */}
+                                        <div className="mb-4 relative">
+                                            <div className={`w-12 h-12 rounded-xl bg-black/30 backdrop-blur-md flex items-center justify-center border border-white/10 shadow-2xl transition-transform duration-500 group-hover:rotate-6`}>
+                                                <SubjectIcon subjectName={subject.name} className={`h-6 w-6 text-white ${theme.iconGlow}`} />
                                             </div>
                                         </div>
                                         
                                         <div className="flex-grow">
-                                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-tight group-hover:translate-x-1 transition-transform drop-shadow-lg">
+                                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-tight group-hover:translate-x-1 transition-transform drop-shadow-lg">
                                                 {subject.name}
                                             </h4>
                                         </div>
 
-                                        {/* Card Footer */}
-                                        <div className="mt-8 flex justify-between items-center">
+                                        {/* Card Footer Reduzido */}
+                                        <div className="mt-4 flex justify-between items-center">
                                             {/* Progress Segments */}
-                                            <div className="flex gap-2.5 items-center">
+                                            <div className="flex gap-1.5 items-center">
                                                 {Array.from({length: 6}).map((_, i) => (
                                                     <div 
                                                         key={i} 
-                                                        className={`h-2 rounded-full transition-all duration-700 
+                                                        className={`h-1.5 rounded-full transition-all duration-700 
                                                             ${i < dots 
-                                                                ? `w-8 ${theme.dotActive}` 
-                                                                : 'w-2.5 bg-black/40'
+                                                                ? `w-6 ${theme.dotActive}` 
+                                                                : 'w-1.5 bg-black/40'
                                                             }`}
                                                     ></div>
                                                 ))}
                                             </div>
                                             
-                                            {/* Neon Button */}
-                                            <div className={`bg-gradient-to-r ${theme.btnGrad} ${theme.btnGlow} px-6 py-3 rounded-full flex items-center gap-3 text-white text-[9px] font-black uppercase tracking-[0.2em] shadow-2xl transition-all`}>
-                                                Acessar <ArrowRightIcon className="h-2.5 w-2.5" />
+                                            {/* Botão Ultra-compacto */}
+                                            <div className={`bg-gradient-to-r ${theme.btnGrad} ${theme.btnGlow} px-4 py-2 rounded-full flex items-center gap-2 text-white text-[8px] font-black uppercase tracking-widest shadow-2xl`}>
+                                                ACESSAR <ArrowRightIcon className="h-2 w-2" />
                                             </div>
                                         </div>
                                     </div>
