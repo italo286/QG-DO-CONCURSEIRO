@@ -22,7 +22,7 @@ export const DailySchedule: React.FC<{
         const timer = setInterval(() => {
             const now = getBrasiliaDate();
             setCurrentMinutes(now.getUTCHours() * 60 + now.getUTCMinutes());
-        }, 60000);
+        }, 1000); // Atualiza a cada segundo para precisão total com o relógio
         return () => clearInterval(timer);
     }, []);
 
@@ -51,7 +51,7 @@ export const DailySchedule: React.FC<{
             <Card className="p-6 bg-gray-800/40 border-gray-700/50 text-center rounded-[2rem]">
                 <CalendarIcon className="h-10 w-10 text-gray-600 mx-auto mb-3"/>
                 <h3 className="text-lg font-bold text-white uppercase tracking-tighter">Cronograma</h3>
-                <p className="text-gray-500 text-xs mt-2 leading-relaxed">Nenhum planejamento ativo.<br/>Configure em "Cronograma".</p>
+                <p className="text-gray-500 text-xs mt-2 leading-relaxed">Nenhum planejamento ativo.</p>
             </Card>
         );
     }
@@ -60,70 +60,72 @@ export const DailySchedule: React.FC<{
     const sortedTimes = Object.keys(todayItems).sort();
 
     return (
-        <Card className="p-8 bg-[#0a0f1d]/60 border-white/5 shadow-2xl relative overflow-hidden rounded-[2.5rem] backdrop-blur-md">
-            <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12 pointer-events-none">
-                <CalendarIcon className="h-24 w-24" />
+        <Card className="p-8 bg-[#0a0f1d]/80 border-white/5 shadow-2xl relative overflow-hidden rounded-[2.5rem] backdrop-blur-xl">
+            <div className="absolute top-0 right-0 p-4 opacity-5 pointer-events-none">
+                <CalendarIcon className="h-32 w-32" />
             </div>
 
-            <div className="mb-10">
+            <div className="mb-12">
                 <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2.5 h-7 bg-cyan-500 rounded-full shadow-[0_0_15px_cyan]"></div>
-                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda do Dia</h3>
+                    <div className="w-2 h-7 bg-cyan-500 rounded-full shadow-[0_0_15px_cyan]"></div>
+                    <h3 className="text-4xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda do Dia</h3>
                 </div>
-                <p className="text-[10px] text-cyan-400/50 font-black uppercase tracking-[0.3em] ml-6">
+                <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.4em] ml-6 opacity-70">
                     {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
                 </p>
             </div>
 
             {sortedTimes.length === 0 ? (
-                <div className="py-10 text-center border-2 border-dashed border-gray-800 rounded-3xl">
+                <div className="py-12 text-center border-2 border-dashed border-gray-800 rounded-[2rem]">
                     <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest italic">Descanso Programado</p>
                 </div>
             ) : (
                 <div className="relative ml-2">
-                    {/* LINHA DE FUNDO DA TIMELINE */}
-                    <div className="absolute left-[13px] top-4 bottom-4 w-0.5 bg-gray-800/50" />
+                    {/* LINHA DA TIMELINE CIANO */}
+                    <div className="absolute left-[13px] top-4 bottom-4 w-[1px] bg-cyan-500/20" />
 
-                    <div className="space-y-10">
+                    <div className="space-y-12">
                         {sortedTimes.map((time, index) => {
                             const content = todayItems[time];
                             const isTopicId = content.startsWith('t') || content.startsWith('st');
                             const topicInfo = isTopicId ? getTopicInfo(content) : null;
                             
                             const itemMinutes = timeToMinutes(time);
-                            const isNext = index < sortedTimes.length - 1 && currentMinutes >= timeToMinutes(sortedTimes[index+1]);
-                            const isActive = currentMinutes >= itemMinutes && !isNext;
-                            const isPast = currentMinutes > itemMinutes;
+                            const nextTime = sortedTimes[index + 1];
+                            const nextItemMinutes = nextTime ? timeToMinutes(nextTime) : 1440; // fim do dia
+                            
+                            const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
+                            const isPast = currentMinutes >= nextItemMinutes;
 
                             return (
                                 <div key={time} className="relative pl-12 group">
-                                    {/* LINHA ATIVA BRILHANTE */}
-                                    {index < sortedTimes.length - 1 && isPast && (
-                                        <div className="absolute left-[13px] top-4 h-full w-0.5 bg-cyan-500 shadow-[0_0_10px_cyan] z-0" />
+                                    {/* LINHA ATIVA COM BRILHO */}
+                                    {(isActive || isPast) && index < sortedTimes.length - 1 && (
+                                        <div className="absolute left-[13px] top-6 h-[calc(100%+3rem)] w-[1px] bg-cyan-400 shadow-[0_0_10px_cyan] z-0" />
                                     )}
 
-                                    {/* CÍRCULO DA TIMELINE ESTILIZADO */}
-                                    <div className={`absolute left-0 top-0.5 w-7 h-7 rounded-full border-4 border-[#0a0f1d] z-10 transition-all duration-700 flex items-center justify-center 
-                                        ${isActive ? 'bg-cyan-500 shadow-[0_0_20px_cyan] scale-110' : 
-                                          isPast ? 'bg-cyan-900 border-cyan-500/50' : 'bg-gray-800 border-gray-700'}`}>
-                                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
+                                    {/* CÍRCULO DA TIMELINE ESTILO ORIGINAL */}
+                                    <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-4 border-[#0a0f1d] z-10 transition-all duration-500 flex items-center justify-center 
+                                        ${isActive ? 'bg-cyan-400 shadow-[0_0_20px_cyan] scale-110' : 
+                                          isPast ? 'bg-cyan-800 border-cyan-400/50' : 'bg-gray-800 border-gray-700'}`}>
+                                        <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
                                     </div>
 
-                                    <div className="space-y-2">
+                                    <div className="space-y-3">
                                         <div className="flex items-center gap-3">
-                                            <span className={`text-xs font-black font-mono tracking-tight uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-600' : 'text-gray-500'}`}>
+                                            <span className={`text-sm font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-700' : 'text-gray-600'}`}>
                                                 {time}
                                             </span>
-                                            {isActive && <span className="text-[8px] bg-cyan-500 text-white px-2 py-0.5 rounded font-black uppercase tracking-widest animate-pulse">ATUAL</span>}
+                                            {isActive && <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">EM ANDAMENTO</span>}
                                         </div>
                                         
-                                        <div className={`p-4 rounded-2xl border transition-all duration-500 relative overflow-hidden
-                                            ${isActive ? 'border-cyan-500/40 shadow-[0_0_30px_-5px_rgba(6,182,212,0.2)] bg-cyan-500/10' : 
-                                              isPast ? 'border-gray-800 bg-gray-900/40 opacity-60' : 'border-white/5 bg-gray-900/20'}`}>
+                                        <div className={`p-5 rounded-2xl border transition-all duration-500 relative overflow-hidden
+                                            ${isActive ? 'border-cyan-400/40 bg-cyan-400/5 shadow-[0_0_40px_-10px_rgba(34,211,238,0.2)]' : 
+                                              isPast ? 'border-gray-800 bg-gray-900/40 opacity-50' : 'border-white/5 bg-gray-900/20'}`}>
                                             
                                             <div className="flex justify-between items-center gap-4">
-                                                <div className="flex gap-3 items-center min-w-0">
-                                                    <div className={`p-2 rounded-lg flex-shrink-0 ${isActive ? 'bg-cyan-500 text-white shadow-[0_0_10px_cyan]' : 'bg-gray-800 text-gray-500'}`}>
+                                                <div className="flex gap-4 items-center min-w-0">
+                                                    <div className={`p-2.5 rounded-xl flex-shrink-0 transition-colors ${isActive ? 'bg-cyan-400 text-black' : 'bg-gray-800 text-gray-500'}`}>
                                                         <PencilIcon className="h-4 w-4" />
                                                     </div>
                                                     <div className="min-w-0">
@@ -131,7 +133,7 @@ export const DailySchedule: React.FC<{
                                                             "{topicInfo?.name || content}"
                                                         </p>
                                                         {topicInfo && (
-                                                            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-0.5">
+                                                            <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mt-1">
                                                                 {topicInfo.subjectName}
                                                             </p>
                                                         )}
@@ -140,9 +142,9 @@ export const DailySchedule: React.FC<{
                                                 {topicInfo && (
                                                     <button 
                                                         onClick={() => onNavigateToTopic(content)}
-                                                        className={`p-2.5 rounded-xl transition-all ${isActive ? 'bg-cyan-500 text-white shadow-lg scale-105' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
+                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-400 text-black shadow-lg scale-105' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
                                                     >
-                                                        <ArrowRightIcon className="h-3.5 w-3.5" />
+                                                        <ArrowRightIcon className="h-4 w-4" />
                                                     </button>
                                                 )}
                                             </div>
@@ -154,12 +156,6 @@ export const DailySchedule: React.FC<{
                     </div>
                 </div>
             )}
-            
-            <div className="mt-12 flex justify-center">
-                 <button className="px-8 py-2.5 bg-white/5 border border-white/10 rounded-full text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all shadow-xl">
-                    Protocolo de Estudo Completo
-                 </button>
-            </div>
         </Card>
     );
 };
