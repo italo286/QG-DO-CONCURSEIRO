@@ -2,11 +2,10 @@
 import React, { useMemo } from 'react';
 import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge, Question, Topic, SubTopic } from '../../../types';
 import { Card, Button } from '../../ui';
-import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, UserCircleIcon, TrashIcon, ArrowRightIcon, CycleIcon, TrophyIcon, FireIcon, StarIcon } from '../../Icons';
+import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, UserCircleIcon, TrashIcon, ArrowRightIcon, CycleIcon } from '../../Icons';
 import { StudentFocusPanel } from '../StudentFocusPanel';
 import { DailySchedule } from '../DailySchedule';
 import { DailyChallenges } from '../DailyChallenges';
-import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../../gamification';
 
 interface DashboardHomeProps {
     messages: TeacherMessage[];
@@ -56,11 +55,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         [broadcasts, currentUser.id]
     );
 
-    const level = calculateLevel(studentProgress.xp);
-    const levelTitle = getLevelTitle(level);
-    const xpCurrentLevel = studentProgress.xp % LEVEL_XP_REQUIREMENT;
-    const progressPercent = (xpCurrentLevel / LEVEL_XP_REQUIREMENT) * 100;
-
     const lastAccessedInfo = useMemo(() => {
         if (!studentProgress?.lastAccessedTopicId) return null;
         
@@ -101,54 +95,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
             {/* Coluna Principal */}
             <div className="lg:col-span-8 space-y-8">
                 
-                {/* WIDGET DE NÍVEL E STATUS - NOVO */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Card className="p-6 bg-gradient-to-br from-gray-900 to-black border-cyan-500/20 rounded-[2rem] flex items-center gap-6 shadow-2xl">
-                        <div className="relative flex-shrink-0">
-                            <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
-                            <div className="relative h-20 w-20 rounded-full border-4 border-cyan-500/30 flex items-center justify-center bg-gray-900 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
-                                <span className="text-4xl font-black text-white">{level}</span>
-                            </div>
-                        </div>
-                        <div className="flex-grow">
-                            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-1 block">Nível Atual</span>
-                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic">{levelTitle}</h4>
-                            <div className="mt-3 space-y-1.5">
-                                <div className="flex justify-between items-end">
-                                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
-                                    <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">{xpCurrentLevel} / {LEVEL_XP_REQUIREMENT}</span>
-                                </div>
-                                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
-                                    <div className="h-full bg-cyan-500 shadow-[0_0_8px_cyan]" style={{ width: `${progressPercent}%` }}></div>
-                                </div>
-                            </div>
-                        </div>
-                    </Card>
-
-                    <Card className="p-6 bg-gray-800/40 border-gray-700/50 rounded-[2rem] flex items-center gap-6">
-                        <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center flex-shrink-0 border border-orange-500/20">
-                            <FireIcon className="h-8 w-8 text-orange-500" />
-                        </div>
-                        <div>
-                            <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.3em] mb-1 block">Ofensiva</span>
-                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">{studentProgress.dailyChallengeStreak?.current || 0} Dias</h4>
-                            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-widest">Foco e Consistência</p>
-                        </div>
-                        <div className="ml-auto">
-                            <Button onClick={() => setView('performance')} className="bg-gray-800 hover:bg-gray-700 border-gray-700 text-xs py-2 px-4 rounded-xl">
-                                Detalhes
-                            </Button>
-                        </div>
-                    </Card>
-                </div>
-
-                {/* CONTINUE DE ONDE PAROU */}
+                {/* CONTINUE DE ONDE PAROU - DESTAQUE NO TOPO */}
                 {lastAccessedInfo && (
-                    <Card className="p-6 bg-cyan-500/5 border-cyan-500/30 rounded-[2rem] flex flex-col md:flex-row items-center gap-6 animate-fade-in group hover:bg-cyan-500/10 transition-all duration-500">
+                    <Card className="p-6 bg-cyan-500/5 border-cyan-500/30 rounded-[2.5rem] flex flex-col md:flex-row items-center gap-6 animate-fade-in group hover:bg-cyan-500/10 transition-all duration-500 shadow-xl shadow-cyan-500/5">
                         <div className="h-16 w-16 rounded-2xl bg-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)] flex-shrink-0 group-hover:scale-110 transition-transform">
                             <CycleIcon className="h-8 w-8 text-white" />
                         </div>
-                        <div className="flex-grow text-center md:text-left">
+                        <div className="flex-grow text-center md:text-left min-w-0">
                             <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-1 block">Retomar Jornada</span>
                             <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none truncate">
                                 {lastAccessedInfo.subtopic?.name || lastAccessedInfo.topic.name}
@@ -159,7 +112,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         </div>
                         <Button 
                             onClick={() => onNavigateToTopic(studentProgress.lastAccessedTopicId!)}
-                            className="w-full md:w-auto py-3 px-8 text-xs font-black uppercase tracking-widest shadow-xl"
+                            className="w-full md:w-auto py-4 px-10 text-[10px] font-black uppercase tracking-[0.2em] shadow-xl rounded-2xl"
                         >
                             ESTUDAR AGORA
                         </Button>
@@ -175,29 +128,29 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
                 <StudentFocusPanel enrolledCourses={enrolledCourses} studentProgress={studentProgress} />
 
-                <Card className="p-8 bg-gray-800/40 border-gray-700/50 rounded-[2rem]">
+                <Card className="p-8 bg-gray-800/40 border-gray-700/50 rounded-[2.5rem]">
                     <div className="flex items-center gap-3 mb-8">
-                        <div className="w-2 h-6 bg-cyan-500 rounded-full"></div>
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Meus Cursos</h3>
+                        <div className="w-1.5 h-7 bg-cyan-500 rounded-full shadow-[0_0_10px_cyan]"></div>
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Meus Cursos</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {enrolledCourses.map(course => {
                             const teacher = teacherProfiles.find(p => p.id === course.teacherId);
                             return (
-                                <Card key={course.id} onClick={() => onCourseSelect(course)} className="group hover:border-cyan-500/50 transition-all duration-500 flex flex-col !p-0 overflow-hidden bg-gray-900/60 shadow-2xl rounded-[1.5rem] hover:translate-y-[-4px]">
+                                <Card key={course.id} onClick={() => onCourseSelect(course)} className="group hover:border-cyan-500/50 transition-all duration-500 flex flex-col !p-0 overflow-hidden bg-gray-900/60 shadow-2xl rounded-[2rem] hover:translate-y-[-4px]">
                                     {course.imageUrl ? (
-                                        <div className="relative h-40 overflow-hidden">
+                                        <div className="relative h-44 overflow-hidden">
                                             <img src={course.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"/>
                                             <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-60"></div>
                                         </div>
                                     ) : (
-                                        <div className="w-full h-40 bg-gray-800 flex items-center justify-center">
+                                        <div className="w-full h-44 bg-gray-800 flex items-center justify-center">
                                             <BookOpenIcon className="h-10 w-10 text-gray-700"/>
                                         </div>
                                     )}
-                                    <div className="p-6 flex-grow flex flex-col">
-                                        <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors flex-grow leading-tight uppercase tracking-tight">{course.name}</h4>
-                                        <div className="mt-6 flex items-center justify-between border-t border-gray-800 pt-4">
+                                    <div className="p-7 flex-grow flex flex-col">
+                                        <h4 className="text-xl font-black text-white group-hover:text-cyan-400 transition-colors flex-grow leading-tight uppercase tracking-tight italic">{course.name}</h4>
+                                        <div className="mt-6 flex items-center justify-between border-t border-gray-800/50 pt-5">
                                             <div className="flex items-center gap-2">
                                                 {teacher?.avatarUrl ? (
                                                     <img src={teacher.avatarUrl} alt={teacher.name} className="h-7 w-7 rounded-full object-cover ring-2 ring-gray-700 shadow-md" />
@@ -254,7 +207,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                             const teacher = teacherProfiles.find(t => t.id === msg.teacherId);
                             const isUnread = !msg.acknowledgedBy.includes(currentUser.id);
                             return (
-                                <div key={msg.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isUnread ? 'bg-orange-500/5 border-orange-500/20' : 'bg-gray-800/40 border-gray-700/40'}`}>
+                                <div key={msg.id} className={`group relative p-5 rounded-[2rem] border transition-all duration-300 ${isUnread ? 'bg-orange-500/5 border-orange-500/20 shadow-lg shadow-orange-500/5' : 'bg-gray-800/40 border-gray-700/40'}`}>
                                     <button onClick={() => onDeleteMessage(msg.id)} className="absolute top-4 right-4 p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100"><TrashIcon className="h-5 w-5" /></button>
                                     <div className="flex gap-4 items-start" onClick={() => isUnread && onAcknowledgeMessage(msg.id)}>
                                         <div className="flex-shrink-0">
@@ -262,7 +215,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                         </div>
                                         <div className="flex-grow min-w-0">
                                             <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest truncate">Prof. {teacher?.name || 'QG'}</p>
-                                            <p className={`text-sm mt-1 ${isUnread ? 'text-white font-bold' : 'text-gray-400'}`}>{msg.message}</p>
+                                            <p className={`text-sm mt-1 leading-relaxed ${isUnread ? 'text-white font-bold' : 'text-gray-400'}`}>{msg.message}</p>
                                         </div>
                                     </div>
                                 </div>
@@ -274,7 +227,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 
             <button
                 onClick={onOpenNewMessageModal}
-                className="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-90 transition-all z-50"
+                className="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-[1.8rem] shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-90 transition-all z-50 border border-white/10"
             >
                 <ChatBubbleLeftRightIcon className="h-8 w-8" />
             </button>
