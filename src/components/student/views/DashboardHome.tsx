@@ -2,11 +2,11 @@
 import React, { useMemo } from 'react';
 import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge, Question, Topic, SubTopic } from '../../../types';
 import { Card, Button } from '../../ui';
-import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, XCircleIcon, UserCircleIcon, TrashIcon, ArrowRightIcon, CycleIcon } from '../../Icons';
+import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, UserCircleIcon, TrashIcon, ArrowRightIcon, CycleIcon, TrophyIcon, FireIcon, StarIcon } from '../../Icons';
 import { StudentFocusPanel } from '../StudentFocusPanel';
 import { DailySchedule } from '../DailySchedule';
 import { DailyChallenges } from '../DailyChallenges';
-import * as FirebaseService from '../../../services/firebaseService';
+import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../../gamification';
 
 interface DashboardHomeProps {
     messages: TeacherMessage[];
@@ -56,6 +56,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         [broadcasts, currentUser.id]
     );
 
+    const level = calculateLevel(studentProgress.xp);
+    const levelTitle = getLevelTitle(level);
+    const xpCurrentLevel = studentProgress.xp % LEVEL_XP_REQUIREMENT;
+    const progressPercent = (xpCurrentLevel / LEVEL_XP_REQUIREMENT) * 100;
+
     const lastAccessedInfo = useMemo(() => {
         if (!studentProgress?.lastAccessedTopicId) return null;
         
@@ -91,127 +96,61 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         await onSaveFullPlan({ ...fullStudyPlan, plans: newPlans });
     };
 
-    const renderAnnouncementsView = () => (
-        <div className="space-y-6">
-            <div className="flex items-center justify-between px-1">
-                <h3 className="text-xl font-black text-white flex items-center uppercase tracking-tighter italic">
-                    <div className="relative mr-3">
-                        <BellIcon className="h-6 w-6 text-orange-400" aria-hidden="true"/> 
-                        {hasUnreadBroadcasts && (
-                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
-                        )}
-                        {hasUnreadBroadcasts && (
-                            <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-600 rounded-full shadow-[0_0_8px_rgba(220,38,38,0.8)] border border-white/20"></div>
-                        )}
-                    </div>
-                    Mural de Avisos
-                </h3>
-                <span className="text-[10px] font-black text-gray-500 bg-gray-900/50 px-2 py-1 rounded-md border border-gray-800">
-                    {broadcasts.length} ALERTAS
-                </span>
-            </div>
-
-            <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
-                {broadcasts.length > 0 ? broadcasts.map(msg => {
-                    const teacher = teacherProfiles.find(t => t.id === msg.teacherId);
-                    const isUnread = !msg.acknowledgedBy.includes(currentUser.id);
-                    const date = new Date(msg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-                    
-                    const targetSubtopicId = msg.context?.subtopicId || msg.context?.topicId;
-
-                    return (
-                        <div 
-                            key={msg.id} 
-                            className={`group relative p-5 rounded-3xl border transition-all duration-300 backdrop-blur-xl shadow-2xl
-                                ${isUnread 
-                                    ? 'bg-orange-500/5 border-orange-500/20 hover:bg-orange-500/10' 
-                                    : 'bg-gray-800/40 border-gray-700/40 hover:bg-gray-800/60'
-                                }`}
-                        >
-                            <button 
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    onDeleteMessage(msg.id);
-                                }}
-                                className="absolute top-4 right-4 p-2 rounded-xl text-gray-600 hover:text-red-400 hover:bg-red-400/10 opacity-0 group-hover:opacity-100 transition-all z-10"
-                                title="Descartar este aviso"
-                            >
-                                <TrashIcon className="h-5 w-5" />
-                            </button>
-
-                            <div className="flex gap-4 items-start" onClick={() => isUnread && onAcknowledgeMessage(msg.id)}>
-                                <div className="flex-shrink-0">
-                                    {teacher?.avatarUrl ? (
-                                        <img src={teacher.avatarUrl} alt="" className="h-12 w-12 rounded-2xl object-cover ring-2 ring-gray-700/50 shadow-lg" />
-                                    ) : (
-                                        <div className="h-12 w-12 rounded-2xl bg-gradient-to-br from-gray-700 to-gray-800 flex items-center justify-center">
-                                            <UserCircleIcon className="h-7 w-7 text-gray-500" />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex-grow min-w-0">
-                                    <div className="flex justify-between items-center mb-1.5">
-                                        <div className="flex items-center gap-2">
-                                            <span className="font-black text-cyan-400 text-xs uppercase tracking-widest truncate">
-                                                Prof. {teacher?.name || 'QG'}
-                                            </span>
-                                            <span className="w-1 h-1 rounded-full bg-gray-700"></span>
-                                            <span className="text-[10px] font-mono text-gray-500 uppercase">{date}</span>
-                                        </div>
-                                    </div>
-                                    <p className={`text-sm leading-relaxed mb-4 ${isUnread ? 'text-white font-bold' : 'text-gray-400 font-medium italic'}`}>
-                                        "{msg.message}"
-                                    </p>
-                                    
-                                    <div className="flex items-center gap-3">
-                                        {targetSubtopicId && (
-                                            <button 
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    onNavigateToTopic(targetSubtopicId);
-                                                }}
-                                                className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500 text-white text-[10px] font-black uppercase tracking-widest hover:bg-cyan-400 transition-all shadow-lg shadow-cyan-900/20"
-                                            >
-                                                Acessar Conteúdo <ArrowRightIcon className="h-3 w-3" />
-                                            </button>
-                                        )}
-                                        {isUnread && (
-                                            <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20">
-                                                <div className="w-1.5 h-1.5 bg-orange-500 rounded-full animate-pulse"></div>
-                                                <span className="text-[9px] font-black text-orange-400 uppercase tracking-tighter">Novo</span>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    );
-                }) : (
-                    <div className="flex flex-col items-center justify-center py-16 px-8 border-2 border-dashed border-gray-800 rounded-[2.5rem] opacity-30">
-                        <div className="w-16 h-16 rounded-full bg-gray-800 flex items-center justify-center mb-4">
-                            <BellIcon className="h-8 w-8 text-gray-600" />
-                        </div>
-                        <p className="text-center text-xs font-black uppercase tracking-widest text-gray-600">Frequência Limpa</p>
-                    </div>
-                )}
-            </div>
-        </div>
-    );
-
     return (
         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
             {/* Coluna Principal */}
             <div className="lg:col-span-8 space-y-8">
                 
-                {/* WIDGET: Continue de Onde Parou */}
+                {/* WIDGET DE NÍVEL E STATUS - NOVO */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card className="p-6 bg-gradient-to-br from-gray-900 to-black border-cyan-500/20 rounded-[2rem] flex items-center gap-6 shadow-2xl">
+                        <div className="relative flex-shrink-0">
+                            <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
+                            <div className="relative h-20 w-20 rounded-full border-4 border-cyan-500/30 flex items-center justify-center bg-gray-900 shadow-[0_0_20px_rgba(6,182,212,0.4)]">
+                                <span className="text-4xl font-black text-white">{level}</span>
+                            </div>
+                        </div>
+                        <div className="flex-grow">
+                            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-1 block">Nível Atual</span>
+                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic">{levelTitle}</h4>
+                            <div className="mt-3 space-y-1.5">
+                                <div className="flex justify-between items-end">
+                                    <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
+                                    <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">{xpCurrentLevel} / {LEVEL_XP_REQUIREMENT}</span>
+                                </div>
+                                <div className="h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                                    <div className="h-full bg-cyan-500 shadow-[0_0_8px_cyan]" style={{ width: `${progressPercent}%` }}></div>
+                                </div>
+                            </div>
+                        </div>
+                    </Card>
+
+                    <Card className="p-6 bg-gray-800/40 border-gray-700/50 rounded-[2rem] flex items-center gap-6">
+                        <div className="h-16 w-16 rounded-2xl bg-orange-500/10 flex items-center justify-center flex-shrink-0 border border-orange-500/20">
+                            <FireIcon className="h-8 w-8 text-orange-500" />
+                        </div>
+                        <div>
+                            <span className="text-[10px] font-black text-orange-500 uppercase tracking-[0.3em] mb-1 block">Ofensiva</span>
+                            <h4 className="text-2xl font-black text-white uppercase tracking-tighter leading-none">{studentProgress.dailyChallengeStreak?.current || 0} Dias</h4>
+                            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-widest">Foco e Consistência</p>
+                        </div>
+                        <div className="ml-auto">
+                            <Button onClick={() => setView('performance')} className="bg-gray-800 hover:bg-gray-700 border-gray-700 text-xs py-2 px-4 rounded-xl">
+                                Detalhes
+                            </Button>
+                        </div>
+                    </Card>
+                </div>
+
+                {/* CONTINUE DE ONDE PAROU */}
                 {lastAccessedInfo && (
                     <Card className="p-6 bg-cyan-500/5 border-cyan-500/30 rounded-[2rem] flex flex-col md:flex-row items-center gap-6 animate-fade-in group hover:bg-cyan-500/10 transition-all duration-500">
                         <div className="h-16 w-16 rounded-2xl bg-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)] flex-shrink-0 group-hover:scale-110 transition-transform">
-                            <CycleIcon className="h-8 w-8 text-white animate-spin-slow" />
+                            <CycleIcon className="h-8 w-8 text-white" />
                         </div>
                         <div className="flex-grow text-center md:text-left">
                             <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-1 block">Retomar Jornada</span>
-                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
+                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none truncate">
                                 {lastAccessedInfo.subtopic?.name || lastAccessedInfo.topic.name}
                             </h4>
                             <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-60">
@@ -220,9 +159,9 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                         </div>
                         <Button 
                             onClick={() => onNavigateToTopic(studentProgress.lastAccessedTopicId!)}
-                            className="w-full md:w-auto py-3 px-8 text-xs font-black uppercase tracking-widest shadow-xl group-hover:px-10 transition-all"
+                            className="w-full md:w-auto py-3 px-8 text-xs font-black uppercase tracking-widest shadow-xl"
                         >
-                            RETOMAR <ArrowRightIcon className="h-3 w-3 ml-2" />
+                            ESTUDAR AGORA
                         </Button>
                     </Card>
                 )}
@@ -239,7 +178,7 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                 <Card className="p-8 bg-gray-800/40 border-gray-700/50 rounded-[2rem]">
                     <div className="flex items-center gap-3 mb-8">
                         <div className="w-2 h-6 bg-cyan-500 rounded-full"></div>
-                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Academia de Cursos</h3>
+                        <h3 className="text-2xl font-black text-white uppercase tracking-tighter">Meus Cursos</h3>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {enrolledCourses.map(course => {
@@ -272,14 +211,13 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                                 </span>
                                             </div>
                                             <div className="text-cyan-400 text-[10px] font-black uppercase tracking-widest flex items-center group-hover:gap-2 transition-all">
-                                                TREINAR <ArrowRightIcon className="h-3 w-3" />
+                                                ACESSAR <ArrowRightIcon className="h-3 w-3" />
                                             </div>
                                         </div>
                                     </div>
                                 </Card>
                             )
                         })}
-                        {enrolledCourses.length === 0 && <p className="text-gray-500 md:col-span-2 text-center py-16 border-2 border-dashed border-gray-800 rounded-3xl">Inicie sua jornada matriculando-se em um curso.</p>}
                     </div>
                 </Card>
             </div>
@@ -298,20 +236,47 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     />
                 )}
 
-                <div className="p-1">
-                    {renderAnnouncementsView()}
+                <div className="space-y-6">
+                    <div className="flex items-center justify-between px-1">
+                        <h3 className="text-xl font-black text-white flex items-center uppercase tracking-tighter italic">
+                            <div className="relative mr-3">
+                                <BellIcon className="h-6 w-6 text-orange-400" aria-hidden="true"/> 
+                                {hasUnreadBroadcasts && (
+                                    <div className="absolute -top-1 -right-1 w-2.5 h-2.5 bg-red-500 rounded-full animate-ping"></div>
+                                )}
+                            </div>
+                            Mural de Avisos
+                        </h3>
+                    </div>
+
+                    <div className="space-y-4 max-h-[550px] overflow-y-auto pr-2 custom-scrollbar">
+                        {broadcasts.length > 0 ? broadcasts.map(msg => {
+                            const teacher = teacherProfiles.find(t => t.id === msg.teacherId);
+                            const isUnread = !msg.acknowledgedBy.includes(currentUser.id);
+                            return (
+                                <div key={msg.id} className={`group relative p-5 rounded-3xl border transition-all duration-300 ${isUnread ? 'bg-orange-500/5 border-orange-500/20' : 'bg-gray-800/40 border-gray-700/40'}`}>
+                                    <button onClick={() => onDeleteMessage(msg.id)} className="absolute top-4 right-4 p-2 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100"><TrashIcon className="h-5 w-5" /></button>
+                                    <div className="flex gap-4 items-start" onClick={() => isUnread && onAcknowledgeMessage(msg.id)}>
+                                        <div className="flex-shrink-0">
+                                            {teacher?.avatarUrl ? <img src={teacher.avatarUrl} alt="" className="h-10 w-10 rounded-xl object-cover" /> : <div className="h-10 w-10 rounded-xl bg-gray-700 flex items-center justify-center"><UserCircleIcon className="h-6 w-6 text-gray-500" /></div>}
+                                        </div>
+                                        <div className="flex-grow min-w-0">
+                                            <p className="text-[10px] font-black text-cyan-400 uppercase tracking-widest truncate">Prof. {teacher?.name || 'QG'}</p>
+                                            <p className={`text-sm mt-1 ${isUnread ? 'text-white font-bold' : 'text-gray-400'}`}>{msg.message}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        }) : <p className="text-center text-gray-600 text-xs font-black uppercase py-10 border-2 border-dashed border-gray-800 rounded-[2rem]">Nenhum aviso</p>}
+                    </div>
                 </div>
             </div>
 
             <button
                 onClick={onOpenNewMessageModal}
-                className="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-90 hover:rotate-3 transition-all duration-300 z-50 group"
-                aria-label="Falar com o Professor"
+                className="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-90 transition-all z-50"
             >
                 <ChatBubbleLeftRightIcon className="h-8 w-8" />
-                <span className="absolute right-24 bg-gray-900/90 backdrop-blur-md text-white text-[10px] font-black uppercase tracking-widest py-3 px-6 rounded-2xl opacity-0 group-hover:opacity-100 transition-all whitespace-nowrap border border-gray-700/50 shadow-2xl pointer-events-none translate-x-4 group-hover:translate-x-0">
-                    Comunicação Direta
-                </span>
             </button>
         </div>
     );

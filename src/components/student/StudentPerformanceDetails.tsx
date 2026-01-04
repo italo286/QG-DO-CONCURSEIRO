@@ -1,13 +1,14 @@
+
 import React, { useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { StudentProgress, Subject, QuestionAttempt } from '../../types';
 import { Card } from '../ui';
-import { ChartBarIcon } from '../Icons';
+import { ChartBarIcon, TrophyIcon, FireIcon, CheckCircleIcon, ClipboardCheckIcon, StarIcon } from '../Icons';
 import { getLocalDateISOString } from '../../utils';
-import { calculateLevel, getLevelTitle } from '../../gamification';
+import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
 import { MedalHall } from './MedalHall';
 
-const calculateLevelProgress = (xp: number) => (xp % 500) / 500 * 100;
+const calculateLevelProgress = (xp: number) => (xp % LEVEL_XP_REQUIREMENT) / LEVEL_XP_REQUIREMENT * 100;
 
 type TopicProgressData = {
     completed: boolean;
@@ -21,21 +22,25 @@ export const StudentPerformanceDetails: React.FC<{
 }> = ({ studentProgress, subjects }) => {
 
     const level = calculateLevel(studentProgress.xp);
+    const levelTitle = getLevelTitle(level);
     const levelProgress = calculateLevelProgress(studentProgress.xp);
+    const nextLevelXp = LEVEL_XP_REQUIREMENT - (studentProgress.xp % LEVEL_XP_REQUIREMENT);
+
+    const totalQuestionsResolved = useMemo(() => {
+        // FIX: Cast curr to any to avoid "Property 'questionsAnswered' does not exist on type 'unknown'" error.
+        return Object.values(studentProgress.dailyActivity).reduce((acc, curr: any) => acc + (curr.questionsAnswered || 0), 0);
+    }, [studentProgress.dailyActivity]);
 
     const performanceData = useMemo(() => {
         const data = {
             bySubject: [] as { name: string; score: number; completion: number }[],
             recentActivity: [] as { date: string, questions: number }[],
-            subjectsByErrorRate: [] as { name: string; errorRate: number, totalAttempts: number, incorrectAttempts: number }[],
-            topicsByErrorRate: [] as { name: string; subject: string, errorRate: number, totalAttempts: number, incorrectAttempts: number }[],
             subjectsBySuccessRate: [] as { name: string; successRate: number, totalAttempts: number, correctAttempts: number }[],
-            topicsBySuccessRate: [] as { name: string; subject: string, successRate: number, totalAttempts: number, correctAttempts: number }[],
         };
 
         subjects.forEach(subject => {
             const subjectProgress = studentProgress.progressByTopic[subject.id];
-            const allSubjectTopics = subject.topics.flatMap(t => [{...t, isSubtopic: false}, ...t.subtopics.map(st => ({...st, isSubtopic: true}))]);
+            const allSubjectTopics = subject.topics.flatMap(t => [t, ...t.subtopics]);
             
             if (!subjectProgress) {
                 data.bySubject.push({ name: subject.name, score: 0, completion: 0 });
@@ -46,40 +51,14 @@ export const StudentPerformanceDetails: React.FC<{
             let topicsWithScoreCount = 0;
             let completedCount = 0;
             let subjectTotalAttempts = 0;
-            let subjectIncorrectAttempts = 0;
             let subjectCorrectAttempts = 0;
 
-            Object.entries(subjectProgress).forEach(([topicId, topicProgress]: [string, TopicProgressData]) => {
+            Object.entries(subjectProgress).forEach(([topicId, topicProgress]: [string, any]) => {
                 const totalAttempts = topicProgress.lastAttempt?.length || 0;
-                
                 if (totalAttempts > 0) {
-                    const incorrectAttempts = topicProgress.lastAttempt.filter(a => !a.isCorrect).length;
-                    const correctAttempts = totalAttempts - incorrectAttempts;
-                    
+                    const correctAttempts = topicProgress.lastAttempt.filter((a: any) => a.isCorrect).length;
                     subjectTotalAttempts += totalAttempts;
-                    subjectIncorrectAttempts += incorrectAttempts;
                     subjectCorrectAttempts += correctAttempts;
-
-                    const originalTopicId = topicId.replace('-tec', '');
-                    const allTopicsAndSubtopics = subject.topics.flatMap(t => [t, ...t.subtopics]);
-                    const topicInfo = allTopicsAndSubtopics.find(t => t.id === originalTopicId);
-                    const topicName = topicInfo ? `${topicInfo.name}${topicId.endsWith('-tec') ? ' (Questões Extraídas)' : ''}` : 'Tópico Desconhecido';
-
-                    data.topicsByErrorRate.push({
-                        name: topicName,
-                        subject: subject.name,
-                        errorRate: (incorrectAttempts / totalAttempts) * 100,
-                        totalAttempts: totalAttempts,
-                        incorrectAttempts: incorrectAttempts
-                    });
-
-                    data.topicsBySuccessRate.push({
-                        name: topicName,
-                        subject: subject.name,
-                        successRate: (correctAttempts / totalAttempts) * 100,
-                        totalAttempts: totalAttempts,
-                        correctAttempts: correctAttempts,
-                    });
                 }
                 
                 if (topicProgress.lastAttempt && topicProgress.lastAttempt.length > 0) {
@@ -89,12 +68,6 @@ export const StudentPerformanceDetails: React.FC<{
             });
 
             if (subjectTotalAttempts > 0) {
-                data.subjectsByErrorRate.push({
-                    name: subject.name,
-                    errorRate: (subjectIncorrectAttempts / subjectTotalAttempts) * 100,
-                    totalAttempts: subjectTotalAttempts,
-                    incorrectAttempts: subjectIncorrectAttempts,
-                });
                 data.subjectsBySuccessRate.push({
                     name: subject.name,
                     successRate: (subjectCorrectAttempts / subjectTotalAttempts) * 100,
@@ -104,9 +77,7 @@ export const StudentPerformanceDetails: React.FC<{
             }
 
             allSubjectTopics.forEach(topic => {
-                if (subjectProgress[topic.id]?.completed) {
-                    completedCount++;
-                }
+                if (subjectProgress[topic.id]?.completed) completedCount++;
             });
 
             const avgScore = topicsWithScoreCount > 0 ? (totalScoreSum / topicsWithScoreCount) * 100 : 0;
@@ -124,144 +95,139 @@ export const StudentPerformanceDetails: React.FC<{
             const date = new Date(today);
             date.setDate(date.getDate() - i);
             const dateStr = getLocalDateISOString(date);
-            const dayData = studentProgress.dailyActivity[dateStr];
             data.recentActivity.push({
                 date: date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit'}),
-                questions: dayData?.questionsAnswered || 0,
+                questions: studentProgress.dailyActivity[dateStr]?.questionsAnswered || 0,
             });
         }
         
-        data.subjectsByErrorRate.sort((a, b) => b.errorRate - a.errorRate);
-        data.topicsByErrorRate.sort((a, b) => b.errorRate - a.errorRate);
-        data.subjectsBySuccessRate.sort((a, b) => b.successRate - a.successRate);
-        data.topicsBySuccessRate.sort((a, b) => b.successRate - a.successRate);
-
         return data;
-
     }, [studentProgress, subjects]);
 
     return (
-        <div className="space-y-8">
-            <Card className="p-6">
-                <h3 className="text-xl font-bold text-white mb-4">Progresso Geral</h3>
-                <div className="flex items-center space-x-4 mb-2">
-                    <div className="text-5xl font-bold text-cyan-400 bg-gray-700/50 rounded-full h-20 w-20 flex items-center justify-center">{level}</div>
-                    <div>
-                        <p className="text-2xl font-bold text-white">Nível {level}</p>
-                        <p className="text-lg text-gray-300">"{getLevelTitle(level)}"</p>
-                        <p className="text-gray-400">{studentProgress.xp} XP Total</p>
+        <div className="space-y-8 animate-fade-in">
+            {/* CABEÇALHO DE NÍVEL E XP - ESTILO ALTA PERFORMANCE */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <Card className="md:col-span-2 p-8 bg-[#020617] border-cyan-500/30 rounded-[2.5rem] relative overflow-hidden shadow-2xl">
+                    <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-cyan-500/10 rounded-full blur-3xl"></div>
+                    <div className="flex items-center gap-8 relative">
+                        <div className="relative">
+                            <div className="absolute inset-0 bg-cyan-500/20 blur-2xl rounded-full"></div>
+                            <div className="relative h-24 w-24 rounded-full border-4 border-cyan-500 flex items-center justify-center bg-gray-900 shadow-[0_0_30px_rgba(6,182,212,0.6)]">
+                                <span className="text-5xl font-black text-white">{level}</span>
+                            </div>
+                        </div>
+                        <div className="flex-grow">
+                            <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic">{levelTitle}</h3>
+                            <div className="mt-4 space-y-2">
+                                <div className="flex justify-between items-end">
+                                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
+                                    <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">{nextLevelXp} XP PARA O NÍVEL {level + 1}</span>
+                                </div>
+                                <div className="h-3 bg-gray-800 rounded-full overflow-hidden p-0.5 border border-white/5">
+                                    <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_12px_cyan]" style={{ width: `${levelProgress}%` }}></div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
+                </Card>
+
+                <div className="grid grid-cols-2 md:grid-cols-1 gap-4">
+                    <Card className="p-6 bg-gray-800/40 border-gray-700/50 rounded-[2rem] flex flex-col justify-center">
+                        <div className="flex items-center gap-3 mb-1">
+                            <ClipboardCheckIcon className="h-5 w-5 text-green-400" />
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Resolvidas</span>
+                        </div>
+                        <p className="text-4xl font-black text-white">{totalQuestionsResolved}</p>
+                        <p className="text-[10px] font-bold text-gray-600 uppercase mt-1">Questões totais</p>
+                    </Card>
+                    <Card className="p-6 bg-gray-800/40 border-gray-700/50 rounded-[2rem] flex flex-col justify-center">
+                        <div className="flex items-center gap-3 mb-1">
+                            <StarIcon className="h-5 w-5 text-yellow-400" />
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Conquistas</span>
+                        </div>
+                        <p className="text-4xl font-black text-white">{studentProgress.earnedBadgeIds.length}</p>
+                        <p className="text-[10px] font-bold text-gray-600 uppercase mt-1">Medalhas e Troféus</p>
+                    </Card>
                 </div>
-                <div className="w-full bg-gray-700 rounded-full h-4">
-                    <div className="bg-gradient-to-r from-cyan-500 to-blue-500 h-4 rounded-full" style={{ width: `${levelProgress}%` }}></div>
-                </div>
-                 <p className="text-right text-sm text-gray-400 mt-1">{500 - (studentProgress.xp % 500)} XP para o próximo nível</p>
-            </Card>
+            </div>
 
             <MedalHall studentProgress={studentProgress} subjects={subjects} />
 
-             <Card className="p-6">
-                <h3 className="text-xl font-bold mb-4">Média de Acertos por Disciplina</h3>
-                 <ResponsiveContainer width="100%" height={300}>
+             <Card className="p-8 bg-gray-800/20 border-gray-700/30 rounded-[2.5rem]">
+                <div className="flex items-center gap-3 mb-8">
+                    <div className="w-1.5 h-6 bg-cyan-500 rounded-full"></div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic">Desempenho por Disciplina</h3>
+                </div>
+                 <ResponsiveContainer width="100%" height={350}>
                     <BarChart data={performanceData.bySubject} margin={{ top: 5, right: 20, left: -10, bottom: 5 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563"/>
-                        <XAxis dataKey="name" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" unit="%" />
-                        <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }} />
-                        <Legend wrapperStyle={{ color: '#D1D5DB' }}/>
-                        <Bar dataKey="score" name="Acertos" fill="#22D3EE" unit="%" />
-                        <Bar dataKey="completion" name="Conclusão" fill="#3B82F6" unit="%" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false}/>
+                        <XAxis dataKey="name" stroke="#6B7280" fontSize={10} tickLine={false} axisLine={false} />
+                        <YAxis stroke="#6B7280" fontSize={10} unit="%" tickLine={false} axisLine={false} />
+                        <Tooltip 
+                            contentStyle={{ backgroundColor: '#0f172a', border: '1px solid #1e293b', borderRadius: '1rem', color: '#fff' }}
+                            itemStyle={{ fontSize: '12px', fontWeight: 'bold' }}
+                        />
+                        <Legend wrapperStyle={{ fontSize: '10px', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '0.1em', paddingTop: '20px' }}/>
+                        <Bar dataKey="score" name="Acertos" fill="#06b6d4" radius={[4, 4, 0, 0]} unit="%" />
+                        <Bar dataKey="completion" name="Conclusão" fill="#6366f1" radius={[4, 4, 0, 0]} unit="%" />
                     </BarChart>
                 </ResponsiveContainer>
              </Card>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                {/* Success Column */}
-                <Card className="p-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><ChartBarIcon className="h-6 w-6 text-green-400" /> Disciplinas com Mais Acertos</h3>
-                    <ul className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        {performanceData.subjectsBySuccessRate.filter(s => s.successRate > 0).length > 0 ? performanceData.subjectsBySuccessRate.filter(s => s.successRate > 0).map((s, i) => (
-                            <li key={i}>
-                                <div className="flex justify-between items-baseline mb-1">
-                                    <span className="font-semibold text-gray-200">{s.name}</span>
-                                    <span className="text-sm font-mono text-green-400">{s.successRate.toFixed(1)}%</span>
+                <Card className="p-8 bg-emerald-500/5 border-emerald-500/20 rounded-[2.5rem]">
+                    <h3 className="text-xl font-black text-emerald-400 mb-6 flex items-center gap-3 uppercase italic tracking-tighter">
+                        <CheckCircleIcon className="h-6 w-6" /> Pontos Fortes
+                    </h3>
+                    <ul className="space-y-6">
+                        {performanceData.subjectsBySuccessRate.filter(s => s.successRate >= 70).length > 0 ? 
+                         performanceData.subjectsBySuccessRate.filter(s => s.successRate >= 70).map((s, i) => (
+                            <li key={i} className="bg-emerald-950/20 p-4 rounded-2xl border border-emerald-500/10">
+                                <div className="flex justify-between items-baseline mb-2">
+                                    <span className="font-black text-white text-sm uppercase tracking-tight">{s.name}</span>
+                                    <span className="text-lg font-black text-emerald-400 italic">{s.successRate.toFixed(1)}%</span>
                                 </div>
-                                <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                    <div className="bg-green-500 h-2.5 rounded-full" style={{ width: `${s.successRate}%` }}></div>
+                                <div className="w-full bg-emerald-900/30 rounded-full h-2">
+                                    <div className="bg-emerald-500 h-full rounded-full shadow-[0_0_10px_rgba(16,185,129,0.5)]" style={{ width: `${s.successRate}%` }}></div>
                                 </div>
-                                <p className="text-xs text-right text-gray-400 mt-1">{s.correctAttempts}/{s.totalAttempts} corretas</p>
+                                <p className="text-[10px] font-bold text-emerald-600 uppercase mt-2">{s.correctAttempts} acertos de {s.totalAttempts} questões</p>
                             </li>
-                        )) : <p className="text-gray-500 text-center py-4">Nenhum acerto registrado ainda. Continue praticando!</p>}
+                        )) : <p className="text-gray-500 text-center py-10 font-bold italic opacity-40 uppercase text-xs tracking-widest">Nenhuma disciplina acima de 70% ainda.</p>}
                     </ul>
                 </Card>
 
-                 <Card className="p-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><ChartBarIcon className="h-6 w-6 text-teal-400" /> Tópicos com Mais Acertos</h3>
-                    <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                        {performanceData.topicsBySuccessRate.filter(t => t.successRate > 0).length > 0 ? performanceData.topicsBySuccessRate.filter(t => t.successRate > 0).map((t, i) => (
-                             <li key={i} className="p-3 bg-gray-900/50 rounded-md">
-                                <p className="font-semibold text-gray-200">{t.name}</p>
-                                <p className="text-xs text-gray-400 mb-1">{t.subject}</p>
-                                 <div className="flex justify-between items-baseline mb-1">
-                                    <span className="text-sm text-teal-400">{t.successRate.toFixed(1)}% de acerto</span>
-                                    <span className="text-xs text-gray-400">{t.correctAttempts}/{t.totalAttempts} corretas</span>
-                                 </div>
-                                 <div className="w-full bg-gray-700 rounded-full h-1.5">
-                                    <div className="bg-teal-500 h-1.5 rounded-full" style={{ width: `${t.successRate}%` }}></div>
+                 <Card className="p-8 bg-red-500/5 border-red-500/20 rounded-[2.5rem]">
+                    <h3 className="text-xl font-black text-red-400 mb-6 flex items-center gap-3 uppercase italic tracking-tighter">
+                        <FireIcon className="h-6 w-6" /> Pontos de Atenção
+                    </h3>
+                    <ul className="space-y-6">
+                        {performanceData.subjectsBySuccessRate.filter(s => s.successRate < 70 && s.successRate > 0).length > 0 ? 
+                         performanceData.subjectsBySuccessRate.filter(s => s.successRate < 70 && s.successRate > 0).map((s, i) => (
+                            <li key={i} className="bg-red-950/20 p-4 rounded-2xl border border-red-500/10">
+                                <div className="flex justify-between items-baseline mb-2">
+                                    <span className="font-black text-white text-sm uppercase tracking-tight">{s.name}</span>
+                                    <span className="text-lg font-black text-red-400 italic">{s.successRate.toFixed(1)}%</span>
                                 </div>
+                                <div className="w-full bg-red-900/30 rounded-full h-2">
+                                    <div className="bg-red-500 h-full rounded-full shadow-[0_0_10px_rgba(239,68,68,0.5)]" style={{ width: `${s.successRate}%` }}></div>
+                                </div>
+                                <p className="text-[10px] font-bold text-red-600 uppercase mt-2">Requer revisão intensiva</p>
                             </li>
-                        )) : <p className="text-gray-500 text-center py-4">Nenhum acerto registrado nos tópicos. Continue assim!</p>}
-                    </ul>
-                </Card>
-
-                {/* Error Column */}
-                <Card className="p-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><ChartBarIcon className="h-6 w-6 text-orange-400" /> Disciplinas com Mais Erros</h3>
-                    <ul className="space-y-4 max-h-96 overflow-y-auto pr-2">
-                        {performanceData.subjectsByErrorRate.filter(s => s.errorRate > 0).length > 0 ? performanceData.subjectsByErrorRate.filter(s => s.errorRate > 0).map((s, i) => (
-                            <li key={i}>
-                                <div className="flex justify-between items-baseline mb-1">
-                                    <span className="font-semibold text-gray-200">{s.name}</span>
-                                    <span className="text-sm font-mono text-orange-400">{s.errorRate.toFixed(1)}%</span>
-                                </div>
-                                <div className="w-full bg-gray-700 rounded-full h-2.5">
-                                    <div className="bg-orange-500 h-2.5 rounded-full" style={{ width: `${s.errorRate}%` }}></div>
-                                </div>
-                                <p className="text-xs text-right text-gray-400 mt-1">{s.incorrectAttempts}/{s.totalAttempts} erradas</p>
-                            </li>
-                        )) : <p className="text-gray-500 text-center py-4">Nenhum erro registrado. Continue assim!</p>}
-                    </ul>
-                </Card>
-
-                <Card className="p-6">
-                    <h3 className="text-xl font-bold mb-4 flex items-center gap-2"><ChartBarIcon className="h-6 w-6 text-red-400" /> Tópicos com Mais Erros</h3>
-                    <ul className="space-y-3 max-h-96 overflow-y-auto pr-2">
-                        {performanceData.topicsByErrorRate.filter(t => t.errorRate > 0).length > 0 ? performanceData.topicsByErrorRate.filter(t => t.errorRate > 0).map((t, i) => (
-                             <li key={i} className="p-3 bg-gray-900/50 rounded-md">
-                                <p className="font-semibold text-gray-200">{t.name}</p>
-                                <p className="text-xs text-gray-400 mb-1">{t.subject}</p>
-                                 <div className="flex justify-between items-baseline mb-1">
-                                    <span className="text-sm text-red-400">{t.errorRate.toFixed(1)}% de erro</span>
-                                    <span className="text-xs text-gray-400">{t.incorrectAttempts}/{t.totalAttempts} erradas</span>
-                                 </div>
-                                 <div className="w-full bg-gray-700 rounded-full h-1.5">
-                                    <div className="bg-red-500 h-1.5 rounded-full" style={{ width: `${t.errorRate}%` }}></div>
-                                </div>
-                            </li>
-                        )) : <p className="text-gray-500 text-center py-4">Nenhum erro registrado nos tópicos. Parabéns!</p>}
+                        )) : <p className="text-gray-500 text-center py-10 font-bold italic opacity-40 uppercase text-xs tracking-widest">Excelente! Nenhuma disciplina abaixo de 70%.</p>}
                     </ul>
                 </Card>
             </div>
             
-            <Card className="p-6">
-                 <h3 className="text-xl font-bold mb-4">Atividade Recente (Últimos 7 dias)</h3>
-                  <ResponsiveContainer width="100%" height={250}>
+            <Card className="p-8 bg-gray-800/10 border-gray-700/20 rounded-[2.5rem]">
+                 <h3 className="text-xl font-black text-white mb-6 uppercase tracking-tighter italic">Ritmo de Batalha (Questões/Dia)</h3>
+                  <ResponsiveContainer width="100%" height={200}>
                     <BarChart data={performanceData.recentActivity}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#4B5563"/>
-                        <XAxis dataKey="date" stroke="#9CA3AF" />
-                        <YAxis stroke="#9CA3AF" allowDecimals={false} />
-                        <Tooltip contentStyle={{ backgroundColor: '#1F2937', border: '1px solid #374151' }} />
-                        <Bar dataKey="questions" name="Questões Resolvidas" fill="#818CF8" />
+                        <CartesianGrid strokeDasharray="3 3" stroke="#374151" vertical={false} />
+                        <XAxis dataKey="date" stroke="#6B7280" fontSize={10} axisLine={false} tickLine={false} />
+                        <YAxis stroke="#6B7280" fontSize={10} axisLine={false} tickLine={false} allowDecimals={false} />
+                        <Tooltip contentStyle={{ backgroundColor: '#0f172a', borderRadius: '1rem', border: 'none' }} />
+                        <Bar dataKey="questions" name="Questões" fill="#fbbf24" radius={[4, 4, 4, 4]} />
                     </BarChart>
                 </ResponsiveContainer>
             </Card>
