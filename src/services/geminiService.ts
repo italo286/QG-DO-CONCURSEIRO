@@ -369,3 +369,32 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
     }));
     return parseJsonResponse(response.text ?? '', 'array');
 };
+
+/**
+ * Limpa e extrai títulos de assuntos de uma lista bruta colada pelo usuário.
+ */
+export const cleanSubtopicNames = async (rawList: string): Promise<string[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const prompt = `Analise a seguinte lista de títulos de aulas/vídeos:
+    "${rawList}"
+
+    Sua tarefa é extrair APENAS o nome descritivo do assunto para cada item da lista.
+    REGRAS DE LIMPEZA:
+    1. Remova emojis (ex: 🎥, 📚).
+    2. Remova prefixos de organização como "Vídeo 1 -", "Video 02 :", "Aula 3 -", "01.", "Parte 1:".
+    3. Remova extensões de arquivo (ex: .mp4, .pdf).
+    4. Remova espaços extras.
+    5. O resultado deve ter EXATAMENTE o mesmo número de itens que linhas/itens fornecidos no texto original.
+    6. Retorne um array JSON contendo apenas strings dos títulos limpos.
+
+    Exemplo de saída esperada: ["Preposições", "Conjunções Coordenativas", "Crase"]`;
+
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+    }));
+    
+    return parseJsonResponse(response.text ?? '[]', 'array');
+};

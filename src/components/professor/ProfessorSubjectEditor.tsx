@@ -6,6 +6,7 @@ import { Card, Button, Spinner, ConfirmModal } from '../ui';
 import { PlusIcon, TrashIcon, PencilIcon, ChevronDownIcon, GeminiIcon, DocumentTextIcon, ClipboardCheckIcon, GameControllerIcon, FlashcardIcon, TagIcon, ChartLineIcon, VideoCameraIcon, SubjectIcon } from '../Icons';
 import { AiTopicGeneratorModal } from './AiTopicGeneratorModal';
 import { AiBulkTopicContentGeneratorModal } from './AiBulkTopicContentGeneratorModal';
+import { AiBulkRenameModal } from './AiBulkRenameModal';
 import { ProfessorTopicEditor } from './ProfessorTopicEditor';
 import { ProfessorSubTopicEditor } from './ProfessorSubTopicEditor';
 
@@ -70,6 +71,9 @@ export const ProfessorSubjectEditor: React.FC<{
     const [isAiBulkSubtopicModalOpen, setIsAiBulkSubtopicModalOpen] = useState(false);
     const [bulkSubtopicTargetTopic, setBulkSubtopicTargetTopic] = useState<Topic | null>(null);
 
+    const [isBulkRenameModalOpen, setIsBulkRenameModalOpen] = useState(false);
+    const [renameTargetTopic, setRenameTargetTopic] = useState<Topic | null>(null);
+
     const [draggedTopicIndex, setDraggedTopicIndex] = useState<number | null>(null);
     const [draggedSubtopicInfo, setDraggedSubtopicInfo] = useState<{ parentIndex: number; subtopicIndex: number } | null>(null);
 
@@ -121,6 +125,11 @@ export const ProfessorSubjectEditor: React.FC<{
     const handleOpenAiBulkSubtopic = (topic: Topic) => {
         setBulkSubtopicTargetTopic(topic);
         setIsAiBulkSubtopicModalOpen(true);
+    };
+
+    const handleOpenBulkRename = (topic: Topic) => {
+        setRenameTargetTopic(topic);
+        setIsBulkRenameModalOpen(true);
     };
 
     const handleSaveTopic = useCallback((topicToSave: Topic) => {
@@ -227,6 +236,18 @@ export const ProfessorSubjectEditor: React.FC<{
         setIsAiBulkSubtopicModalOpen(false);
         setBulkSubtopicTargetTopic(null);
     }, [currentSubject, bulkSubtopicTargetTopic, updateSubjectStateAndDb, setToastMessage]);
+
+    const handleConfirmBulkRename = (renamedSubtopics: SubTopic[]) => {
+        if (!renameTargetTopic) return;
+        const updatedTopics = currentSubject.topics.map(t => {
+            if (t.id === renameTargetTopic.id) {
+                return { ...t, subtopics: renamedSubtopics };
+            }
+            return t;
+        });
+        updateSubjectStateAndDb({ ...currentSubject, topics: updatedTopics });
+        setToastMessage("Subtópicos renomeados com sucesso!");
+    };
     
     const executeDeleteTopic = () => {
         if (!confirmDeleteTopicData) return;
@@ -250,6 +271,7 @@ export const ProfessorSubjectEditor: React.FC<{
     const handleCloseAiTopicModal = useCallback(() => setIsAiTopicModalOpen(false), []);
     const handleCloseAiBulkModal = useCallback(() => setIsAiBulkModalOpen(false), []);
     const handleCloseAiBulkSubtopicModal = useCallback(() => { setIsAiBulkSubtopicModalOpen(false); setBulkSubtopicTargetTopic(null); }, []);
+    const handleCloseBulkRenameModal = useCallback(() => { setIsBulkRenameModalOpen(false); setRenameTargetTopic(null); }, []);
 
     const handleDragStart = (e: DragEvent<HTMLElement>, index: number) => {
         setDraggedTopicIndex(index);
@@ -482,6 +504,13 @@ export const ProfessorSubjectEditor: React.FC<{
                                     <div className="flex items-center space-x-2">
                                         <div className="flex bg-gray-700 rounded-md overflow-hidden border border-gray-600">
                                             <button 
+                                                onClick={(e) => {e.stopPropagation(); handleOpenBulkRename(topic)}} 
+                                                className="p-1 px-2 text-amber-400 hover:bg-gray-600 text-[10px] font-black flex items-center border-r border-gray-600" 
+                                                title="Renomear Subtópicos com IA"
+                                            >
+                                                <GeminiIcon className="h-3 w-3 mr-1"/> RENOMEAR
+                                            </button>
+                                            <button 
                                                 onClick={(e) => {e.stopPropagation(); handleOpenAiBulkSubtopic(topic)}} 
                                                 className="p-1 px-2 text-cyan-400 hover:bg-gray-600 text-[10px] font-bold flex items-center border-r border-gray-600" 
                                                 title="Gerar Subtópicos em Massa com IA"
@@ -567,6 +596,15 @@ export const ProfessorSubjectEditor: React.FC<{
                 onSave={handleSaveAiBulkSubtopics}
                 mode="subtopic"
             />
+
+            {renameTargetTopic && (
+                <AiBulkRenameModal
+                    isOpen={isBulkRenameModalOpen}
+                    onClose={handleCloseBulkRenameModal}
+                    subtopics={renameTargetTopic.subtopics}
+                    onConfirm={handleConfirmBulkRename}
+                />
+            )}
 
             <ProfessorTopicEditor
                 isOpen={isTopicModalOpen}
