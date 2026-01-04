@@ -60,119 +60,110 @@ export const DailySchedule: React.FC<{
     const sortedTimes = Object.keys(todayItems).sort();
 
     return (
-        <Card className="p-6 bg-gray-800/60 border-cyan-500/20 shadow-2xl relative overflow-hidden">
+        <Card className="p-8 bg-[#0a0f1d]/60 border-white/5 shadow-2xl relative overflow-hidden rounded-[2.5rem]">
             <div className="absolute top-0 right-0 p-4 opacity-5 rotate-12 pointer-events-none">
                 <CalendarIcon className="h-24 w-24" />
             </div>
 
-            <div className="mb-8">
+            <div className="mb-10">
                 <div className="flex items-center gap-3 mb-1">
-                    <div className="w-2 h-6 bg-cyan-500 rounded-full"></div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tighter">Agenda do Dia</h3>
+                    <div className="w-2.5 h-7 bg-cyan-500 rounded-full shadow-[0_0_15px_cyan]"></div>
+                    <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic">Agenda do Dia</h3>
                 </div>
-                <p className="text-[10px] text-cyan-400/70 font-black uppercase tracking-[0.2em]">
+                <p className="text-[10px] text-cyan-400/50 font-black uppercase tracking-[0.3em] ml-6">
                     {now.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long' })}
                 </p>
             </div>
 
             {sortedTimes.length === 0 ? (
-                <div className="py-10 text-center border-2 border-dashed border-gray-700 rounded-2xl">
-                    <p className="text-gray-500 text-sm font-bold uppercase tracking-widest italic">Descanso Programado</p>
+                <div className="py-10 text-center border-2 border-dashed border-gray-800 rounded-3xl">
+                    <p className="text-gray-600 text-[10px] font-black uppercase tracking-widest italic">Descanso Programado</p>
                 </div>
             ) : (
-                <div className="relative space-y-6">
-                    {sortedTimes.map((time, index) => {
-                        const content = todayItems[time];
-                        const isTopicId = content.startsWith('t') || content.startsWith('st');
-                        const topicInfo = isTopicId ? getTopicInfo(content) : null;
-                        const isCompletedManually = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
-                        
-                        const itemMinutes = timeToMinutes(time);
-                        const isPast = currentMinutes >= itemMinutes;
-                        const isCircleActive = isPast || isCompletedManually;
+                <div className="relative ml-2">
+                    {/* LINHA DA TIMELINE */}
+                    <div className="absolute left-[13px] top-4 bottom-4 w-0.5 bg-cyan-950/50" />
 
-                        const nextTime = sortedTimes[index + 1];
-                        const isLineActive = nextTime ? (currentMinutes >= timeToMinutes(nextTime)) : false;
+                    <div className="space-y-10">
+                        {sortedTimes.map((time, index) => {
+                            const content = todayItems[time];
+                            const isTopicId = content.startsWith('t') || content.startsWith('st');
+                            const topicInfo = isTopicId ? getTopicInfo(content) : null;
+                            const isCompleted = topicInfo ? (studentProgress.progressByTopic[topicInfo.subjectId]?.[content]?.completed || false) : false;
+                            
+                            const itemMinutes = timeToMinutes(time);
+                            const isNext = index < sortedTimes.length - 1 && currentMinutes >= timeToMinutes(sortedTimes[index+1]);
+                            const isActive = currentMinutes >= itemMinutes && !isNext;
 
-                        const isLast = index === sortedTimes.length - 1;
+                            return (
+                                <div key={time} className="relative pl-12 group">
+                                    {/* LINHA ATIVA */}
+                                    {index < sortedTimes.length - 1 && currentMinutes >= itemMinutes && (
+                                        <div className="absolute left-[13px] top-4 h-full w-0.5 bg-cyan-500 shadow-[0_0_10px_cyan]" />
+                                    )}
 
-                        return (
-                            <div key={time} className="relative pl-10 group">
-                                {!isLast && (
-                                    <div className={`absolute left-3.5 top-7 w-0.5 h-full z-0 transition-colors duration-700 ${isLineActive ? 'bg-cyan-500' : 'bg-gray-700'}`} />
-                                )}
+                                    {/* CÍRCULO DA TIMELINE */}
+                                    <div className={`absolute left-0 top-0.5 w-7 h-7 rounded-full border-4 border-gray-900 z-10 transition-all duration-700 flex items-center justify-center 
+                                        ${isActive ? 'bg-cyan-500 shadow-[0_0_20px_cyan] scale-110' : 
+                                          currentMinutes > itemMinutes ? 'bg-cyan-700 border-cyan-500' : 'bg-gray-800 border-gray-700'}`}>
+                                        <div className={`w-2 h-2 rounded-full ${isActive ? 'bg-white animate-ping' : 'bg-transparent'}`} />
+                                    </div>
 
-                                <div className={`absolute left-0 top-1 w-7 h-7 rounded-full border-4 border-gray-900 flex items-center justify-center z-10 transition-all duration-700 ${isCircleActive ? 'bg-cyan-500 shadow-[0_0_15px_rgba(6,182,212,0.6)]' : 'bg-gray-700 group-hover:bg-gray-600'}`}>
-                                    {isCompletedManually ? (
-                                        <CheckIcon className="h-3 w-3 text-white" />
-                                    ) : isPast ? (
-                                        <div className="w-1.5 h-1.5 bg-white rounded-full animate-pulse" />
-                                    ) : null}
-                                </div>
-
-                                <div className="space-y-1">
-                                    <span className={`text-[10px] font-black font-mono tracking-tighter uppercase transition-colors ${isCircleActive ? 'text-cyan-400' : 'text-gray-500'}`}>
-                                        {time}
-                                    </span>
-                                    
-                                    <div 
-                                        className={`p-3 rounded-xl border transition-all duration-300 ${isCircleActive ? 'bg-cyan-500/5 border-cyan-500/30' : 'bg-gray-900/40 border-gray-700 hover:border-gray-600'}`}
-                                    >
-                                        {topicInfo ? (
-                                            <div className="flex justify-between items-start gap-2">
-                                                <div className="min-w-0">
-                                                    <p className={`text-xs font-black uppercase tracking-tighter mb-0.5 truncate ${isCircleActive ? 'text-cyan-500/70' : 'text-gray-500'}`}>
-                                                        {topicInfo.subjectName}
-                                                    </p>
-                                                    <p className={`text-sm font-bold leading-tight ${isCircleActive ? 'text-white' : 'text-gray-300'}`}>
-                                                        {topicInfo.name}
-                                                    </p>
-                                                </div>
-                                                <div className="flex flex-col gap-1">
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className={`text-xs font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : 'text-gray-500'}`}>
+                                                {time}
+                                            </span>
+                                            {isActive && <span className="text-[8px] bg-cyan-500/20 text-cyan-400 px-2 py-0.5 rounded font-black uppercase tracking-widest animate-pulse">AGORA</span>}
+                                        </div>
+                                        
+                                        <div className={`p-5 rounded-2xl border transition-all duration-500 relative overflow-hidden bg-[#111827]/40
+                                            ${isActive ? 'border-cyan-500/40 shadow-2xl bg-cyan-500/5' : 'border-white/5 hover:border-white/10'}`}>
+                                            
+                                            {topicInfo ? (
+                                                <div className="flex justify-between items-center gap-4">
+                                                    <div className="flex gap-4 items-center min-w-0">
+                                                        <div className={`p-2 rounded-lg ${isActive ? 'bg-cyan-500 text-white shadow-[0_0_10px_cyan]' : 'bg-gray-800 text-gray-500'}`}>
+                                                            <PencilIcon className="h-4 w-4" />
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <p className={`text-sm font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                                                                "{topicInfo.name}"
+                                                            </p>
+                                                            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mt-1">
+                                                                {topicInfo.subjectName}
+                                                            </p>
+                                                        </div>
+                                                    </div>
                                                     <button 
-                                                        onClick={() => onToggleTopicCompletion(topicInfo.subjectId, content, !isCompletedManually)}
-                                                        className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isCompletedManually ? 'text-cyan-500 bg-cyan-500/10' : 'text-gray-500 bg-gray-800 hover:text-white hover:bg-cyan-600'}`}
-                                                        title={isCompletedManually ? "Desmarcar conclusão" : "Marcar como concluído"}
+                                                        onClick={() => onNavigateToTopic(content)}
+                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-500 text-white shadow-xl' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
                                                     >
-                                                        <CheckIcon className="h-3 w-3" />
+                                                        <ArrowRightIcon className="h-4 w-4" />
                                                     </button>
-                                                    {!isCompletedManually && (
-                                                        <button 
-                                                            /* FIX: Changed handleNavigateToTopic to onNavigateToTopic as per reported error */
-                                                            onClick={() => onNavigateToTopic(content)}
-                                                            className={`h-6 w-6 rounded-lg flex items-center justify-center transition-all ${isCircleActive ? 'bg-cyan-600/20 text-cyan-400 hover:bg-cyan-600' : 'bg-gray-800 text-gray-500 hover:bg-cyan-600'} hover:text-white`}
-                                                            title="Ir para aula"
-                                                        >
-                                                            <ArrowRightIcon className="h-3 w-3" />
-                                                        </button>
-                                                    )}
                                                 </div>
-                                            </div>
-                                        ) : (
-                                            <div className="flex items-center gap-2">
-                                                <PencilIcon className={`h-3 w-3 flex-shrink-0 ${isCircleActive ? 'text-cyan-400' : 'text-purple-400'}`} />
-                                                <p className={`text-xs italic line-clamp-2 ${isCircleActive ? 'text-cyan-100/70' : 'text-gray-400'}`}>"{content}"</p>
-                                            </div>
-                                        )}
+                                            ) : (
+                                                <div className="flex items-center gap-4">
+                                                    <div className="p-2 rounded-lg bg-gray-800/50 text-gray-600">
+                                                        <PencilIcon className="h-4 w-4" />
+                                                    </div>
+                                                    <p className={`text-sm font-bold italic truncate ${isActive ? 'text-cyan-200' : 'text-gray-500'}`}>"{content}"</p>
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })}
+                    </div>
                 </div>
             )}
             
-            <div className="mt-8 pt-4 border-t border-gray-700/50 flex justify-center">
-                 <button className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-cyan-400 transition-colors">
-                    Ver Plano Completo
+            <div className="mt-12 flex justify-center">
+                 <button className="px-6 py-2 bg-white/5 border border-white/10 rounded-full text-[9px] font-black uppercase tracking-[0.3em] text-gray-500 hover:text-cyan-400 hover:border-cyan-500/30 transition-all">
+                    Visualizar Protocolo Completo
                  </button>
             </div>
         </Card>
     );
 };
-
-const CheckIcon: React.FC<{ className?: string }> = ({ className }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round">
-        <polyline points="20 6 9 17 4 12" />
-    </svg>
-);
