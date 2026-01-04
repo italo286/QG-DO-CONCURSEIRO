@@ -1,3 +1,4 @@
+
 import jsPDF from 'jspdf';
 import { Question } from './types';
 
@@ -31,12 +32,13 @@ export const getWeekDates = (date: Date): Date[] => {
     return week;
 };
 
-export const parseGoogleDriveUrl = (url: string): { embedUrl: string; downloadUrl: string } | null => {
+export const parseGoogleDriveUrl = (url: string): { id: string; embedUrl: string; downloadUrl: string } | null => {
     const regex = /(?:file\/d\/|id=|\/u\/\d+\/folders\/|open\?id=)([a-zA-Z0-9_-]{25,})/;
     const match = url.match(regex);
     if (match && match[1]) {
         const fileId = match[1];
         return {
+            id: fileId,
             embedUrl: `https://drive.google.com/file/d/${fileId}/preview`,
             downloadUrl: `https://drive.google.com/uc?export=download&id=${fileId}`,
         };
@@ -69,6 +71,20 @@ export const convertMediaUrlToEmbed = (url: string | undefined): string => {
     }
     
     return url;
+};
+
+export const getMediaThumbnail = (url: string): string | null => {
+    if (!url) return null;
+    
+    // YouTube
+    const ytId = getYoutubeVideoId(url);
+    if (ytId) return `https://img.youtube.com/vi/${ytId}/maxresdefault.jpg`;
+    
+    // Google Drive
+    const driveInfo = parseGoogleDriveUrl(url);
+    if (driveInfo) return `https://drive.google.com/thumbnail?id=${driveInfo.id}&sz=w600`;
+    
+    return null;
 };
 
 export const rgbToHex = (rgb: string): string => {
@@ -140,12 +156,6 @@ export const markdownToHtml = (text: string): string => {
 };
 
 export const getBrasiliaDate = (): Date => {
-    // This function calculates the current time in Brasilia (UTC-3) reliably,
-    // regardless of the user's local timezone settings. It does this by creating
-    // a date object from the current UTC time components and then manually
-    // subtracting 3 hours. The rest of the app can then use UTC methods
-    // (like getUTCHours(), getUTCMinutes()) on the returned Date object to get
-    // the correct time components for Brasilia.
     const now = new Date();
     const utcDate = new Date(Date.UTC(
         now.getUTCFullYear(),
@@ -162,7 +172,6 @@ export const getBrasiliaDate = (): Date => {
 
 
 export const getLocalDateISOString = (date: Date): string => {
-    // Uses UTC methods to ensure consistency with getBrasiliaDate
     const year = date.getUTCFullYear();
     const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
     const day = date.getUTCDate().toString().padStart(2, '0');

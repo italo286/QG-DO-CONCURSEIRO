@@ -3,13 +3,13 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
     Subject, Topic, SubTopic, PdfFile, StudentProgress, MiniGame, QuestionAttempt, VideoFile, BankProfilePdf
 } from '../../../types';
-import { convertMediaUrlToEmbed, getYoutubeVideoId } from '../../../utils';
+import { convertMediaUrlToEmbed, getMediaThumbnail } from '../../../utils';
 import { Card, Button } from '../../ui';
 import { 
     DocumentTextIcon, LightBulbIcon, VideoCameraIcon,
     FlashcardIcon, GameControllerIcon, ClipboardListIcon, SplitScreenIcon, GeminiIcon,
     XCircleIcon, ChevronDoubleLeftIcon, ArrowRightIcon, TrophyIcon, TagIcon, ClipboardCheckIcon,
-    BrainIcon, BriefcaseIcon, ChartLineIcon, GlobeIcon
+    BrainIcon, BriefcaseIcon, ChartLineIcon
 } from '../../Icons';
 import { QuizView } from '../QuizView';
 import { NotesEditor } from '../NotesEditor';
@@ -274,24 +274,24 @@ export const TopicView: React.FC<TopicViewProps> = ({
             case 'videos':
                 if (activeVideo) {
                     return (
-                        <div className="p-6 space-y-6 max-h-full overflow-y-auto animate-fade-in bg-gray-950/80 backdrop-blur-xl rounded-[2.5rem] border border-gray-700/50 m-4">
+                        <div className="p-6 space-y-6 max-h-full overflow-y-auto animate-fade-in bg-gray-950 rounded-[2.5rem] border border-gray-700/50 m-4 shadow-2xl">
                             <div className="flex items-center justify-between">
-                                <button onClick={() => setActiveVideo(null)} className="text-cyan-400 hover:text-white transition-all flex items-center font-black text-[10px] uppercase tracking-widest bg-gray-800/80 px-5 py-2.5 rounded-full border border-gray-700 shadow-xl hover:scale-105 active:scale-95">
+                                <button onClick={() => setActiveVideo(null)} className="text-cyan-400 hover:text-white transition-all flex items-center font-black text-[10px] uppercase tracking-widest bg-gray-800 px-5 py-2.5 rounded-full border border-gray-700 shadow-xl hover:scale-105 active:scale-95">
                                     <ArrowRightIcon className="h-3 w-3 mr-2 transform rotate-180" />
                                     Fechar Cinema
                                 </button>
                                 <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-cyan-500/10 border border-cyan-500/20">
                                     <div className="w-1.5 h-1.5 bg-cyan-500 rounded-full animate-pulse"></div>
-                                    <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Transmitindo</span>
+                                    <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">Em Execução</span>
                                 </div>
                             </div>
                             
                             <div className="space-y-6">
                                 <div className="space-y-1">
-                                    <h3 className="text-3xl font-black text-white tracking-tighter uppercase leading-none italic drop-shadow-2xl">{activeVideo.name}</h3>
-                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{selectedSubject.name} • {selectedTopic.name}</p>
+                                    <h3 className="text-3xl font-black text-white tracking-tighter uppercase leading-none italic">{activeVideo.name}</h3>
+                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em]">{selectedSubject.name} • Protocolo High Performance</p>
                                 </div>
-                                <div className="relative aspect-video rounded-[2rem] overflow-hidden shadow-[0_0_80px_-20px_rgba(34,211,238,0.4)] border-4 border-gray-800/50 bg-black group">
+                                <div className="relative aspect-video rounded-[2rem] overflow-hidden shadow-[0_0_100px_-20px_rgba(34,211,238,0.3)] border-4 border-gray-800 bg-black">
                                     <iframe 
                                         src={convertMediaUrlToEmbed(activeVideo.url)} 
                                         title={activeVideo.name}
@@ -300,9 +300,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                         allowFullScreen
                                         className="w-full h-full"
                                     ></iframe>
-                                </div>
-                                <div className="flex justify-center pt-4">
-                                    <p className="text-xs text-gray-500 font-bold uppercase tracking-widest opacity-40">Modo de Alta Performance Ativado</p>
                                 </div>
                             </div>
                         </div>
@@ -313,35 +310,28 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         <header className="flex flex-col md:flex-row md:items-end justify-between gap-6">
                             <div className="space-y-2">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-2.5 h-10 bg-gradient-to-b from-cyan-400 to-blue-600 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.5)]"></div>
+                                    <div className="w-2.5 h-10 bg-cyan-500 rounded-full shadow-[0_0_15px_rgba(6,182,212,0.6)]"></div>
                                     <h3 className="text-4xl font-black text-white uppercase tracking-tighter italic leading-none">Galeria de Vídeo</h3>
                                 </div>
-                                <p className="text-xs text-gray-500 font-bold uppercase tracking-[0.3em] ml-5">Protocolo de Ensino Visual</p>
-                            </div>
-                            <div className="flex gap-4">
-                                <div className="bg-gray-800/50 px-4 py-2 rounded-2xl border border-gray-700/50 flex flex-col items-center">
-                                    <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">Total</span>
-                                    <span className="text-lg font-black text-cyan-400">{(currentContent.videoUrls || []).length}</span>
-                                </div>
+                                <p className="text-xs text-gray-500 font-bold uppercase tracking-[0.3em] ml-5">Transmissão Direta do QG</p>
                             </div>
                         </header>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
-                            {(currentContent.videoUrls || []).map((video) => {
-                                const youtubeId = getYoutubeVideoId(video.url);
-                                const isDrive = video.url.includes('drive.google.com');
-                                const thumbnailUrl = youtubeId ? `https://img.youtube.com/vi/${youtubeId}/maxresdefault.jpg` : null;
+                            {(currentContent.videoUrls || []).map((video, index) => {
+                                const thumbnailUrl = getMediaThumbnail(video.url);
+                                // Prioriza o nome do subtópico/aula conforme pedido pelo usuário
+                                const displayName = (currentContent.videoUrls || []).length > 1 
+                                    ? `${currentContent.name} - Parte ${index + 1}`
+                                    : currentContent.name;
 
                                 return (
                                     <div 
                                         key={video.url} 
-                                        onClick={() => setActiveVideo(video)} 
+                                        onClick={() => setActiveVideo({...video, name: displayName})} 
                                         className="group relative cursor-pointer"
                                     >
-                                        {/* Efeito de Glow no Hover */}
-                                        <div className="absolute -inset-2 bg-gradient-to-br from-cyan-500/20 to-purple-600/20 rounded-[2.5rem] blur-2xl opacity-0 group-hover:opacity-100 transition-all duration-700"></div>
-                                        
-                                        <Card className="!p-0 overflow-hidden bg-gray-900/40 border-gray-800 hover:border-cyan-500/40 transition-all duration-500 rounded-[2rem] shadow-2xl flex flex-col h-full hover:translate-y-[-8px] backdrop-blur-sm relative z-10">
+                                        <Card className="!p-0 overflow-hidden bg-gray-900 border-gray-800 hover:border-cyan-500/40 transition-all duration-500 rounded-[2.5rem] shadow-2xl flex flex-col h-full hover:translate-y-[-8px] backdrop-blur-sm">
                                             
                                             {/* Thumbnail Container */}
                                             <div className="relative aspect-video overflow-hidden bg-gray-950">
@@ -349,79 +339,47 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                                     <img src={thumbnailUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
                                                 ) : (
                                                     <div className="w-full h-full flex items-center justify-center bg-gradient-to-tr from-gray-900 via-gray-800 to-gray-900 relative">
-                                                        {/* Pattern de fundo para vídeos sem thumbnail */}
-                                                        <div className="absolute inset-0 opacity-[0.03] pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')]"></div>
                                                         <div className="relative flex flex-col items-center gap-3">
                                                             <div className="w-16 h-16 rounded-full bg-gray-900/80 flex items-center justify-center border border-gray-700 shadow-2xl group-hover:border-cyan-500/50 transition-colors">
                                                                 <VideoCameraIcon className="h-8 w-8 text-gray-700 group-hover:text-cyan-500 transition-colors" />
                                                             </div>
-                                                            <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.4em]">Sinal Encriptado</span>
                                                         </div>
                                                     </div>
                                                 )}
                                                 
-                                                {/* Gradientes e Overlays */}
-                                                <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-black/20 opacity-80"></div>
+                                                <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-black/10 opacity-90"></div>
                                                 
-                                                {/* Play Button Premium */}
+                                                {/* Play Button Central (Padrão Elite) */}
                                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 transform scale-50 group-hover:scale-100">
-                                                    <div className="w-16 h-16 rounded-full bg-white/10 backdrop-blur-md border border-white/20 flex items-center justify-center shadow-2xl">
-                                                        <div className="w-12 h-12 rounded-full bg-cyan-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.6)]">
-                                                            <svg className="w-5 h-5 ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M4.516 7.548c.436-1.146 1.943-1.146 2.378 0l3.158 8.271c.436 1.146-.667 2.181-1.66 2.181H2.607c-.993 0-2.096-1.035-1.66-2.181l3.569-8.271z" transform="rotate(90 10 10)" /></svg>
-                                                        </div>
+                                                    <div className="w-16 h-16 rounded-full bg-cyan-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.6)]">
+                                                        <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M4.516 7.548c.436-1.146 1.943-1.146 2.378 0l3.158 8.271c.436 1.146-.667 2.181-1.66 2.181H2.607c-.993 0-2.096-1.035-1.66-2.181l3.569-8.271z" transform="rotate(90 10 10)" /></svg>
                                                     </div>
                                                 </div>
 
-                                                {/* Badges Flutuantes */}
-                                                <div className="absolute top-4 left-4 flex gap-2">
-                                                    <div className="px-3 py-1 rounded-lg bg-gray-950/80 backdrop-blur-md border border-gray-700/50 shadow-lg">
+                                                <div className="absolute top-5 left-5">
+                                                    <div className="px-3 py-1 rounded-lg bg-gray-950/90 backdrop-blur-md border border-gray-700/50 shadow-lg">
                                                         <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">AULA</span>
                                                     </div>
-                                                    {isDrive && (
-                                                        <div className="px-3 py-1 rounded-lg bg-blue-500/20 backdrop-blur-md border border-blue-500/30 shadow-lg flex items-center gap-1.5">
-                                                            <GlobeIcon className="h-2.5 w-2.5 text-blue-400" />
-                                                            <span className="text-[9px] font-black text-blue-400 uppercase tracking-widest">DRIVE</span>
-                                                        </div>
-                                                    )}
                                                 </div>
                                             </div>
 
-                                            {/* Footer Info Premium */}
-                                            <div className="p-7 flex-grow flex flex-col">
-                                                <div className="flex-grow">
-                                                    <h4 className="text-base font-black text-white group-hover:text-cyan-400 transition-colors leading-tight line-clamp-2 uppercase tracking-tight mb-2 italic">
-                                                        {video.name}
-                                                    </h4>
-                                                </div>
+                                            {/* Footer Info Minimalista */}
+                                            <div className="p-7 flex-grow flex flex-col justify-center">
+                                                <h4 className="text-base font-black text-white group-hover:text-cyan-400 transition-colors leading-tight line-clamp-2 uppercase tracking-tight italic">
+                                                    {displayName}
+                                                </h4>
                                                 
-                                                <div className="mt-6 flex items-center justify-between border-t border-gray-800/50 pt-5">
-                                                    <div className="flex items-center gap-3">
-                                                        <div className="flex -space-x-1.5">
-                                                            {[1,2,3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full ring-2 ring-gray-900 ${i <= 2 ? 'bg-cyan-500' : 'bg-gray-700'}`}></div>)}
-                                                        </div>
-                                                        <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest">HD 1080P</span>
+                                                <div className="mt-4 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-opacity">
+                                                    <div className="flex gap-1.5">
+                                                        {[1,2,3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= 2 ? 'bg-cyan-500' : 'bg-gray-700'}`}></div>)}
                                                     </div>
-                                                    <div className="flex items-center gap-2 group-hover:gap-3 transition-all duration-300">
-                                                        <span className="text-[10px] font-black text-cyan-400 uppercase tracking-[0.2em] opacity-0 group-hover:opacity-100 transition-opacity">ASSISTIR</span>
-                                                        <div className="w-8 h-8 rounded-full bg-gray-800 flex items-center justify-center border border-gray-700 group-hover:border-cyan-500 group-hover:bg-cyan-500/10 transition-all">
-                                                            <ArrowRightIcon className="h-3 w-3 text-gray-500 group-hover:text-cyan-400" />
-                                                        </div>
-                                                    </div>
+                                                    <span className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">ASSISTIR AGORA</span>
                                                 </div>
                                             </div>
                                         </Card>
                                     </div>
                                 );
                             })}
-                        </div>
-                        {/* Rodapé da Galeria */}
-                        <div className="flex flex-col items-center justify-center py-10 border-t border-gray-800/50 opacity-40">
-                             <div className="flex items-center gap-4 mb-4">
-                                <div className="w-12 h-px bg-gray-700"></div>
-                                <VideoCameraIcon className="h-5 w-5 text-gray-600" />
-                                <div className="w-12 h-px bg-gray-700"></div>
-                             </div>
-                             <p className="text-[10px] font-black text-gray-600 uppercase tracking-[0.5em]">Fim da Transmissão</p>
                         </div>
                     </div>
                 );
