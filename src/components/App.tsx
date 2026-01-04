@@ -1,5 +1,6 @@
+
 import { useState, useEffect } from 'react';
-import { auth } from '../firebaseConfig';
+import { auth, messaging } from '../firebaseConfig';
 import * as FirebaseService from '../services/firebaseService';
 import { User } from '../types';
 import { LoginPage } from './auth';
@@ -19,17 +20,39 @@ export const App = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isStudentView, setIsStudentView] = useState(false);
 
+    // --- Notificações Push ---
+    const setupNotifications = async (userId: string) => {
+        if (!messaging) return;
+
+        try {
+            const permission = await Notification.requestPermission();
+            if (permission === 'granted') {
+                const token = await messaging.getToken();
+                if (token) {
+                    await FirebaseService.updateUserFcmToken(userId, token);
+                    console.log("FCM Token registrado:", token);
+                    
+                    // Se estiver no Android, avisa a interface nativa
+                    if ((window as any).Android && typeof (window as any).Android.onFcmTokenRegistered === 'function') {
+                        (window as any).Android.onFcmTokenRegistered(token);
+                    }
+                }
+            }
+        } catch (error) {
+            console.error("Erro ao configurar notificações:", error);
+        }
+    };
+
     useEffect(() => {
         const unsubscribe = auth.onAuthStateChanged(async (authUser) => {
             if (authUser) {
                 try {
-                    // Fetch profile from Firestore to get role and other details
                     const userProfile = await FirebaseService.getUserProfile(authUser.uid);
                     if (userProfile) {
                         setCurrentUser(userProfile);
+                        // Tenta registrar o token push após login bem-sucedido
+                        setupNotifications(authUser.uid);
                     } else {
-                        // This case can happen if user exists in Auth but not in Firestore DB.
-                        // For this app, we log them out.
                         await auth.signOut();
                         setCurrentUser(null);
                     }
@@ -44,7 +67,6 @@ export const App = () => {
             setIsLoading(false);
         });
 
-        // Cleanup subscription on unmount
         return () => unsubscribe();
     }, []);
 

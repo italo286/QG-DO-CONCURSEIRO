@@ -3,9 +3,8 @@ import firebase from "firebase/compat/app";
 import "firebase/compat/auth";
 import "firebase/compat/firestore";
 import "firebase/compat/storage";
+import "firebase/compat/messaging"; // Importação necessária para Notificações Push
 
-// Your web app's Firebase configuration
-// The values are loaded from the .env file
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
@@ -15,13 +14,12 @@ const firebaseConfig = {
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialize Firebase, preventing re-initialization on hot reloads
 if (!firebase.apps.length) {
     firebase.initializeApp(firebaseConfig);
 }
 
-// Export Firebase services
 export const auth = firebase.auth();
 export const db = firebase.firestore();
 export const storage = firebase.storage();
-export { firebase }; // Export the firebase object for advanced features like FieldValue
+export const messaging = firebase.messaging.isSupported() ? firebase.messaging() : null; // Inicialização segura
+export { firebase };

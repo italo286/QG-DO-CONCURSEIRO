@@ -5,6 +5,12 @@ import { getBrasiliaDate, getLocalDateISOString } from '../utils';
 
 type Unsubscribe = () => void;
 
+// --- Notificações ---
+export const updateUserFcmToken = async (uid: string, token: string): Promise<void> => {
+    const userRef = db.collection('users').doc(uid);
+    await userRef.update({ fcmToken: token });
+};
+
 // --- User Management ---
 export const getUserProfile = async (uid: string): Promise<User | null> => {
   const userRef = db.collection('users').doc(uid);

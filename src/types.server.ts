@@ -7,6 +7,7 @@ export interface User {
   name: string;
   role: UserRole;
   avatarUrl?: string;
+  fcmToken?: string; // Armazena o ID do dispositivo para Push Notifications
 }
 
 export interface PdfFile {
