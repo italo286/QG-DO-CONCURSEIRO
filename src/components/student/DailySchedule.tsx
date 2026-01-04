@@ -67,7 +67,7 @@ export const DailySchedule: React.FC<{
         return (
             <Card className="p-4 bg-gray-800/40 border-gray-700/50 text-center rounded-[1rem]">
                 <CalendarIcon className="h-6 w-6 text-gray-600 mx-auto mb-1"/>
-                <p className="text-gray-500 text-[10px] leading-relaxed">Nenhum planejamento ativo.</p>
+                <p className="text-gray-500 text-xs leading-relaxed">Nenhum planejamento ativo.</p>
             </Card>
         );
     }
@@ -82,18 +82,18 @@ export const DailySchedule: React.FC<{
             </div>
 
             <div className="mb-6">
-                <div className="flex items-center gap-2 mb-0.5">
-                    <div className="w-1 h-5 bg-cyan-500 rounded-full shadow-[0_0_8px_cyan]"></div>
-                    <h3 className="text-xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
+                <div className="flex items-center gap-2 mb-1">
+                    <div className="w-1.5 h-6 bg-cyan-500 rounded-full shadow-[0_0_8px_cyan]"></div>
+                    <h3 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
                 </div>
-                <p className="text-[8px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-3 opacity-60">
+                <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-4 opacity-60">
                     {now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                 </p>
             </div>
 
             {sortedTimes.length === 0 ? (
                 <div className="py-6 text-center border border-dashed border-gray-800 rounded-[1.2rem]">
-                    <p className="text-gray-600 text-[8px] font-black uppercase tracking-widest italic">Folga</p>
+                    <p className="text-gray-600 text-xs font-black uppercase tracking-widest italic">Folga</p>
                 </div>
             ) : (
                 <div className="relative ml-0.5">
@@ -114,7 +114,7 @@ export const DailySchedule: React.FC<{
                             const isPast = currentMinutes >= nextItemMinutes;
 
                             return (
-                                <div key={time} className="relative pl-7 group">
+                                <div key={time} className="relative pl-8 group">
                                     {/* LINHA DE CONEXÃO: SÓ BRILHA SE O ITEM JÁ PASSOU */}
                                     {index < sortedTimes.length - 1 && (
                                         <div className={`absolute left-[9px] top-4 h-[calc(100%+1rem)] w-[1px] transition-all duration-700 
@@ -129,20 +129,20 @@ export const DailySchedule: React.FC<{
                                         <div className={`w-1 h-1 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
                                     </div>
 
-                                    <div className="space-y-1">
-                                        <div className="flex items-center gap-2">
-                                            <span className={`text-[10px] font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-800' : 'text-gray-600'}`}>
+                                    <div className="space-y-1.5">
+                                        <div className="flex items-center gap-2.5">
+                                            <span className={`text-sm font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-800' : 'text-gray-600'}`}>
                                                 {time}
                                             </span>
-                                            {isActive && <span className="text-[6px] bg-cyan-400 text-black px-1 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">LIVE</span>}
+                                            {isActive && <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">LIVE</span>}
                                         </div>
                                         
-                                        <div className={`p-2.5 rounded-xl border transition-all duration-300 relative overflow-hidden
-                                            ${isActive ? 'border-cyan-400/30 bg-cyan-400/5 shadow-lg' : 
-                                              isPast ? 'border-gray-800 bg-gray-900/30 opacity-30' : 'border-white/5 bg-gray-900/10'}`}>
+                                        <div className={`p-3.5 rounded-xl border transition-all duration-300 relative overflow-hidden
+                                            ${isActive ? 'border-cyan-400/30 bg-cyan-400/5 shadow-xl' : 
+                                              isPast ? 'border-gray-800 bg-gray-900/30 opacity-40' : 'border-white/5 bg-gray-900/10'}`}>
                                             
                                             <div className="flex justify-between items-center gap-2">
-                                                <div className="flex gap-2 items-center min-w-0 flex-grow">
+                                                <div className="flex gap-3 items-center min-w-0 flex-grow">
                                                     {editingSlot === time ? (
                                                         <div className="flex items-center gap-2 w-full">
                                                             <input 
@@ -151,30 +151,30 @@ export const DailySchedule: React.FC<{
                                                                 value={editValue} 
                                                                 onChange={(e) => setEditValue(e.target.value)}
                                                                 onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(time)}
-                                                                className="bg-gray-800 border border-cyan-500/50 rounded px-2 py-0.5 text-xs text-white w-full outline-none"
+                                                                className="bg-gray-800 border border-cyan-500/50 rounded px-2 py-1 text-sm text-white w-full outline-none"
                                                             />
                                                             <button onClick={() => handleSaveEdit(time)} className="text-green-400 hover:text-green-300">
-                                                                <CheckIcon className="h-4 w-4" />
+                                                                <CheckIcon className="h-5 w-5" />
                                                             </button>
                                                             <button onClick={() => setEditingSlot(null)} className="text-red-400 hover:text-red-300">
-                                                                <XCircleIcon className="h-4 w-4" />
+                                                                <XCircleIcon className="h-5 w-5" />
                                                             </button>
                                                         </div>
                                                     ) : (
                                                         <>
                                                             <button 
                                                                 onClick={() => handleStartEdit(time, topicInfo?.name || content)}
-                                                                className={`p-1.5 rounded-md flex-shrink-0 transition-all ${isActive ? 'bg-cyan-400 text-black shadow-md' : 'bg-gray-800 text-gray-500 hover:text-cyan-400'}`}
+                                                                className={`p-2 rounded-lg flex-shrink-0 transition-all ${isActive ? 'bg-cyan-400 text-black shadow-md' : 'bg-gray-800 text-gray-500 hover:text-cyan-400'}`}
                                                                 title="Editar item"
                                                             >
-                                                                <PencilIcon className="h-3 w-3" />
+                                                                <PencilIcon className="h-4 w-4" />
                                                             </button>
                                                             <div className="min-w-0">
-                                                                <p className={`text-[11px] font-bold truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
+                                                                <p className={`text-sm font-black truncate ${isActive ? 'text-white' : 'text-gray-400'}`}>
                                                                     "{topicInfo?.name || content}"
                                                                 </p>
                                                                 {topicInfo && (
-                                                                    <p className="text-[7px] font-black text-gray-600 uppercase tracking-widest mt-0.5 truncate">
+                                                                    <p className="text-[10px] font-black text-gray-600 uppercase tracking-widest mt-1 truncate">
                                                                         {topicInfo.subjectName}
                                                                     </p>
                                                                 )}
@@ -185,9 +185,9 @@ export const DailySchedule: React.FC<{
                                                 {topicInfo && editingSlot !== time && (
                                                     <button 
                                                         onClick={() => onNavigateToTopic(content)}
-                                                        className={`p-1.5 rounded-lg transition-all ${isActive ? 'bg-cyan-400 text-black shadow-md' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
+                                                        className={`p-2 rounded-lg transition-all ${isActive ? 'bg-cyan-400 text-black shadow-lg scale-105' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
                                                     >
-                                                        <ArrowRightIcon className="h-3 w-3" />
+                                                        <ArrowRightIcon className="h-4 w-4" />
                                                     </button>
                                                 )}
                                             </div>
@@ -200,13 +200,13 @@ export const DailySchedule: React.FC<{
                 </div>
             )}
 
-            <div className="mt-6 pt-3 border-t border-gray-800 flex justify-center">
+            <div className="mt-8 pt-4 border-t border-gray-800 flex justify-center">
                  <button 
                     onClick={onViewFullSchedule}
-                    className="flex items-center gap-1.5 text-[7px] font-black uppercase tracking-[0.2em] text-gray-600 hover:text-cyan-400 transition-colors group"
+                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-cyan-400 transition-colors group"
                  >
-                    Ver Cronograma
-                    <ArrowRightIcon className="h-2.5 w-2.5 group-hover:translate-x-0.5 transition-transform" />
+                    Ver Cronograma Completo
+                    <ArrowRightIcon className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
                  </button>
             </div>
         </Card>
