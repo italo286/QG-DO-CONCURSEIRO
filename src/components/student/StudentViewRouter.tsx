@@ -149,7 +149,14 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             return <CourseView {...props} course={props.selectedCourse} currentUserId={props.currentUser.id} />;
         case 'subject':
             if (!props.selectedSubject || !props.selectedCourse) return null;
-            return <SubjectView subject={props.selectedSubject} studentProgress={props.studentProgress} onTopicSelect={props.onTopicSelect} course={props.selectedCourse} />;
+            // FIX: Added missing onToggleTopicCompletion prop to SubjectView to fix reported type error.
+            return <SubjectView 
+                subject={props.selectedSubject} 
+                studentProgress={props.studentProgress} 
+                onTopicSelect={props.onTopicSelect} 
+                onToggleTopicCompletion={props.onToggleTopicCompletion}
+                course={props.selectedCourse} 
+            />;
         case 'topic':
             if (!props.selectedTopic || !props.selectedSubject) return null;
             return <TopicView {...props} selectedSubject={props.selectedSubject} selectedTopic={props.selectedTopic} selectedSubtopic={props.selectedSubtopic} />;

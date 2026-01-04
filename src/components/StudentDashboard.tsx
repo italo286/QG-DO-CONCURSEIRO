@@ -148,6 +148,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         });
     }, [isPreview, handleUpdateStudentProgress, setStudentProgress]);
 
+    // FIX: Added handleDeleteMessage to support discarding teacher/broadcast messages from the dashboard.
+    const handleDeleteMessage = async (messageId: string) => {
+        if (window.confirm("Tem certeza que deseja descartar este aviso? Ele não aparecerá mais para você.")) {
+            try {
+                await FirebaseService.deleteMessageForUser(messageId, user.id);
+            } catch (error) {
+                console.error("Erro ao descartar mensagem:", error);
+            }
+        }
+    };
+
     useEffect(() => {
         if (!studentProgress) return;
         const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
@@ -365,6 +376,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
+                    // FIX: Passed missing onDeleteMessage prop to fix the reported error.
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
@@ -450,6 +462,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onToggleSplitView={() => setIsSplitView(!isSplitView)}
                     onSetIsSidebarCollapsed={setIsSidebarCollapsed}
                     onOpenChatModal={() => setIsChatModalOpen(true)}
+                    // FIX: Passed handleDeleteMessage to StudentViewRouter.
+                    onDeleteMessage={handleDeleteMessage}
                     setView={setView}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}

@@ -2,7 +2,7 @@
 import React, { useMemo } from 'react';
 import { Course, StudentProgress, StudyPlan, Subject, TeacherMessage, User, DailyChallenge, Question, Topic, SubTopic } from '../../../types';
 import { Card, Button } from '../../ui';
-import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, XCircleIcon, UserCircleIcon, TrashIcon, ArrowRightIcon } from '../../Icons';
+import { BellIcon, BookOpenIcon, ChatBubbleLeftRightIcon, XCircleIcon, UserCircleIcon, TrashIcon, ArrowRightIcon, CycleIcon } from '../../Icons';
 import { StudentFocusPanel } from '../StudentFocusPanel';
 import { DailySchedule } from '../DailySchedule';
 import { DailyChallenges } from '../DailyChallenges';
@@ -47,6 +47,24 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
 }) => {
     const broadcasts = useMemo(() => messages.filter(m => m.studentId === null), [messages]);
 
+    // Lógica para encontrar o último tópico acessado
+    const lastAccessedInfo = useMemo(() => {
+        if (!studentProgress?.lastAccessedTopicId) return null;
+        
+        for (const subject of allSubjects) {
+            for (const topic of subject.topics) {
+                if (topic.id === studentProgress.lastAccessedTopicId) {
+                    return { subject, topic, subtopic: null };
+                }
+                const sub = topic.subtopics.find(st => st.id === studentProgress.lastAccessedTopicId);
+                if (sub) {
+                    return { subject, topic, subtopic: sub };
+                }
+            }
+        }
+        return null;
+    }, [studentProgress, allSubjects]);
+
     const renderAnnouncementsView = () => (
         <div className="space-y-6">
             <div className="flex items-center justify-between px-1">
@@ -68,7 +86,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     const isUnread = !msg.acknowledgedBy.includes(currentUser.id);
                     const date = new Date(msg.timestamp).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
                     
-                    // Extrair contexto de subtópico se houver (lógica simulada para o botão solicitado)
                     const targetSubtopicId = msg.context?.subtopicId || msg.context?.topicId;
 
                     return (
@@ -80,7 +97,6 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                                     : 'bg-gray-800/40 border-gray-700/40 hover:bg-gray-800/60'
                                 }`}
                         >
-                            {/* Botão Descartar */}
                             <button 
                                 onClick={(e) => {
                                     e.stopPropagation();
@@ -155,6 +171,31 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
         <div className="relative grid grid-cols-1 lg:grid-cols-12 gap-8 pb-20">
             {/* Coluna Principal */}
             <div className="lg:col-span-8 space-y-8">
+                
+                {/* WIDGET: Continue de Onde Parou */}
+                {lastAccessedInfo && (
+                    <Card className="p-6 bg-cyan-500/5 border-cyan-500/30 rounded-[2rem] flex flex-col md:flex-row items-center gap-6 animate-fade-in group hover:bg-cyan-500/10 transition-all duration-500">
+                        <div className="h-16 w-16 rounded-2xl bg-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)] flex-shrink-0 group-hover:scale-110 transition-transform">
+                            <CycleIcon className="h-8 w-8 text-white animate-spin-slow" />
+                        </div>
+                        <div className="flex-grow text-center md:text-left">
+                            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.3em] mb-1 block">Retomar Jornada</span>
+                            <h4 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
+                                {lastAccessedInfo.subtopic?.name || lastAccessedInfo.topic.name}
+                            </h4>
+                            <p className="text-xs text-gray-500 font-bold mt-1 uppercase tracking-widest opacity-60">
+                                {lastAccessedInfo.subject.name}
+                            </p>
+                        </div>
+                        <Button 
+                            onClick={() => onNavigateToTopic(studentProgress.lastAccessedTopicId!)}
+                            className="w-full md:w-auto py-3 px-8 text-xs font-black uppercase tracking-widest shadow-xl group-hover:px-10 transition-all"
+                        >
+                            RETOMAR <ArrowRightIcon className="h-3 w-3 ml-2" />
+                        </Button>
+                    </Card>
+                )}
+
                 <DailyChallenges 
                     studentProgress={studentProgress}
                     onStartDailyChallenge={onStartDailyChallenge}
@@ -217,13 +258,11 @@ export const DashboardHome: React.FC<DashboardHomeProps> = ({
                     />
                 )}
 
-                {/* Mural de Avisos adaptado para a lateral */}
                 <div className="p-1">
                     {renderAnnouncementsView()}
                 </div>
             </div>
 
-            {/* Botão Flutuante de Chat */}
             <button
                 onClick={onOpenNewMessageModal}
                 className="fixed bottom-10 right-10 w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-3xl shadow-[0_15px_30px_-5px_rgba(6,182,212,0.4)] flex items-center justify-center text-white hover:scale-110 active:scale-90 hover:rotate-3 transition-all duration-300 z-50 group"

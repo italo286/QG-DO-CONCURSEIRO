@@ -173,9 +173,24 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
     const handleCourseSelect = (course: Course) => { setSelectedCourse(course); setView('course'); };
     const handleSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); setView('subject'); };
+    
+    // ATUALIZADO: Salva o lastAccessedTopicId ao selecionar um tópico
     const handleTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
-        if ('subtopics' in topic) { setSelectedTopic(topic); setSelectedSubtopic(null); } 
-        else { setSelectedTopic(parentTopic!); setSelectedSubtopic(topic); }
+        if ('subtopics' in topic) { 
+            setSelectedTopic(topic); 
+            setSelectedSubtopic(null); 
+        } 
+        else { 
+            setSelectedTopic(parentTopic!); 
+            setSelectedSubtopic(topic); 
+        }
+        
+        // Persiste histórico
+        if (studentProgress) {
+            const newProgress = { ...studentProgress, lastAccessedTopicId: topic.id };
+            handleUpdateStudentProgress(newProgress, studentProgress);
+        }
+
         setView('topic');
     };
 
@@ -341,11 +356,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 
                 if (!res.ok) {
                     const errorBody = await res.text();
-                    // SE O ERRO FOR 429 OU CONTER QUOTA, O APP ESPERA MAIS TEMPO
                     if (res.status === 429 || errorBody.includes('quota') || errorBody.includes('429')) {
                         setChallengeGenerationStatus('IA Congestionada. Aguardando 30s...');
                         await new Promise(r => setTimeout(r, 30000));
-                        // Tentar novamente uma única vez
                         const retryRes = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
                         if (!retryRes.ok) throw new Error('O sistema de IA está muito ocupado agora. Tente gerar novamente em 1 minuto.');
                         results[type] = await retryRes.json();
@@ -356,7 +369,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     results[type] = await res.json();
                 }
                 
-                // Intervalo de segurança maior entre chamadas para evitar burst de requisições
                 setChallengeGenerationStatus('Resfriando sistemas (8s)...');
                 await new Promise(r => setTimeout(r, 8000));
             }
@@ -397,7 +409,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
-                {/* EXIBIÇÃO DO STATUS DE GERAÇÃO */}
                 {isGeneratingAllChallenges && challengeGenerationStatus && (
                     <div className="mb-6 p-4 bg-cyan-900/30 border border-cyan-500/50 rounded-xl flex items-center gap-4 animate-pulse">
                         <Spinner />

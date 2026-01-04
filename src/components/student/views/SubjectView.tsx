@@ -15,6 +15,7 @@ interface SubjectViewProps {
     subject: Subject;
     studentProgress: StudentProgress;
     onTopicSelect: (topic: Topic | SubTopic, parentTopic?: Topic) => void;
+    onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void; // NOVO
     course: Course;
 }
 
@@ -47,7 +48,7 @@ const MaterialSummary: React.FC<{ content: Topic | SubTopic }> = ({ content }) =
 };
 
 
-export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgress, onTopicSelect, course }) => {
+export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgress, onTopicSelect, onToggleTopicCompletion, course }) => {
     const [openTopics, setOpenTopics] = useState<{[key: string]: boolean}>({});
     
     const subjectProgressData = studentProgress?.progressByTopic[subject.id];
@@ -91,7 +92,6 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
 
     return (
         <div className="space-y-8 animate-fade-in">
-            {/* Header Disciplina Padronizado */}
             <div className="bg-gray-800/40 rounded-[2rem] p-8 border border-gray-700/50 flex items-center gap-8 relative overflow-hidden shadow-2xl">
                 <div className="absolute top-0 right-0 -mr-16 -mt-16 w-48 h-48 bg-cyan-500/5 rounded-full blur-3xl pointer-events-none"></div>
                 
@@ -124,25 +124,40 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                     return (
                         <li key={topic.id} className="group">
                             <details 
-                                className="bg-gray-800/30 rounded-2xl border border-gray-700/50 group-hover:border-cyan-500/30 transition-all duration-300"
+                                className={`bg-gray-800/30 rounded-2xl border transition-all duration-300 ${isCompleted ? 'border-green-500/20 opacity-70' : 'border-gray-700/50 group-hover:border-cyan-500/30'}`}
                                 open={isOpen}
                                 onToggle={(e) => setOpenTopics(prev => ({ ...prev, [topic.id]: (e.target as HTMLDetailsElement).open }))}
                             >
                                 <summary className="p-5 cursor-pointer list-none">
                                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                        <div className="flex-grow min-w-0">
-                                            <div className="flex items-center gap-3 mb-2">
-                                                {isCompleted && <CheckCircleIcon className="h-4 w-4 text-green-500 flex-shrink-0" />}
-                                                <h3 className={`font-black text-lg tracking-tight uppercase transition-colors ${isCompleted ? 'text-gray-400' : 'text-white group-hover:text-cyan-400'}`}>
-                                                    {topic.name}
-                                                </h3>
-                                                {freqConfig && (
-                                                    <span className={`px-2 py-0.5 rounded-md text-[8px] font-black border ${freqConfig.bg} ${freqConfig.color} ${freqConfig.border} hidden sm:inline`}>
-                                                        {freqConfig.label}
-                                                    </span>
-                                                )}
+                                        
+                                        <div className="flex items-center gap-4 flex-grow min-w-0">
+                                            {/* CHECKBOX MANUAL */}
+                                            <button 
+                                                onClick={(e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    onToggleTopicCompletion(subject.id, topic.id, !isCompleted);
+                                                }}
+                                                className={`h-7 w-7 rounded-lg border-2 flex items-center justify-center transition-all ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'border-gray-700 hover:border-cyan-500 text-transparent'}`}
+                                                title={isCompleted ? "Marcar como pendente" : "Marcar como concluído"}
+                                            >
+                                                <CheckCircleIcon className="h-4 w-4" />
+                                            </button>
+
+                                            <div className="flex-grow min-w-0">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <h3 className={`font-black text-lg tracking-tight uppercase transition-colors ${isCompleted ? 'text-gray-500 line-through' : 'text-white group-hover:text-cyan-400'}`}>
+                                                        {topic.name}
+                                                    </h3>
+                                                    {freqConfig && (
+                                                        <span className={`px-2 py-0.5 rounded-md text-[8px] font-black border ${freqConfig.bg} ${freqConfig.color} ${freqConfig.border} hidden sm:inline`}>
+                                                            {freqConfig.label}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                <MaterialSummary content={topic} />
                                             </div>
-                                            <MaterialSummary content={topic} />
                                         </div>
                                         
                                         <div className="flex items-center justify-between md:justify-end gap-6 border-t md:border-t-0 border-gray-700/50 pt-3 md:pt-0">
@@ -180,15 +195,27 @@ export const SubjectView: React.FC<SubjectViewProps> = ({ subject, studentProgre
                                                 return (
                                                      <div key={subtopic.id} className="relative group/sub">
                                                         <div className="flex items-center justify-between bg-gray-800/40 p-4 rounded-xl border border-transparent hover:border-gray-700 transition-all">
-                                                            <div className="flex-grow">
-                                                                <div className="flex items-center gap-2 mb-1">
-                                                                    {stIsCompleted && <CheckCircleIcon className="h-3 w-3 text-green-500" />}
-                                                                    <span className={`text-sm font-bold tracking-tight uppercase ${stIsCompleted ? 'text-gray-500' : 'text-gray-200'}`}>
-                                                                        {subtopic.name}
-                                                                    </span>
-                                                                    {stFreq && <span className={`text-[7px] font-black ${stFreq.color} opacity-70`}>● {stFreq.label}</span>}
+                                                            <div className="flex items-center gap-4 flex-grow">
+                                                                {/* CHECKBOX SUBTOPICO */}
+                                                                <button 
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        onToggleTopicCompletion(subject.id, subtopic.id, !stIsCompleted);
+                                                                    }}
+                                                                    className={`h-6 w-6 rounded-md border-2 flex items-center justify-center transition-all ${stIsCompleted ? 'bg-green-600 border-green-600 text-white' : 'border-gray-700 hover:border-cyan-500 text-transparent'}`}
+                                                                >
+                                                                    <CheckCircleIcon className="h-3 w-3" />
+                                                                </button>
+
+                                                                <div>
+                                                                    <div className="flex items-center gap-2 mb-1">
+                                                                        <span className={`text-sm font-bold tracking-tight uppercase ${stIsCompleted ? 'text-gray-500 line-through' : 'text-gray-200'}`}>
+                                                                            {subtopic.name}
+                                                                        </span>
+                                                                        {stFreq && <span className={`text-[7px] font-black ${stFreq.color} opacity-70`}>● {stFreq.label}</span>}
+                                                                    </div>
+                                                                    <MaterialSummary content={subtopic} />
                                                                 </div>
-                                                                <MaterialSummary content={subtopic} />
                                                             </div>
                                                             <div className="flex items-center gap-4">
                                                                 <div className="hidden sm:flex flex-col items-end opacity-60">

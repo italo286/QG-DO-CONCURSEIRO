@@ -9,7 +9,7 @@ import {
     DocumentTextIcon, LightBulbIcon, VideoCameraIcon,
     FlashcardIcon, GameControllerIcon, ClipboardListIcon, SplitScreenIcon, GeminiIcon,
     XCircleIcon, ChevronDoubleLeftIcon, ArrowRightIcon, TrophyIcon, TagIcon, ClipboardCheckIcon,
-    BrainIcon, BriefcaseIcon, ChartLineIcon
+    BrainIcon, BriefcaseIcon, ChartLineIcon, CheckCircleIcon
 } from '../../Icons';
 import { QuizView } from '../QuizView';
 import { NotesEditor } from '../NotesEditor';
@@ -28,6 +28,7 @@ interface TopicViewProps {
     onNoteSave: (contentId: string, content: string) => void;
     saveQuizProgress: (subjectId: string, topicId: string, attempt: QuestionAttempt) => void;
     handleTopicQuizComplete: (subjectId: string, topicId: string, attempts: QuestionAttempt[]) => void;
+    onToggleTopicCompletion: (subjectId: string, topicId: string, isCompleted: boolean) => void;
     onPlayGame: (game: MiniGame, topicId: string) => void;
     onToggleSplitView: () => void;
     onSetIsSidebarCollapsed: (collapsed: boolean) => void;
@@ -47,6 +48,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
     onNoteSave,
     saveQuizProgress,
     handleTopicQuizComplete,
+    onToggleTopicCompletion,
     onPlayGame,
     onToggleSplitView,
     onSetIsSidebarCollapsed,
@@ -77,6 +79,7 @@ export const TopicView: React.FC<TopicViewProps> = ({
 
     const currentContent = selectedSubtopic || selectedTopic;
     const parentTopic = selectedTopic;
+    const isCompleted = studentProgress?.progressByTopic[selectedSubject.id]?.[currentContent.id]?.completed;
 
     const tabs = [
         { value: 'pdf', label: 'Aula', icon: DocumentTextIcon, count: currentContent.fullPdfs?.length },
@@ -320,7 +323,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-10">
                             {(currentContent.videoUrls || []).map((video, index) => {
                                 const thumbnailUrl = getMediaThumbnail(video.url);
-                                // Prioriza o nome do subtópico/aula conforme pedido pelo usuário
                                 const displayName = (currentContent.videoUrls || []).length > 1 
                                     ? `${currentContent.name} - Parte ${index + 1}`
                                     : currentContent.name;
@@ -332,8 +334,6 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                         className="group relative cursor-pointer"
                                     >
                                         <Card className="!p-0 overflow-hidden bg-gray-900 border-gray-800 hover:border-cyan-500/40 transition-all duration-500 rounded-[2.5rem] shadow-2xl flex flex-col h-full hover:translate-y-[-8px] backdrop-blur-sm">
-                                            
-                                            {/* Thumbnail Container */}
                                             <div className="relative aspect-video overflow-hidden bg-gray-950">
                                                 {thumbnailUrl ? (
                                                     <img src={thumbnailUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-1000" />
@@ -346,29 +346,22 @@ export const TopicView: React.FC<TopicViewProps> = ({
                                                         </div>
                                                     </div>
                                                 )}
-                                                
                                                 <div className="absolute inset-0 bg-gradient-to-t from-gray-950 via-transparent to-black/10 opacity-90"></div>
-                                                
-                                                {/* Play Button Central (Padrão Elite) */}
                                                 <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-500 transform scale-50 group-hover:scale-100">
                                                     <div className="w-16 h-16 rounded-full bg-cyan-500 text-white flex items-center justify-center shadow-[0_0_30px_rgba(6,182,212,0.6)]">
                                                         <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 20 20"><path d="M4.516 7.548c.436-1.146 1.943-1.146 2.378 0l3.158 8.271c.436 1.146-.667 2.181-1.66 2.181H2.607c-.993 0-2.096-1.035-1.66-2.181l3.569-8.271z" transform="rotate(90 10 10)" /></svg>
                                                     </div>
                                                 </div>
-
                                                 <div className="absolute top-5 left-5">
                                                     <div className="px-3 py-1 rounded-lg bg-gray-950/90 backdrop-blur-md border border-gray-700/50 shadow-lg">
                                                         <span className="text-[9px] font-black text-cyan-400 uppercase tracking-widest">AULA</span>
                                                     </div>
                                                 </div>
                                             </div>
-
-                                            {/* Footer Info Minimalista */}
                                             <div className="p-7 flex-grow flex flex-col justify-center">
                                                 <h4 className="text-base font-black text-white group-hover:text-cyan-400 transition-colors leading-tight line-clamp-2 uppercase tracking-tight italic">
                                                     {displayName}
                                                 </h4>
-                                                
                                                 <div className="mt-4 flex items-center justify-between opacity-40 group-hover:opacity-100 transition-opacity">
                                                     <div className="flex gap-1.5">
                                                         {[1,2,3].map(i => <div key={i} className={`w-1.5 h-1.5 rounded-full ${i <= 2 ? 'bg-cyan-500' : 'bg-gray-700'}`}></div>)}
@@ -606,9 +599,19 @@ export const TopicView: React.FC<TopicViewProps> = ({
                         <h2 className="text-3xl font-bold mb-1">{currentContent.name}</h2>
                         <p className="text-gray-400">{parentTopic.name} / {selectedSubject?.name}</p>
                     </div>
-                    <Button onClick={onToggleSplitView} className="text-sm py-2 px-3 bg-red-600 hover:bg-red-500">
-                        <XCircleIcon className="h-5 w-5 mr-2" /> Fechar Divisão
-                    </Button>
+                    <div className="flex items-center gap-3">
+                         {/* BOTÃO MISSÃO CUMPRIDA EM MODO SPLIT */}
+                         <button 
+                            onClick={() => onToggleTopicCompletion(selectedSubject.id, currentContent.id, !isCompleted)}
+                            className={`flex items-center gap-2 px-6 py-2.5 rounded-full border-2 font-black text-xs uppercase tracking-widest transition-all ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-transparent border-gray-700 text-gray-400 hover:border-green-500 hover:text-green-400'}`}
+                        >
+                            <CheckCircleIcon className="h-4 w-4" />
+                            {isCompleted ? 'CONCLUÍDO' : 'MARCAR CONCLUÍDO'}
+                        </button>
+                        <Button onClick={onToggleSplitView} className="text-sm py-2 px-3 bg-red-600 hover:bg-red-500">
+                            <XCircleIcon className="h-5 w-5 mr-2" /> Fechar Divisão
+                        </Button>
+                    </div>
                 </div>
                 <div className="landscape-hint">
                     Gire o dispositivo para o modo paisagem para melhor visualização.
@@ -641,12 +644,21 @@ export const TopicView: React.FC<TopicViewProps> = ({
 
     return (
         <Card className="h-full flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0 flex-wrap gap-2">
+            <div className="flex justify-between items-center p-4 border-b border-gray-700 flex-shrink-0 flex-wrap gap-4">
                 <div>
                     <h2 className="text-3xl font-bold mb-1">{currentContent.name}</h2>
                     <p className="text-gray-400">{parentTopic.name} / {selectedSubject?.name}</p>
                 </div>
-                <div className="flex items-center space-x-2">
+                <div className="flex items-center space-x-3">
+                    {/* BOTÃO MISSÃO CUMPRIDA */}
+                    <button 
+                        onClick={() => onToggleTopicCompletion(selectedSubject.id, currentContent.id, !isCompleted)}
+                        className={`flex items-center gap-2 px-6 py-2.5 rounded-full border-2 font-black text-xs uppercase tracking-widest transition-all ${isCompleted ? 'bg-green-500 border-green-500 text-white' : 'bg-transparent border-gray-700 text-gray-400 hover:border-green-500 hover:text-green-400'}`}
+                    >
+                        <CheckCircleIcon className="h-4 w-4" />
+                        {isCompleted ? 'MISSÃO CUMPRIDA' : 'MARCAR COMO LIDA'}
+                    </button>
+
                     <Button onClick={onToggleSplitView} className="text-sm py-2 px-3">
                         <SplitScreenIcon className="h-5 w-5 mr-2" /> Dividir Tela
                     </Button>

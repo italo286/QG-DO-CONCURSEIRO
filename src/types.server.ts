@@ -257,6 +257,7 @@ export interface StudentProgress {
   glossaryChallenge?: DailyChallenge<Question>;
   portugueseChallenge?: DailyChallenge<Question>;
   simulados?: Simulado[];
+  lastAccessedTopicId?: string; // NOVO: Histórico de navegação
 }
 
 export interface MessageReply {
