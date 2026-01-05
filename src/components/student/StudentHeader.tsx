@@ -60,7 +60,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const xpCurrentLevel = studentProgress ? studentProgress.xp % LEVEL_XP_REQUIREMENT : 0;
     const progressPercent = (xpCurrentLevel / LEVEL_XP_REQUIREMENT) * 100;
     const nextLevelXp = LEVEL_XP_REQUIREMENT - xpCurrentLevel;
-    const streak = studentProgress?.dailyChallengeStreak?.current || 0;
 
     const globalAccuracy = useMemo(() => {
         if (!studentProgress) return 0;
@@ -134,6 +133,15 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    // Lógica unificada para sub-rótulo de perfil respeitando gênero e cargo
+    const getUserSublabel = () => {
+        const isFem = user.gender === 'feminine';
+        if (user.role === 'professor') {
+            return isFem ? 'PROFESSORA' : 'PROFESSOR';
+        }
+        return isFem ? 'CONCURSEIRA' : 'CONCURSEIRO';
+    };
+
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_15px_50px_-15px_rgba(0,0,0,0.8)] h-24">
             <div className="w-full h-full px-6 sm:px-12 md:px-16 lg:px-24 flex items-center justify-between gap-4">
@@ -146,17 +154,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     <div className="h-12 w-[1px] bg-white/10 hidden xs:block"></div>
                 </div>
 
-                {/* 2. TÍTULO (Escala Automática) */}
+                {/* 2. TÍTULO */}
                 <div className="flex-shrink-0 hidden sm:block">
                     <span className="text-lg md:text-xl lg:text-3xl font-black text-white uppercase tracking-tighter leading-none drop-shadow-2xl">
                         QG DO CONCURSEIRO
                     </span>
                 </div>
 
-                {/* 3. ELEMENTOS DE PERFORMANCE (ALUNO) OU IDENTIFICADOR (PROFESSOR) */}
+                {/* 3. ELEMENTOS DE PERFORMANCE OU IDENTIFICADOR */}
                 {!isProfessorView ? (
                     <>
-                        {/* HUD NÍVEL ALUNO */}
                         <div className="flex-shrink-0">
                             <button onClick={() => onSetView('performance')} className="flex items-center gap-2 lg:gap-4 hover:bg-white/5 p-1.5 lg:p-2 rounded-2xl transition-all group">
                                 <div className="relative h-10 w-10 lg:h-14 lg:w-14">
@@ -179,7 +186,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                             </button>
                         </div>
 
-                        {/* HUD ACERTO ALUNO */}
                         <div className="flex-shrink-0 hidden md:block">
                             <button onClick={() => onSetView('performance')} className="flex items-center gap-2 lg:gap-4 hover:bg-white/5 p-1.5 lg:p-2 rounded-2xl transition-all group text-left">
                                 <div className={`relative h-10 w-10 lg:h-12 lg:w-12 ${accTheme.shadow} rounded-full`}>
@@ -199,7 +205,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </>
                 ) : (
-                    /* ELEMENTO GRÁFICO DO PROFESSOR (SUBSTITUIÇÃO) */
                     <div className="flex-shrink-0 flex items-center gap-4 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 px-6 py-3 rounded-2xl border border-cyan-500/20 shadow-xl">
                         <div className="w-10 h-10 rounded-xl bg-cyan-500 flex items-center justify-center shadow-[0_0_20px_rgba(6,182,212,0.4)]">
                             <AcademicCapIcon className="h-6 w-6 text-white" />
@@ -228,7 +233,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 5. PERFIL USUÁRIO */}
+                {/* 5. PERFIL USUÁRIO (NOME E SUB-RÓTULO AO LADO DO AVATAR) */}
                 <div ref={navRef} className="flex-shrink-0 relative flex items-center gap-3">
                     <button 
                         onClick={() => setIsNavOpen(prev => !prev)} 
@@ -245,15 +250,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                             <div className="absolute bottom-0 right-0 w-2.5 lg:w-3 h-2.5 lg:h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
                         </div>
                         <div className="hidden xs:flex flex-col text-left">
-                            <span className="text-[10px] lg:text-[13px] font-black text-white uppercase truncate max-w-[70px] lg:max-w-[100px] leading-tight tracking-tight">{user.name || user.username}</span>
+                            <span className="text-[10px] lg:text-[13px] font-black text-white uppercase truncate max-w-[70px] lg:max-w-[100px] leading-tight tracking-tight">
+                                {user.name || user.username}
+                            </span>
                             <span className="text-[7px] lg:text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none mt-1">
-                                {isProfessorView ? 'PROFESSOR' : (user.gender === 'feminine' ? 'CONCURSEIRA' : 'CONCURSEIRO')}
+                                {getUserSublabel()}
                             </span>
                         </div>
                         <ChevronDownIcon className={`h-4 w-4 text-gray-600 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                     </button>
 
-                    {/* DIVISOR FINAL DIREITO */}
                     <div className="h-12 w-[1px] bg-white/20 hidden sm:block"></div>
 
                     {isNavOpen && (

@@ -118,7 +118,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 notifiedScheduleItems.current.add(dayKey);
                 
                 let taskName = currentTask;
-                // Tentar encontrar o nome do tópico se for um ID
                 for (const sub of allSubjects) {
                     const topic = sub.topics.find(t => t.id === currentTask);
                     if (topic) { taskName = topic.name; break; }
@@ -137,7 +136,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             }
         };
 
-        const interval = setInterval(checkSchedule, 30000); // Checa a cada 30 segundos
+        const interval = setInterval(checkSchedule, 30000);
         checkSchedule();
         return () => clearInterval(interval);
     }, [studyPlan, allSubjects, isPreview, addNotification]);
@@ -148,7 +147,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
         const currentIds = new Set(messages.map(m => m.id));
         
-        // Se for a primeira carga, apenas popula o ref sem notificar
         if (lastMessageIds.current.size === 0) {
             lastMessageIds.current = currentIds;
             return;
@@ -531,8 +529,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 onGoHome={() => setView('dashboard')} 
             />
             
-            {/* CONTAINER DE NOTIFICAÇÕES POP-UP */}
-            <div className="fixed top-24 right-4 z-[60] flex flex-col gap-3 pointer-events-none">
+            {/* CONTAINER DE NOTIFICAÇÕES POP-UP - AGORA CENTRALIZADO NO TOPO */}
+            <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-4 pointer-events-none items-center w-full max-w-lg px-4">
                 {activeNotifications.map(notification => (
                     <NotificationToast 
                         key={notification.id} 
