@@ -134,128 +134,145 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    // Lógica para rótulo de gênero e cargo
+    const getUserSublabel = () => {
+        const isFem = user.gender === 'feminine';
+        if (user.role === 'professor') {
+            return isFem ? 'Professora' : 'Professor';
+        }
+        return isFem ? 'Concurseira' : 'Concurseiro';
+    };
+
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
-            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-2">
+            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-4">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (SEM NOME DA PÁGINA) */}
-                <div className="flex items-center gap-3 lg:gap-5 flex-1 min-w-0">
+                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (GRANDE E SEM ITÁLICO) */}
+                <div className="flex items-center gap-4 lg:gap-6 flex-1 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-9 w-auto rounded-lg" />
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg" />
                     </button>
-                    <div className="hidden lg:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
+                    <div className="hidden lg:block h-10 w-[1px] bg-white/10 flex-shrink-0"></div>
                     <div className="min-w-0">
-                        <span className="text-base md:text-lg xl:text-xl font-black text-white uppercase tracking-tighter leading-none truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                        <span className="text-xl md:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter leading-none truncate pr-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                             QG do concurseiro
                         </span>
                     </div>
                 </div>
 
-                {/* 2. CENTRO: HUD DE PERFORMANCE */}
-                <button 
-                    onClick={() => onSetView('performance')}
-                    className="flex items-center gap-4 lg:gap-10 flex-shrink-0 px-4 py-1.5 hover:bg-white/5 rounded-2xl transition-all group mx-2"
-                    title="Ver desempenho detalhado"
-                >
-                    {/* LEVEL CIRCLE */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className="relative h-11 w-11 md:h-13 md:w-13 flex-shrink-0">
+                {/* 2. CENTRO: HUD DE PERFORMANCE (ESPAÇAMENTO OTIMIZADO) */}
+                <div className="hidden md:flex items-center gap-6 lg:gap-12 flex-shrink-0">
+                    {/* LEVEL HUD */}
+                    <button 
+                        onClick={() => onSetView('performance')}
+                        className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group"
+                        title="Ver nível e XP"
+                    >
+                        <div className="relative h-12 w-12 flex-shrink-0">
                             {streak > 0 && (
-                                <div className="absolute -top-1 -right-1 z-20 bg-orange-500 rounded-full p-0.5 md:p-1 shadow-[0_0_10px_rgba(249,115,22,0.6)] animate-pulse">
+                                <div className="absolute -top-1 -right-1 z-20 bg-orange-500 rounded-full p-1 shadow-[0_0_10px_rgba(249,115,22,0.6)]">
                                     <FireIcon className="h-2.5 w-2.5 text-white" />
                                 </div>
                             )}
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="4" />
-                                <circle cx="18" cy="18" r="16" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="100 100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" className="transition-all duration-1000" />
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="100 100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-[14px] md:text-[16px] font-black text-white leading-none">{level}</span>
+                                <span className="text-[14px] font-black text-white leading-none">{level}</span>
                                 <span className="text-[6px] font-black text-cyan-500/60">LVL</span>
                             </div>
                         </div>
                         <div className="hidden lg:flex flex-col text-left">
-                            <span className="text-[12px] font-black text-white uppercase italic leading-none group-hover:text-cyan-400">{levelTitle}</span>
+                            <span className="text-[11px] font-black text-white uppercase italic leading-none group-hover:text-cyan-400 transition-colors">{levelTitle}</span>
                             <span className="text-[8px] font-black text-cyan-400/70 uppercase tracking-widest mt-1">+{nextLevelXp} XP P/ UP</span>
                         </div>
-                    </div>
+                    </button>
 
-                    {/* ACCURACY CIRCLE */}
-                    <div className="flex items-center gap-3 flex-shrink-0">
-                        <div className={`relative h-10 w-10 md:h-12 md:w-12 ${accTheme.shadow} rounded-full transition-all group-hover:scale-105`}>
+                    {/* ACCURACY HUD - ADICIONADO NOMES E STATUS */}
+                    <button 
+                        onClick={() => onSetView('performance')}
+                        className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group"
+                        title="Ver acerto em questões"
+                    >
+                        <div className={`relative h-11 w-11 ${accTheme.shadow} rounded-full transition-all group-hover:scale-105 flex-shrink-0`}>
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="3" />
-                                <circle cx="18" cy="18" r="16" fill="none" stroke={accTheme.stroke} strokeWidth="3" strokeDasharray="100 100" strokeDashoffset={100 - globalAccuracy} strokeLinecap="round" className="transition-all duration-1000" />
+                                <circle cx="18" cy="18" r="16" fill="none" stroke={accTheme.stroke} strokeWidth="3" strokeDasharray="100 100" strokeDashoffset={100 - globalAccuracy} strokeLinecap="round" />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <span className={`text-[9px] md:text-[10px] font-black italic ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
+                                <span className={`text-[10px] font-black ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
                             </div>
                         </div>
-                        <div className="hidden xl:flex flex-col text-right">
-                            <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">ACERTO GLOBAL</span>
-                            <span className={`text-[10px] font-black uppercase italic leading-none ${accTheme.text}`}>{accTheme.label}</span>
+                        <div className="hidden xl:flex flex-col text-left">
+                            <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">ACERTO EM QUESTÕES</span>
+                            <span className={`text-[10px] font-black uppercase italic leading-none mt-0.5 ${accTheme.text}`}>{accTheme.label}</span>
                         </div>
-                    </div>
-                </button>
+                    </button>
+                </div>
 
-                {/* 3. LADO DIREITO: TEMPO + PERFIL */}
-                <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-                    <div className="hidden md:flex items-center h-9 bg-black/40 rounded-full border border-white/5 p-1 px-3 gap-3">
+                {/* 3. LADO DIREITO: TEMPO + PERFIL (COM RÓTULO DE GÊNERO/CARGO) */}
+                <div className="flex items-center gap-3 lg:gap-5 flex-shrink-0">
+                    {/* RELÓGIO (MD+) */}
+                    <div className="hidden md:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1 px-4 gap-4">
                         <div className="flex flex-col items-center">
                             <span className="text-[6px] font-black text-gray-500 uppercase tracking-widest">HORA</span>
-                            <span className="text-[11px] font-mono font-bold text-white">
+                            <span className="text-[12px] font-mono font-bold text-white">
                                 {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
-                        <div className="w-[1px] h-4 bg-white/10"></div>
+                        <div className="w-[1px] h-5 bg-white/10"></div>
                         <div className="flex flex-col items-center">
                             <span className="text-[6px] font-black text-cyan-500 uppercase tracking-widest">SESSÃO</span>
-                            <span className="text-[11px] font-mono font-bold text-cyan-400">
+                            <span className="text-[12px] font-mono font-bold text-cyan-400">
                                 {formatTime(studySeconds)}
                             </span>
                         </div>
                     </div>
 
+                    {/* MENU USUÁRIO */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
-                            className={`flex items-center gap-2 p-1 pr-3 rounded-full bg-gray-800/40 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800' : ''}`}
+                            className={`flex items-center gap-3 p-1 pr-4 rounded-full bg-gray-800/40 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-lg' : ''}`}
                         >
                             <div className="relative">
-                                <div className="h-8 w-8 md:h-9 md:w-9 rounded-full overflow-hidden border-2 border-cyan-500/20">
+                                <div className="h-9 w-9 rounded-full overflow-hidden border-2 border-cyan-500/20 shadow-inner">
                                     {user.avatarUrl ? (
                                         <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
                                     ) : (
                                         <UserCircleIcon className="h-full w-full text-gray-600 p-1" />
                                     )}
                                 </div>
-                                <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border border-[#020617]"></div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
                             </div>
-                            <div className="hidden sm:flex flex-col text-left max-w-[80px]">
-                                <span className="text-[10px] font-black text-white uppercase truncate">{user.name || user.username}</span>
-                                <span className="text-[7px] font-bold text-cyan-500 uppercase tracking-widest leading-none">QG</span>
+                            <div className="hidden sm:flex flex-col text-left">
+                                <span className="text-[11px] font-black text-white uppercase truncate max-w-[100px] leading-tight">{user.name || user.username}</span>
+                                <span className="text-[8px] font-bold text-cyan-500 uppercase tracking-widest leading-none mt-0.5">
+                                    {getUserSublabel()}
+                                </span>
                             </div>
-                            <ChevronDownIcon className={`h-3 w-3 text-gray-500 transition-transform ${isNavOpen ? 'rotate-180 text-cyan-400' : ''}`} />
+                            <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${isNavOpen ? 'rotate-180 text-cyan-400' : ''}`} />
                         </button>
 
                         {isNavOpen && (
-                            <div className="absolute right-0 mt-3 w-56 bg-[#020617] border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl">
-                                <div className="p-3 bg-white/5 border-b border-white/5">
-                                    <p className="text-[8px] font-black text-gray-500 uppercase tracking-[0.2em]">Navegação Tática</p>
+                            <div className="absolute right-0 mt-3 w-60 bg-[#020617] border border-white/10 rounded-2xl shadow-2xl z-50 overflow-hidden backdrop-blur-xl animate-fade-in">
+                                <div className="p-4 bg-white/5 border-b border-white/5">
+                                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-[0.2em]">Menu de Navegação</p>
                                 </div>
-                                <div className="py-1">
+                                <div className="py-2">
                                     {navigationItems.map(item => (
                                         <button 
                                             key={item.view} 
                                             onClick={() => { onSetView(item.view); setIsNavOpen(false); }} 
-                                            className={`w-full text-left px-4 py-2.5 text-[9px] font-black uppercase tracking-widest transition-all ${view === item.view ? 'bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500' : 'text-gray-400 hover:bg-white/5'}`}
+                                            className={`w-full text-left px-5 py-3 text-[10px] font-black uppercase tracking-widest transition-all ${view === item.view ? 'bg-cyan-500/10 text-cyan-400 border-l-4 border-cyan-500' : 'text-gray-400 hover:bg-white/5'}`}
                                         >
                                             {item.label}
                                         </button>
                                     ))}
                                 </div>
-                                <div className="p-2 border-t border-white/5 bg-black/20">
-                                    <button onClick={onLogout} className="w-full text-center py-2 text-[8px] font-black uppercase text-rose-500 hover:bg-rose-500/10 rounded-lg">Desconectar</button>
+                                <div className="p-3 border-t border-white/5 bg-black/20">
+                                    <button onClick={onLogout} className="w-full text-center py-2.5 text-[9px] font-black uppercase text-rose-500 hover:bg-rose-500/10 rounded-xl border border-rose-500/20 transition-all">Desconectar da Base</button>
                                 </div>
                             </div>
                         )}
