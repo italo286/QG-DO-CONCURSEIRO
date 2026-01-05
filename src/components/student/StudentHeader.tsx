@@ -161,20 +161,24 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
             <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-2">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + TÍTULO (FLEX-1 PARA TRUNCAR) */}
+                {/* 1. LADO ESQUERDO: BRANDING + TÍTULO */}
                 <div className="flex items-center gap-3 lg:gap-6 flex-1 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-9 w-auto rounded-lg" />
                     </button>
                     <div className="hidden xl:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
                     <div className="min-w-0">
-                        <h1 className="text-lg md:text-xl xl:text-2xl font-black text-white uppercase tracking-tighter leading-tight italic truncate drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                        {/* 
+                            ADICIONADO pr-4: O itálico inclina a última letra para a direita. 
+                            Sem esse padding, o 'truncate' corta o final da letra.
+                        */}
+                        <h1 className="text-lg md:text-xl xl:text-2xl font-black text-white uppercase tracking-tighter leading-tight italic truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
                             {pageTitle}
                         </h1>
                     </div>
                 </div>
 
-                {/* 2. CENTRO: HUD DE PERFORMANCE (FLEX-SHRINK-0 PARA NÃO SER ESMAGADO) */}
+                {/* 2. CENTRO: HUD DE PERFORMANCE */}
                 <button 
                     onClick={() => onSetView('performance')}
                     className="flex items-center gap-4 lg:gap-10 flex-shrink-0 px-4 py-1.5 hover:bg-white/5 rounded-2xl transition-all group mx-2"
@@ -221,9 +225,8 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </button>
 
-                {/* 3. LADO DIREITO: TEMPO + PERFIL (FLEX-SHRINK-0) */}
+                {/* 3. LADO DIREITO: TEMPO + PERFIL */}
                 <div className="flex items-center gap-2 md:gap-4 flex-shrink-0">
-                    {/* RELÓGIO E SESSÃO (Aparece em MD+) */}
                     <div className="hidden md:flex items-center h-9 bg-black/40 rounded-full border border-white/5 p-1 px-3 gap-3">
                         <div className="flex flex-col items-center">
                             <span className="text-[6px] font-black text-gray-500 uppercase tracking-widest">HORA</span>
@@ -240,7 +243,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </div>
 
-                    {/* MENU USUÁRIO */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
