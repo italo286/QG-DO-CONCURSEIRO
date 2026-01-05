@@ -243,78 +243,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         });
     }, [isPreview, handleUpdateStudentProgress, setStudentProgress]);
 
-    const executeDeleteMessage = async () => {
-        if (confirmDeleteMessageId) {
-            try {
-                await FirebaseService.deleteMessageForUser(confirmDeleteMessageId, user.id);
-            } catch (error) {
-                console.error("Erro ao descartar mensagem:", error);
-            }
-            setConfirmDeleteMessageId(null);
-        }
-    };
-
-    useEffect(() => {
-        if (!studentProgress) return;
-        const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
-        if (awarded.length > 0) {
-            setAwardedBadges(prev => [...prev, ...awarded]);
-            const newProgress = {
-                ...studentProgress,
-                earnedBadgeIds: [...new Set([...studentProgress.earnedBadgeIds, ...awarded.map(b => b.id)])]
-            };
-            handleUpdateStudentProgress(newProgress, studentProgress);
-        }
-    }, [studentProgress, allSubjects, allStudentProgress, handleUpdateStudentProgress]);
-    
+    // Restore missing handler functions
     const handleCourseSelect = (course: Course) => { setSelectedCourse(course); setView('course'); };
     const handleSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); setView('subject'); };
-    
     const handleTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
-        if ('subtopics' in topic) { 
-            setSelectedTopic(topic); 
-            setSelectedSubtopic(null); 
-        } 
-        else { 
-            setSelectedTopic(parentTopic!); 
-            setSelectedSubtopic(topic); 
-        }
-        
-        if (studentProgress) {
-            const newProgress = { ...studentProgress, lastAccessedTopicId: topic.id };
-            handleUpdateStudentProgress(newProgress, studentProgress);
-        }
-
+        if ('subtopics' in topic) { setSelectedTopic(topic); setSelectedSubtopic(null); } 
+        else { setSelectedTopic(parentTopic!); setSelectedSubtopic(topic); }
         setView('topic');
     };
 
     const handleNavigateToTopic = (topicId: string) => {
         for (const subject of allSubjects) {
             for (const topic of subject.topics) {
-                const foundTopic = topic.id === topicId;
-                const foundSubtopic = topic.subtopics.find(st => st.id === topicId);
-
-                if (foundTopic || foundSubtopic) {
-                    const associatedCourse = enrolledCourses.find(c => 
-                        c.disciplines.some(d => d.subjectId === subject.id)
-                    );
-
-                    if (associatedCourse) {
-                        setSelectedCourse(associatedCourse);
-                    }
-
-                    setSelectedSubject(subject);
-                    setSelectedTopic(topic);
-                    setSelectedSubtopic(foundSubtopic || null);
-                    
-                    if (studentProgress) {
-                        const newProgress = { ...studentProgress, lastAccessedTopicId: topicId };
-                        handleUpdateStudentProgress(newProgress, studentProgress);
-                    }
-
-                    setView('topic');
-                    return;
-                }
+                if (topic.id === topicId) { setSelectedSubject(subject); setSelectedTopic(topic); setSelectedSubtopic(null); setView('topic'); return; }
+                const subtopic = topic.subtopics.find(st => st.id === topicId);
+                if (subtopic) { setSelectedSubject(subject); setSelectedTopic(topic); setSelectedSubtopic(subtopic); setView('topic'); return; }
             }
         }
     };
@@ -344,7 +287,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             setActiveChallenge(prev => prev ? { ...prev, sessionAttempts: challenge.sessionAttempts || [] } : null);
             
-            FirebaseService.saveStudentProgress(newProgress);
+            FirebaseService.saveStudentProgress(newProgress); // Fire-and-forget save
             return newProgress;
         });
     };
@@ -411,6 +354,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             FirebaseService.saveStudentProgress(newProgress);
             
+            // Side effects after state update
             setTimeout(() => {
                 setXpToasts(prev => [...prev, ...xpToastsToAdd]);
                 setTimeout(() => setXpToasts(prev => prev.filter(t => !xpToastsToAdd.some(tt => tt.id === t.id))), 3000);
@@ -451,46 +395,30 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         if (isPreview || !studentProgress) return;
     
         setIsGeneratingAllChallenges(true);
-        setChallengeGenerationStatus('Sincronizando com o QG...');
+        setChallengeGenerationStatus('Iniciando conexão com o QG...');
         try {
-            const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
+            const apiKey = import.meta.env.VITE_DAILY_CHALLENGE_API_KEY;
             const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
+            const labels = { review: 'Revisão', glossary: 'Glossário', portuguese: 'Português' };
             
-            const results: Record<string, any[]> = {};
-            
-            const statusMap = {
-                review: 'Preparando Protocolo de Revisão...',
-                glossary: 'Indexando Nomenclatura Técnica...',
-                portuguese: 'Sorteando Alvos de Português...'
-            };
-
+            const results = [];
             for (const type of types) {
-                setChallengeGenerationStatus(statusMap[type]);
-                const res = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-                
+                setChallengeGenerationStatus(`Gerando Desafio de ${labels[type]}...`);
+                const res = await fetch(`/.netlify/functions/generateStudentChallenge-on-demand?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
                 if (!res.ok) {
-                    const errorBody = await res.text();
-                    if (res.status === 429 || errorBody.includes('quota') || errorBody.includes('429')) {
-                        setChallengeGenerationStatus('IA Congestionada. Aguardando 30s...');
-                        await new Promise(r => setTimeout(r, 30000));
-                        const retryRes = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-                        if (!retryRes.ok) throw new Error('O sistema de IA está muito ocupado agora. Tente gerar novamente em 1 minuto.');
-                        results[type] = await retryRes.json();
-                    } else {
-                        throw new Error(`Erro operacional em ${type}: ${res.status}`);
-                    }
-                } else {
-                    results[type] = await res.json();
+                     const errorBody = await res.text();
+                     throw new Error(`Falha ao gerar desafio de ${type}: ${res.status} ${errorBody}`);
                 }
-                
-                setChallengeGenerationStatus('Resfriando sistemas (8s)...');
-                await new Promise(r => setTimeout(r, 8000));
+                results.push(await res.json());
             }
             
+            const [reviewItems, glossaryItems, portugueseItems] = results;
+            
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: results['review'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: results['glossary'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: results['portuguese'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+    
+            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: reviewItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: glossaryItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
+            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: portugueseItems, isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
             
             const newProgress = {
                 ...studentProgress,
@@ -499,17 +427,42 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 portugueseChallenge: newPortugueseChallenge,
             };
             
-            await handleUpdateStudentProgress(newProgress, studentProgress);
-            setChallengeGenerationStatus('Missões ativadas!');
+            handleUpdateStudentProgress(newProgress, studentProgress);
+            setChallengeGenerationStatus('Missões prontas para o combate!');
+            setTimeout(() => setChallengeGenerationStatus(''), 2000);
     
-        } catch (error: any) {
+        } catch (error) {
             console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(error.message || `Ocorreu uma falha na comunicação com a IA. Tente gerar novamente em um minuto.`);
+            setChallengeGenerationStatus('');
+            alert(`Não foi possível gerar todos os desafios. Por favor, tente novamente. Detalhes: ${error}`);
         } finally {
             setIsGeneratingAllChallenges(false);
-            setChallengeGenerationStatus('');
         }
     };
+
+    const executeDeleteMessage = async () => {
+        if (confirmDeleteMessageId) {
+            try {
+                await FirebaseService.deleteMessageForUser(confirmDeleteMessageId, user.id);
+            } catch (error) {
+                console.error("Erro ao descartar mensagem:", error);
+            }
+            setConfirmDeleteMessageId(null);
+        }
+    };
+
+    useEffect(() => {
+        if (!studentProgress) return;
+        const awarded = Gamification.checkAndAwardBadges(studentProgress, allSubjects, allStudentProgress);
+        if (awarded.length > 0) {
+            setAwardedBadges(prev => [...prev, ...awarded]);
+            const newProgress = {
+                ...studentProgress,
+                earnedBadgeIds: [...new Set([...studentProgress.earnedBadgeIds, ...awarded.map(b => b.id)])]
+            };
+            handleUpdateStudentProgress(newProgress, studentProgress);
+        }
+    }, [studentProgress, allSubjects, allStudentProgress, handleUpdateStudentProgress]);
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
@@ -520,16 +473,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 user={user} 
                 studentProgress={studentProgress} 
                 view={view} 
-                selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} 
-                selectedSubjectName={selectedSubject?.name}
-                selectedCourseName={selectedCourse?.name} 
-                activeChallengeType={activeChallenge?.type}
                 onSetView={setView} 
                 onLogout={onLogout} 
                 onGoHome={() => setView('dashboard')} 
             />
             
-            {/* CONTAINER DE NOTIFICAÇÕES POP-UP - AGORA CENTRALIZADO NO TOPO */}
+            {/* CONTAINER DE NOTIFICAÇÕES POP-UP CENTRALIZADO */}
             <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-4 pointer-events-none items-center w-full max-w-lg px-4">
                 {activeNotifications.map(notification => (
                     <NotificationToast 
@@ -728,7 +677,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
                 </div>
             )}
-            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={setIsCustomQuizCreatorOpen.bind(null, false)} onSave={(quiz) => {
+            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={() => setIsCustomQuizCreatorOpen(false)} onSave={(quiz) => {
                 const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
                 handleUpdateStudentProgress(newProgress, studentProgress);
             }}/>
