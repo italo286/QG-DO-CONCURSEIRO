@@ -134,40 +134,40 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Função aprimorada para retornar Título e Código de Setor
-    const getPageContext = (): { title: string; code: string } => {
+    // Função aprimorada para retornar Título (removido o código numérico a pedido do usuário)
+    const getPageTitle = (): string => {
         switch (view) {
             case 'dashboard': 
-                return { title: 'Início', code: '01' };
+                return 'Início';
             case 'daily_challenge_quiz':
                 const challengeName = activeChallengeType === 'portuguese' ? 'Português' : 
                                     activeChallengeType === 'glossary' ? 'Glossário' : 
                                     activeChallengeType === 'review' ? 'Revisão' : 'Desafio';
-                return { title: `Missão: ${challengeName}`, code: '03' };
+                return `Missão: ${challengeName}`;
             case 'daily_challenge_results':
-                return { title: 'Resultados', code: '03' };
+                return 'Resultados';
             case 'course':
-                return { title: selectedCourseName || 'Curso', code: '02' };
+                return selectedCourseName || 'Curso';
             case 'subject':
-                return { title: selectedSubjectName || 'Disciplina', code: '02' };
+                return selectedSubjectName || 'Disciplina';
             case 'topic':
-                return { title: selectedTopicName || 'Estudo', code: '02' };
+                return selectedTopicName || 'Estudo';
             case 'schedule':
-                return { title: 'Agenda', code: '05' };
+                return 'Agenda';
             case 'performance':
-                return { title: 'Meu Score', code: '04' };
+                return 'Meu Score';
             case 'reviews':
-                return { title: 'Revisões', code: '06' };
+                return 'Revisões';
             case 'practice_area':
-                return { title: 'Prática', code: '07' };
+                return 'Prática';
             case 'settings':
-                return { title: 'Configurações', code: '08' };
+                return 'Configurações';
             default:
-                return { title: 'QG', code: '00' };
+                return 'QG';
         }
     };
 
-    const pageContext = getPageContext();
+    const pageTitle = getPageTitle();
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)]">
@@ -181,11 +181,8 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     <div className="hidden xl:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
                     <div className="hidden lg:block min-w-0">
                         <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic flex items-center gap-3">
-                            <span className="text-cyan-500 font-mono text-sm not-italic opacity-40 flex-shrink-0">
-                                {pageContext.code}
-                            </span>
-                            <span className="truncate max-w-[200px] xl:max-w-[350px] drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">
-                                {pageContext.title}
+                            <span className="truncate max-w-[200px] xl:max-w-[450px] drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">
+                                {pageTitle}
                             </span>
                         </h1>
                     </div>
