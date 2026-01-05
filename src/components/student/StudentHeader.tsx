@@ -100,7 +100,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isNavOpen]);
 
-    // Relógio sincronizado com Brasília
+    // Relógio sincronizado com Brasília a cada segundo
     useEffect(() => {
         const interval = setInterval(() => setCurrentBrTime(getBrasiliaDate()), 1000);
         return () => clearInterval(interval);
@@ -203,7 +203,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 </div>
 
                 <div className="flex items-center gap-8 lg:gap-7 flex-shrink-0">
-                    {/* RELÓGIO E SESSÃO - Agora usando Brasília Time para o Relógio do Topo */}
+                    {/* RELÓGIO E SESSÃO Sincronizados */}
                     <div className="hidden md:flex items-center h-15 bg-black/40 rounded-full border border-white/5 p-1 px-5 gap-6 shadow-inner">
                         <div className="flex flex-col items-center">
                             <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">HORÁRIO QG</span>

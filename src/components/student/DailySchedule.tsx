@@ -27,7 +27,7 @@ export const DailySchedule: React.FC<{
         const timer = setInterval(() => {
             const nowBr = getBrasiliaDate();
             setCurrentMinutes(nowBr.getHours() * 60 + nowBr.getMinutes());
-        }, 15000); 
+        }, 1000); // Atualiza a cada segundo para precisão máxima
         return () => clearInterval(timer);
     }, []);
 
@@ -107,6 +107,7 @@ export const DailySchedule: React.FC<{
                             const nextTimeStr = sortedTimes[index + 1];
                             const nextItemMinutes = nextTimeStr ? timeToMinutes(nextTimeStr) : 1440;
                             
+                            // Lógica rigorosa de ativação baseada em minutos totais de Brasília
                             const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
                             const isPast = currentMinutes >= nextItemMinutes;
 

@@ -157,8 +157,8 @@ export const markdownToHtml = (text: string): string => {
 
 /**
  * Retorna a data e hora atual no fuso horário de Brasília (America/Sao_Paulo).
- * Utiliza a API Intl para garantir consistência entre o que o usuário vê (relógio)
- * e a lógica do sistema (cronograma/notificações).
+ * Utiliza a API Intl de forma granular para evitar erros de arredondamento de strings
+ * e garantir que o objeto Date resultante tenha os valores literais de Brasília.
  */
 export const getBrasiliaDate = (): Date => {
     const now = new Date();
@@ -172,14 +172,13 @@ export const getBrasiliaDate = (): Date => {
         const parts = formatter.formatToParts(now);
         const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0');
         
-        // Criamos um objeto Date que "finge" ser local para facilitargetHours/getMinutes, 
-        // mas com os valores numéricos reais de Brasília.
+        // Criamos um novo objeto Date e setamos os campos individualmente baseados em Brasília
         const brDate = new Date();
         brDate.setFullYear(getPart('year'), getPart('month') - 1, getPart('day'));
         brDate.setHours(getPart('hour'), getPart('minute'), getPart('second'), now.getMilliseconds());
         return brDate;
     } catch (e) {
-        // Fallback para UTC-3 caso a API Intl falhe (raro em browsers modernos)
+        // Fallback robusto
         const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
         return new Date(utc + (3600000 * -3));
     }
