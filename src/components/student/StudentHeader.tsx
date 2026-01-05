@@ -37,10 +37,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const [currentTime, setCurrentTime] = useState(new Date());
     const [studySeconds, setStudySeconds] = useState(0);
 
+    // Cálculos de Gamificação
     const level = calculateLevel(studentProgress.xp);
     const levelTitle = getLevelTitle(level);
     const xpCurrentLevel = studentProgress.xp % LEVEL_XP_REQUIREMENT;
     const progressPercent = (xpCurrentLevel / LEVEL_XP_REQUIREMENT) * 100;
+    const nextLevelXp = LEVEL_XP_REQUIREMENT - xpCurrentLevel;
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -124,36 +126,40 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-8 md:h-10 w-auto rounded-md" />
                     </button>
                     <div className="hidden lg:block min-w-0">
-                        <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none truncate max-w-[200px] xl:max-w-md">
+                        <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none truncate max-w-[150px] xl:max-w-xs">
                             {getViewTitle()}
                         </h1>
                         <p className="text-[8px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">High Performance Ed.</p>
                     </div>
                 </div>
 
-                {/* 2. WIDGET DE NÍVEL */}
-                <div className="flex-grow max-w-[160px] md:max-w-xs lg:max-w-md flex items-center gap-3 md:gap-4">
+                {/* 2. WIDGET DE NÍVEL (RESTAURADO COM PONTUAÇÃO) */}
+                <div className="flex-grow max-w-[160px] md:max-w-xs lg:max-w-md flex items-center gap-3 md:gap-4 mx-2 md:mx-4">
                     <div className="relative flex-shrink-0">
                         <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full"></div>
-                        <div className="relative h-10 w-10 md:h-12 md:w-12 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950">
+                        <div className="relative h-10 w-10 md:h-11 md:w-11 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
                             <span className="text-lg md:text-xl font-black text-white">{level}</span>
                         </div>
                     </div>
                     <div className="flex-grow min-w-0">
                         <div className="flex flex-col mb-1">
                             <span className="text-[7px] md:text-[8px] font-black text-cyan-500 uppercase tracking-[0.2em] leading-none mb-0.5">Nível</span>
-                            <span className="text-xs md:text-lg font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
+                            <span className="text-xs md:text-sm font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
                         </div>
                         <div className="space-y-1">
-                            <div className="h-[2px] bg-gray-900 rounded-full overflow-hidden border border-white/5">
+                            <div className="h-[3px] bg-gray-900 rounded-full overflow-hidden border border-white/5">
                                 <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_8px_cyan] transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
+                            </div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[6px] md:text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
+                                <span className="text-[6px] md:text-[8px] font-black text-cyan-400 uppercase tracking-widest">FALTAM {nextLevelXp} XP</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. RELÓGIO E SESSÃO (DESKTOP) */}
-                <div className="hidden xl:flex items-center h-10 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5 flex-shrink-0">
+                {/* 3. RELÓGIO E SESSÃO (DESKTOP/TABLET) */}
+                <div className="hidden md:flex items-center h-10 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5 flex-shrink-0">
                     <div className="px-3 flex flex-col items-center justify-center">
                         <span className="text-[7px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Relógio</span>
                         <span className="text-xs font-mono font-black text-white leading-none">
@@ -169,11 +175,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 </div>
 
                 {/* 4. PERFIL UNIFICADO (USER PILL) */}
-                <div className="flex items-center flex-shrink-0">
+                <div className="flex items-center flex-shrink-0 ml-2">
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
-                            className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full bg-gray-800/50 border border-white/10 hover:bg-gray-700/70 transition-all group"
+                            className="flex items-center gap-2 md:gap-3 pl-1.5 pr-3 md:pr-4 py-1.5 rounded-full bg-gray-800/50 border border-white/10 hover:bg-gray-700/70 transition-all group"
                         >
                             <div className="h-8 w-8 md:h-10 md:w-10 rounded-full overflow-hidden border border-white/10 shadow-lg flex-shrink-0">
                                 {user.avatarUrl ? (
@@ -183,7 +189,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 )}
                             </div>
                             <div className="hidden sm:flex flex-col text-left">
-                                <span className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-tight leading-none">
+                                <span className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-tight leading-none truncate max-w-[80px] lg:max-w-[120px]">
                                     {user.name || user.username}
                                 </span>
                                 <span className="text-[7px] font-bold text-cyan-500 uppercase tracking-widest mt-1">
