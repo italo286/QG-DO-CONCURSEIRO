@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { StudyPlan, Subject, StudentProgress } from '../../types';
 import { Card } from '../ui';
@@ -15,8 +16,8 @@ export const DailySchedule: React.FC<{
 }> = ({ fullStudyPlan, subjects, studentProgress, onNavigateToTopic, onToggleTopicCompletion, onViewFullSchedule, onUpdateRoutine }) => {
     
     const [currentMinutes, setCurrentMinutes] = useState(() => {
-        const now = getBrasiliaDate();
-        return now.getUTCHours() * 60 + now.getUTCMinutes();
+        const nowBr = getBrasiliaDate();
+        return nowBr.getHours() * 60 + nowBr.getMinutes();
     });
 
     const [editingSlot, setEditingSlot] = useState<string | null>(null);
@@ -24,15 +25,15 @@ export const DailySchedule: React.FC<{
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const now = getBrasiliaDate();
-            setCurrentMinutes(now.getUTCHours() * 60 + now.getUTCMinutes());
-        }, 30000); // Atualiza a cada 30 segundos
+            const nowBr = getBrasiliaDate();
+            setCurrentMinutes(nowBr.getHours() * 60 + nowBr.getMinutes());
+        }, 15000); 
         return () => clearInterval(timer);
     }, []);
 
     const activePlan = (fullStudyPlan.plans || []).find(p => p.id === fullStudyPlan.activePlanId);
-    const now = getBrasiliaDate();
-    const todayIndex = now.getUTCDay();
+    const nowBr = getBrasiliaDate();
+    const todayIndex = nowBr.getDay();
 
     const getTopicInfo = (topicId: string): { name: string; subjectName: string; subjectId: string } | null => {
         for (const subject of subjects) {
@@ -84,7 +85,7 @@ export const DailySchedule: React.FC<{
                     <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
                 </div>
                 <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-5 opacity-70">
-                    {now.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    {nowBr.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                 </p>
             </div>
 
@@ -103,11 +104,10 @@ export const DailySchedule: React.FC<{
                             const topicInfo = isTopicId ? getTopicInfo(content) : null;
                             
                             const itemMinutes = timeToMinutes(time);
-                            const nextTime = sortedTimes[index + 1];
-                            const nextItemMinutes = nextTime ? timeToMinutes(nextTime) : 1440;
+                            const nextTimeStr = sortedTimes[index + 1];
+                            const nextItemMinutes = nextTimeStr ? timeToMinutes(nextTimeStr) : 1440;
                             
                             const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
-                            // FIX: Changed currentTotalMinutes to currentMinutes to fix the undefined variable error.
                             const isPast = currentMinutes >= nextItemMinutes;
 
                             return (

@@ -64,7 +64,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [challengeGenerationStatus, setChallengeGenerationStatus] = useState<string>('');
     const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
     
-    // Notificações Pop-up
     const [activeNotifications, setActiveNotifications] = useState<NotificationItem[]>([]);
     const notifiedScheduleItems = useRef<Set<string>>(new Set());
     const lastMessageIds = useRef<Set<string>>(new Set());
@@ -96,14 +95,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         setActiveNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    // Monitorar Agenda
     useEffect(() => {
         if (isPreview || !studyPlan || !studyPlan.activePlanId) return;
 
         const checkSchedule = () => {
-            const now = getBrasiliaDate();
-            const todayIndex = now.getUTCDay();
-            const currentTotalMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+            const nowBr = getBrasiliaDate();
+            const todayIndex = nowBr.getDay();
+            const currentTotalMinutes = nowBr.getHours() * 60 + nowBr.getMinutes();
             
             const activePlan = studyPlan.plans.find(p => p.id === studyPlan.activePlanId);
             if (!activePlan) return;
@@ -125,7 +123,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             }
 
             if (activeTimeSlot) {
-                const todayKey = `${getLocalDateISOString(now)}-${activeTimeSlot}`;
+                const todayKey = `${getLocalDateISOString(nowBr)}-${activeTimeSlot}`;
                 const taskContent = todayItems[activeTimeSlot];
 
                 if (taskContent && !notifiedScheduleItems.current.has(todayKey)) {
@@ -156,7 +154,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         return () => clearInterval(interval);
     }, [studyPlan, allSubjects, isPreview, addNotification]);
 
-    // Monitorar Mensagens
     useEffect(() => {
         if (isPreview || !messages.length) return;
 
@@ -189,7 +186,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         if (view === 'topic') { setView('subject'); setSelectedTopic(null); setSelectedSubtopic(null); return true; }
         if (view === 'subject') { setView('course'); setSelectedSubject(null); return true; }
         if (view === 'course') { setView('dashboard'); setSelectedCourse(null); return true; }
-        if (['schedule', 'performance', 'reviews', 'games', 'practice_area', 'settings'].includes(view)) { setView('dashboard'); return true; }
+        if (['schedule', 'performance', 'reviews', 'settings', 'review_quiz', 'games', 'practice_area'].includes(view)) { setView('dashboard'); return true; }
         if (view === 'review_quiz' || view === 'daily_challenge_quiz') { setView(view === 'review_quiz' ? 'reviews' : 'dashboard'); setSelectedReview(null); setActiveChallenge(null); return true; }
         if (view === 'custom_quiz_player' || view === 'simulado_player') { setView('practice_area'); setActiveCustomQuiz(null); setActiveSimulado(null); return true; }
         return false;
@@ -338,8 +335,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 if (isCatchUp) addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
                 else {
                     addChallengeXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
-                    const yesterday = getBrasiliaDate(); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-                    const yesterdayISO = getLocalDateISOString(yesterday);
+                    const yesterdayBr = getBrasiliaDate(); yesterdayBr.setDate(yesterdayBr.getDate() - 1);
+                    const yesterdayISO = getLocalDateISOString(yesterdayBr);
                     const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
                     if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
                     else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
@@ -377,7 +374,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 const res = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
                 if (!res.ok) throw new Error(`Falha no sistema de missões: ${type}`);
                 results[type] = await res.json();
-                await new Promise(r => setTimeout(r, 2000));
+                await new Promise(r => setTimeout(r, 1000));
             }
             const todayISO = getLocalDateISOString(getBrasiliaDate());
             const newProgress = {
@@ -400,6 +397,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} 
                 selectedSubjectName={selectedSubject?.name} selectedCourseName={selectedCourse?.name} 
                 activeChallengeType={activeChallenge?.type} onSetView={(v) => setView(v)} onLogout={onLogout} onGoHome={() => setView('dashboard')} 
+                onOpenProfile={() => setView('settings')}
             />
             
             <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-4 pointer-events-none items-center w-full max-w-lg px-4">

@@ -156,25 +156,22 @@ export const markdownToHtml = (text: string): string => {
 };
 
 export const getBrasiliaDate = (): Date => {
-    const now = new Date();
-    const utcDate = new Date(Date.UTC(
-        now.getUTCFullYear(),
-        now.getUTCMonth(),
-        now.getUTCDate(),
-        now.getUTCHours(),
-        now.getUTCMinutes(),
-        now.getUTCSeconds(),
-        now.getUTCMilliseconds()
-    ));
-    utcDate.setUTCHours(utcDate.getUTCHours() - 3);
-    return utcDate;
+    try {
+        const brString = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
+        return new Date(brString);
+    } catch (e) {
+        // Fallback robusto se a timezone falhar
+        const now = new Date();
+        const offset = -3; // Brasilia é UTC-3
+        return new Date(now.getTime() + (offset * 3600000) + (now.getTimezoneOffset() * 60000));
+    }
 };
 
 
 export const getLocalDateISOString = (date: Date): string => {
-    const year = date.getUTCFullYear();
-    const month = (date.getUTCMonth() + 1).toString().padStart(2, '0');
-    const day = date.getUTCDate().toString().padStart(2, '0');
+    const year = date.getFullYear();
+    const month = (date.getMonth() + 1).toString().padStart(2, '0');
+    const day = date.getDate().toString().padStart(2, '0');
     return `${year}-${month}-${day}`;
 };
 
