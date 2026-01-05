@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, TeacherMessage } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
@@ -68,8 +67,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [activeNotifications, setActiveNotifications] = useState<NotificationItem[]>([]);
     const notifiedScheduleItems = useRef<Set<string>>(new Set());
     const lastMessageIds = useRef<Set<string>>(new Set());
-    const scheduleAudio = useRef(new Audio('https://cdn.pixabay.com/audio/2025/11/26/audio_debacce7b2.mp3'));
-    const messageAudio = useRef(new Audio('https://cdn.pixabay.com/audio/2025/06/22/audio_99092c829e.mp3'));
+    const scheduleAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3')); // Som de alerta futurista
+    const messageAudio = useRef(new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3'));
 
     const {
         isLoading,
@@ -84,12 +83,9 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         teacherProfiles
     } = useStudentData(user, isPreview);
 
-    // --- Lógica de Notificações Pop-up ---
     const addNotification = useCallback((notif: Omit<NotificationItem, 'id'>) => {
         const id = `notif-${Date.now()}`;
         setActiveNotifications(prev => [...prev, { ...notif, id }]);
-        
-        // Auto-remover após 8 segundos
         setTimeout(() => {
             setActiveNotifications(prev => prev.filter(n => n.id !== id));
         }, 8000);
@@ -99,45 +95,63 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         setActiveNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    // Monitorar Agenda
+    // Monitorar Agenda com Lógica de Janela Ativa
     useEffect(() => {
         if (isPreview || !studyPlan || !studyPlan.activePlanId) return;
 
         const checkSchedule = () => {
             const now = getBrasiliaDate();
             const todayIndex = now.getUTCDay();
-            const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
-            const dayKey = `${todayIndex}-${timeStr}`;
-
+            const currentTotalMinutes = now.getUTCHours() * 60 + now.getUTCMinutes();
+            
             const activePlan = studyPlan.plans.find(p => p.id === studyPlan.activePlanId);
             if (!activePlan) return;
 
-            const currentTask = activePlan.weeklyRoutine[todayIndex]?.[timeStr];
+            const todayItems = activePlan.weeklyRoutine[todayIndex] || {};
+            const sortedTimes = Object.keys(todayItems).sort();
 
-            if (currentTask && !notifiedScheduleItems.current.has(dayKey)) {
-                notifiedScheduleItems.current.add(dayKey);
-                
-                let taskName = currentTask;
-                // Tentar traduzir ID de tópico para nome real
-                for (const sub of allSubjects) {
-                    const topic = sub.topics.find(t => t.id === currentTask);
-                    if (topic) { taskName = topic.name; break; }
-                    for (const t of sub.topics) {
-                        const st = t.subtopics.find(s => s.id === currentTask);
-                        if (st) { taskName = st.name; break; }
-                    }
+            // Encontrar qual slot está ativo no exato momento
+            let activeTimeSlot: string | null = null;
+            for (let i = 0; i < sortedTimes.length; i++) {
+                const [h, m] = sortedTimes[i].split(':').map(Number);
+                const slotMinutes = h * 60 + m;
+                const nextTime = sortedTimes[i + 1];
+                const nextMinutes = nextTime ? (parseInt(nextTime.split(':')[0]) * 60 + parseInt(nextTime.split(':')[1])) : 1440;
+
+                if (currentTotalMinutes >= slotMinutes && currentTotalMinutes < nextMinutes) {
+                    activeTimeSlot = sortedTimes[i];
+                    break;
                 }
+            }
 
-                addNotification({
-                    type: 'schedule',
-                    title: 'Hora de Estudar!',
-                    message: `Seu compromisso "${taskName}" começou.`
-                });
-                scheduleAudio.current.play().catch(() => console.log('Interação do usuário necessária para som'));
+            if (activeTimeSlot) {
+                const todayKey = `${getLocalDateISOString(now)}-${activeTimeSlot}`;
+                const taskContent = todayItems[activeTimeSlot];
+
+                if (taskContent && !notifiedScheduleItems.current.has(todayKey)) {
+                    notifiedScheduleItems.current.add(todayKey);
+                    
+                    let taskName = taskContent;
+                    for (const sub of allSubjects) {
+                        const topic = sub.topics.find(t => t.id === taskContent);
+                        if (topic) { taskName = topic.name; break; }
+                        for (const t of sub.topics) {
+                            const st = t.subtopics.find(s => s.id === taskContent);
+                            if (st) { taskName = st.name; break; }
+                        }
+                    }
+
+                    addNotification({
+                        type: 'schedule',
+                        title: 'MISSÃO ATIVADA',
+                        message: `Iniciando agora: "${taskName}". Mantenha o foco!`
+                    });
+                    scheduleAudio.current.play().catch(() => {});
+                }
             }
         };
 
-        const interval = setInterval(checkSchedule, 30000); // Checa a cada 30 segundos
+        const interval = setInterval(checkSchedule, 15000); // Checa a cada 15 segundos
         checkSchedule();
         return () => clearInterval(interval);
     }, [studyPlan, allSubjects, isPreview, addNotification]);
@@ -147,8 +161,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         if (isPreview || !messages.length) return;
 
         const currentIds = new Set(messages.map(m => m.id));
-        
-        // Primeira carga: apenas armazena os IDs existentes para não notificar tudo retroativamente
         if (lastMessageIds.current.size === 0) {
             lastMessageIds.current = currentIds;
             return;
@@ -164,58 +176,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
                 addNotification({
                     type: isBroadcast ? 'announcement' : 'message',
-                    title: isBroadcast ? 'Novo Aviso Publicado' : 'Nova Mensagem do Professor',
-                    message: isBroadcast ? msg.message : `${teacherName} te enviou uma mensagem.`
+                    title: isBroadcast ? 'COMUNICADO DO QG' : 'MENSAGEM DE COMANDO',
+                    message: isBroadcast ? msg.message : `${teacherName} enviou orientações.`
                 });
             });
-            messageAudio.current.play().catch(() => console.log('Interação do usuário necessária para som'));
+            messageAudio.current.play().catch(() => {});
             lastMessageIds.current = currentIds;
         }
     }, [messages, teacherProfiles, isPreview, addNotification]);
 
     const handleBack = useCallback((): boolean => {
-        if (view === 'topic') {
-            setView('subject');
-            setSelectedTopic(null);
-            setSelectedSubtopic(null);
-            return true;
-        }
-        if (view === 'subject') {
-            setView('course');
-            setSelectedSubject(null);
-            return true;
-        }
-        if (view === 'course') {
-            setView('dashboard');
-            setSelectedCourse(null);
-            return true;
-        }
-        if (['schedule', 'performance', 'reviews', 'games', 'practice_area', 'settings'].includes(view)) {
-            setView('dashboard');
-            return true;
-        }
-        if (view === 'review_quiz' || view === 'daily_challenge_quiz') {
-            setView(view === 'review_quiz' ? 'reviews' : 'dashboard');
-            setSelectedReview(null);
-            setActiveChallenge(null);
-            return true;
-        }
-        if (view === 'custom_quiz_player' || view === 'simulado_player') {
-            setView('practice_area');
-            setActiveCustomQuiz(null);
-            setActiveSimulado(null);
-            return true;
-        }
+        if (view === 'topic') { setView('subject'); setSelectedTopic(null); setSelectedSubtopic(null); return true; }
+        if (view === 'subject') { setView('course'); setSelectedSubject(null); return true; }
+        if (view === 'course') { setView('dashboard'); setSelectedCourse(null); return true; }
+        if (['schedule', 'performance', 'reviews', 'games', 'practice_area', 'settings'].includes(view)) { setView('dashboard'); return true; }
+        if (view === 'review_quiz' || view === 'daily_challenge_quiz') { setView(view === 'review_quiz' ? 'reviews' : 'dashboard'); setSelectedReview(null); setActiveChallenge(null); return true; }
+        if (view === 'custom_quiz_player' || view === 'simulado_player') { setView('practice_area'); setActiveCustomQuiz(null); setActiveSimulado(null); return true; }
         return false;
     }, [view]);
     
     useEffect(() => {
         window.customGoBack = handleBack;
-        return () => {
-            if(window.customGoBack === handleBack) {
-                window.customGoBack = undefined;
-            }
-        };
+        return () => { if(window.customGoBack === handleBack) window.customGoBack = undefined; };
     }, [handleBack]);
 
 
@@ -271,22 +253,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     
     const handleCourseSelect = (course: Course) => { setSelectedCourse(course); setView('course'); };
     const handleSubjectSelect = (subject: Subject) => { setSelectedSubject(subject); setView('subject'); };
-    
     const handleTopicSelect = (topic: Topic | SubTopic, parentTopic?: Topic) => {
-        if ('subtopics' in topic) { 
-            setSelectedTopic(topic); 
-            setSelectedSubtopic(null); 
-        } 
-        else { 
-            setSelectedTopic(parentTopic!); 
-            setSelectedSubtopic(topic); 
-        }
-        
+        if ('subtopics' in topic) { setSelectedTopic(topic); setSelectedSubtopic(null); } 
+        else { setSelectedTopic(parentTopic!); setSelectedSubtopic(topic); }
         if (studentProgress) {
             const newProgress = { ...studentProgress, lastAccessedTopicId: topic.id };
             handleUpdateStudentProgress(newProgress, studentProgress);
         }
-
         setView('topic');
     };
 
@@ -295,25 +268,16 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             for (const topic of subject.topics) {
                 const foundTopic = topic.id === topicId;
                 const foundSubtopic = topic.subtopics.find(st => st.id === topicId);
-
                 if (foundTopic || foundSubtopic) {
-                    const associatedCourse = enrolledCourses.find(c => 
-                        c.disciplines.some(d => d.subjectId === subject.id)
-                    );
-
-                    if (associatedCourse) {
-                        setSelectedCourse(associatedCourse);
-                    }
-
+                    const associatedCourse = enrolledCourses.find(c => c.disciplines.some(d => d.subjectId === subject.id));
+                    if (associatedCourse) setSelectedCourse(associatedCourse);
                     setSelectedSubject(subject);
                     setSelectedTopic(topic);
                     setSelectedSubtopic(foundSubtopic || null);
-                    
                     if (studentProgress) {
                         const newProgress = { ...studentProgress, lastAccessedTopicId: topicId };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }
-
                     setView('topic');
                     return;
                 }
@@ -325,27 +289,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
     const saveDailyChallengeAttempt = (challengeType: 'review' | 'glossary' | 'portuguese', attempt: QuestionAttempt) => {
         if (isPreview) return;
-
         setStudentProgress(prevProgress => {
             if (!prevProgress) return null;
-
             const newProgress = JSON.parse(JSON.stringify(prevProgress));
             const challengeKey = `${challengeType}Challenge` as const;
             const challenge = newProgress[challengeKey];
             if (!challenge) return prevProgress;
-
-            if (!challenge.sessionAttempts) {
-                challenge.sessionAttempts = [];
-            }
+            if (!challenge.sessionAttempts) challenge.sessionAttempts = [];
             const existingAttemptIndex = challenge.sessionAttempts.findIndex((a: QuestionAttempt) => a.questionId === attempt.questionId);
-            if (existingAttemptIndex > -1) {
-                challenge.sessionAttempts[existingAttemptIndex] = attempt;
-            } else {
-                challenge.sessionAttempts.push(attempt);
-            }
-            
+            if (existingAttemptIndex > -1) challenge.sessionAttempts[existingAttemptIndex] = attempt;
+            else challenge.sessionAttempts.push(attempt);
             setActiveChallenge(prev => prev ? { ...prev, sessionAttempts: challenge.sessionAttempts || [] } : null);
-            
             FirebaseService.saveStudentProgress(newProgress);
             return newProgress;
         });
@@ -354,80 +308,52 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[], isCatchUp: boolean = false) => {
         if (!activeChallenge || isPreview) return;
         const challengeType = activeChallenge.type;
-
         const xpToastsToAdd: XpToast[] = [];
         let totalXpGained = 0;
-
         const addChallengeXp = (amount: number, message?: string) => {
             totalXpGained += amount;
-            if (message) {
-                xpToastsToAdd.push({ id: Date.now() + Math.random(), amount, message });
-            }
+            if (message) xpToastsToAdd.push({ id: Date.now() + Math.random(), amount, message });
         };
 
         setStudentProgress(prevProgress => {
             if (!prevProgress) return null;
-
             const newProgress = JSON.parse(JSON.stringify(prevProgress));
             const challengeKey = `${challengeType}Challenge` as const;
             const challenge = newProgress[challengeKey];
             if (!challenge) return prevProgress;
-
             challenge.isCompleted = true;
             challenge.sessionAttempts = finalAttempts;
             challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
-            
             const correctCount = finalAttempts.filter(a => a.isCorrect).length;
             const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
-            
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-
             if (score >= 0.6) {
-                if (isCatchUp) {
-                    addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
-                } else {
+                if (isCatchUp) addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
+                else {
                     addChallengeXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
-                    const yesterday = getBrasiliaDate();
-                    yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+                    const yesterday = getBrasiliaDate(); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
                     const yesterdayISO = getLocalDateISOString(yesterday);
-                    
                     const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
                     if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
                     else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
                     streak.lastCompletedDate = todayISO;
                     streak.longest = Math.max(streak.current, streak.longest);
                     newProgress.dailyChallengeStreak = streak;
-
                     const streakBonus = Gamification.XP_CONFIG.STREAK_BONUS as Record<number, number>;
-                    if (streakBonus[streak.current]) {
-                        addChallengeXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
-                    }
+                    if (streakBonus[streak.current]) addChallengeXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
                 }
-                
                 if (!newProgress.dailyChallengeCompletions) newProgress.dailyChallengeCompletions = {};
                 if (!newProgress.dailyChallengeCompletions[todayISO]) newProgress.dailyChallengeCompletions[todayISO] = {};
                 newProgress.dailyChallengeCompletions[todayISO][challengeType] = true;
             }
-
             newProgress.xp = (newProgress.xp || 0) + totalXpGained;
-            
             FirebaseService.saveStudentProgress(newProgress);
-            
             setTimeout(() => {
                 setXpToasts(prev => [...prev, ...xpToastsToAdd]);
                 setTimeout(() => setXpToasts(prev => prev.filter(t => !xpToastsToAdd.some(tt => tt.id === t.id))), 3000);
-
-                const oldLevel = Gamification.calculateLevel(prevProgress.xp);
-                const newLevel = Gamification.calculateLevel(newProgress.xp);
-                if (newLevel > oldLevel) {
-                    setNewLevelInfo({ level: newLevel, title: Gamification.getLevelTitle(newLevel) });
-                    setIsLevelUpModalOpen(true);
-                }
             }, 100);
-
             return newProgress;
         });
-
         setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
     };
 
@@ -441,6 +367,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         setActiveChallenge(null);
     };
     
+    // FIX: Added missing startDailyChallenge function to fix 'Cannot find name startDailyChallenge' error and fulfill StudentViewRouter expectations.
     const startDailyChallenge = (challenge: DailyChallenge<any>, type: 'review' | 'glossary' | 'portuguese', isCatchUp = false) => {
         if (challenge && challenge.items.length > 0) {
             setActiveChallenge({ type, questions: challenge.items, sessionAttempts: challenge.sessionAttempts || [], isCatchUp });
@@ -451,66 +378,28 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
     const handleGenerateAllDailyChallenges = async () => {
         if (isPreview || !studentProgress) return;
-    
         setIsGeneratingAllChallenges(true);
         setChallengeGenerationStatus('Sincronizando com o QG...');
         try {
             const apiKey = process.env.VITE_DAILY_CHALLENGE_API_KEY;
             const types: Array<'review' | 'glossary' | 'portuguese'> = ['review', 'glossary', 'portuguese'];
-            
             const results: Record<string, any[]> = {};
-            
-            const statusMap = {
-                review: 'Preparando Protocolo de Revisão...',
-                glossary: 'Indexando Nomenclatura Técnica...',
-                portuguese: 'Sorteando Alvos de Português...'
-            };
-
             for (const type of types) {
-                setChallengeGenerationStatus(statusMap[type]);
+                setChallengeGenerationStatus(`Preparando ${type}...`);
                 const res = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-                
-                if (!res.ok) {
-                    const errorBody = await res.text();
-                    if (res.status === 429 || errorBody.includes('quota') || errorBody.includes('429')) {
-                        setChallengeGenerationStatus('IA Congestionada. Aguardando 30s...');
-                        await new Promise(r => setTimeout(r, 30000));
-                        const retryRes = await fetch(`/api/generate-challenge?apiKey=${apiKey}&studentId=${user.id}&challengeType=${type}`);
-                        if (!retryRes.ok) throw new Error('O sistema de IA está muito ocupado agora. Tente gerar novamente em 1 minuto.');
-                        results[type] = await retryRes.json();
-                    } else {
-                        throw new Error(`Erro operacional em ${type}: ${res.status}`);
-                    }
-                } else {
-                    results[type] = await res.json();
-                }
-                
-                setChallengeGenerationStatus('Resfriando sistemas (8s)...');
-                await new Promise(r => setTimeout(r, 8000));
+                if (!res.ok) throw new Error(`Falha no sistema de missões: ${type}`);
+                results[type] = await res.json();
+                await new Promise(r => setTimeout(r, 2000));
             }
-            
             const todayISO = getLocalDateISOString(getBrasiliaDate());
-            const newReviewChallenge: DailyChallenge<Question> = { date: todayISO, items: results['review'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newGlossaryChallenge: DailyChallenge<Question> = { date: todayISO, items: results['glossary'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            const newPortugueseChallenge: DailyChallenge<Question> = { date: todayISO, items: results['portuguese'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] };
-            
             const newProgress = {
                 ...studentProgress,
-                reviewChallenge: newReviewChallenge,
-                glossaryChallenge: newGlossaryChallenge,
-                portugueseChallenge: newPortugueseChallenge,
+                reviewChallenge: { date: todayISO, items: results['review'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] },
+                glossaryChallenge: { date: todayISO, items: results['glossary'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] },
+                portugueseChallenge: { date: todayISO, items: results['portuguese'], isCompleted: false, attemptsMade: 0, sessionAttempts: [] },
             };
-            
             await handleUpdateStudentProgress(newProgress, studentProgress);
-            setChallengeGenerationStatus('Missões ativadas!');
-    
-        } catch (error: any) {
-            console.error("Erro ao gerar todos os desafios diários:", error);
-            alert(error.message || `Ocorreu uma falha na comunicação com a IA. Tente gerar novamente em um minuto.`);
-        } finally {
-            setIsGeneratingAllChallenges(false);
-            setChallengeGenerationStatus('');
-        }
+        } catch (error: any) { alert(error.message || `Erro operacional na IA.`); } finally { setIsGeneratingAllChallenges(false); setChallengeGenerationStatus(''); }
     };
 
     if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
@@ -519,33 +408,22 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     return (
         <div className="bg-gray-900 text-white min-h-screen">
             <StudentHeader 
-                user={user} 
-                studentProgress={studentProgress} 
-                view={view} 
+                user={user} studentProgress={studentProgress} view={view} 
                 selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} 
-                selectedSubjectName={selectedSubject?.name}
-                selectedCourseName={selectedCourse?.name} 
-                activeChallengeType={activeChallenge?.type}
-                onSetView={setView} 
-                onLogout={onLogout} 
-                onGoHome={() => setView('dashboard')} 
+                selectedSubjectName={selectedSubject?.name} selectedCourseName={selectedCourse?.name} 
+                activeChallengeType={activeChallenge?.type} onSetView={(v) => setView(v)} onLogout={onLogout} onGoHome={() => setView('dashboard')} 
             />
             
-            {/* CONTAINER DE NOTIFICAÇÕES POP-UP CENTRALIZADO NO TOPO */}
             <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-4 pointer-events-none items-center w-full max-w-lg px-4">
                 {activeNotifications.map(notification => (
-                    <NotificationToast 
-                        key={notification.id} 
-                        notification={notification} 
-                        onClose={removeNotification} 
-                    />
+                    <NotificationToast key={notification.id} notification={notification} onClose={removeNotification} />
                 ))}
             </div>
 
             <main className="p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
                 {view !== 'dashboard' && !isPreview && (
-                    <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all">
-                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all font-black text-[10px] uppercase tracking-widest">
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar para Painel
                     </button>
                 )}
                 {isGeneratingAllChallenges && challengeGenerationStatus && (
@@ -558,11 +436,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onUpdateUser={onUpdateUser}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
-                    onCourseSelect={handleCourseSelect}
-                    onSubjectSelect={handleSubjectSelect}
-                    onTopicSelect={handleTopicSelect}
-                    onStartDailyChallenge={startDailyChallenge}
-                    onGenerateAllChallenges={handleGenerateAllDailyChallenges}
+                    onCourseSelect={handleCourseSelect} onSubjectSelect={handleSubjectSelect} onTopicSelect={handleTopicSelect}
+                    onStartDailyChallenge={startDailyChallenge} onGenerateAllChallenges={handleGenerateAllDailyChallenges}
                     onNavigateToTopic={handleNavigateToTopic}
                     onToggleTopicCompletion={(subjectId, topicId, isCompleted) => {
                         const newProgress = { ...studentProgress };
@@ -578,15 +453,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         setIsGeneratingReview(true);
                         try {
                             const questions = await GeminiService.generateSmartReview(studentProgress, allSubjects);
-                            if (questions.length > 0) {
-                                onStartReview({ id: `rev-ai-${Date.now()}`, name: "Revisão Inteligente da IA", type: 'ai', createdAt: Date.now(), questions, isCompleted: false });
-                            } else { alert("Não há dados suficientes para gerar uma revisão inteligente."); }
+                            if (questions.length > 0) onStartReview({ id: `rev-ai-${Date.now()}`, name: "Revisão Inteligente da IA", type: 'ai', createdAt: Date.now(), questions, isCompleted: false });
+                            else alert("Dados insuficientes para IA.");
                         } catch (e) { console.error(e); } finally { setIsGeneratingReview(false); }
                     }}
                     onGenerateSrsReview={(questions) => {
-                        if (questions.length > 0) {
-                            onStartReview({ id: `rev-srs-${Date.now()}`, name: "Revisão Diária (SRS)", type: 'srs', createdAt: Date.now(), questions, isCompleted: false });
-                        } else { alert("Nenhuma questão agendada para revisão hoje."); }
+                        if (questions.length > 0) onStartReview({ id: `rev-srs-${Date.now()}`, name: "Revisão Diária (SRS)", type: 'srs', createdAt: Date.now(), questions, isCompleted: false });
+                        else alert("Nada para revisar hoje.");
                     }}
                     onGenerateSmartFlashcards={async (questions) => {
                         const flashcards = await GeminiService.generateFlashcardsFromIncorrectAnswers(questions);
@@ -623,14 +496,12 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
                     handleDailyChallengeComplete={handleDailyChallengeComplete}
-                    onAddBonusXp={addXp}
-                    onPlayGame={(game, topicId) => { setPlayingGame({ game, topicId }); setIsGamePlayerOpen(true); }}
+                    onAddBonusXp={addXp} onPlayGame={(game, topicId) => { setPlayingGame({ game, topicId }); setIsGamePlayerOpen(true); }}
                     onDeleteCustomGame={(gameId) => {
                         const newProgress = { ...studentProgress, customGames: studentProgress.customGames.filter(g => g.id !== gameId) };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    onOpenCustomGameModal={() => {}}
-                    onSelectTargetCargo={(courseId, cargoName) => {
+                    onOpenCustomGameModal={() => {}} onSelectTargetCargo={(courseId, cargoName) => {
                         const newProgress = { ...studentProgress, targetCargoByCourse: { ...(studentProgress.targetCargoByCourse || {}), [courseId]: cargoName } };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
@@ -638,13 +509,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         const newProgress = { ...studentProgress, notesByTopic: { ...studentProgress.notesByTopic, [contentId]: content } };
                         handleUpdateStudentProgress(newProgress, studentProgress);
                     }}
-                    onToggleSplitView={() => setIsSplitView(!isSplitView)}
-                    onSetIsSidebarCollapsed={setIsSidebarCollapsed}
-                    onOpenChatModal={() => setIsChatModalOpen(true)}
-                    onDeleteMessage={(id) => setConfirmDeleteMessageId(id)}
-                    setView={setView}
-                    setActiveChallenge={setActiveChallenge}
-                    onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
+                    onToggleSplitView={() => setIsSplitView(!isSplitView)} onSetIsSidebarCollapsed={setIsSidebarCollapsed}
+                    onOpenChatModal={() => setIsChatModalOpen(true)} onDeleteMessage={(id) => setConfirmDeleteMessageId(id)}
+                    // FIX: Wrapped setView in an arrow function to fix type mismatch error between useState and StudentViewRouter expectations.
+                    setView={(v) => setView(v)} setActiveChallenge={setActiveChallenge} onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
                     handleGameComplete={(gameId: string) => {
                         const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -655,27 +523,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                         FirebaseService.createReportNotification(allSubjects.find(s=>s.id === subjectId)!.teacherId, user, allSubjects.find(s => s.id === subjectId)!.name, selectedSubtopic?.name || selectedTopic!.name, (isTec ? (selectedSubtopic || selectedTopic)?.tecQuestions : (selectedSubtopic || selectedTopic)?.questions)?.find(q=>q.id === questionId)?.statement || 'N/A', reason);
                     }}
                     onCloseDailyChallengeResults={() => { setDailyChallengeResults(null); setView('dashboard'); }}
-                    onNavigateToDailyChallengeResults={handleNavigateToDailyChallengeResults}
+                    onNavigateToDailyChallengeResults={() => setView('daily_challenge_results')}
                     onOpenCreator={() => setIsCustomQuizCreatorOpen(true)}
                     onStartQuiz={(quiz) => { setActiveCustomQuiz(quiz); setQuizInstanceKey(Date.now()); setView('custom_quiz_player'); }}
                     onDeleteQuiz={(quizId) => {
-                         if (window.confirm("Tem certeza que deseja apagar este quiz?")) {
+                         if (window.confirm("Apagar este quiz?")) {
                             const newProgress = { ...studentProgress, customQuizzes: (studentProgress.customQuizzes || []).filter(q => q.id !== quizId) };
                             handleUpdateStudentProgress(newProgress, studentProgress);
                         }
                     }}
                     saveCustomQuizAttempt={(attempt) => {
-                        setActiveCustomQuiz(prev => {
-                            if (!prev) return null;
-                            const newAttempts = [...(prev.attempts || []), attempt];
-                            return { ...prev, attempts: newAttempts };
-                        });
+                        setActiveCustomQuiz(prev => { if (!prev) return null; return { ...prev, attempts: [...(prev.attempts || []), attempt] }; });
                     }}
                     handleCustomQuizComplete={(finalAttempts) => {
                         const newProgress = Gamification.processCustomQuizCompletion(studentProgress, activeCustomQuiz!.id, finalAttempts, addXp);
-                        handleUpdateStudentProgress(newProgress, studentProgress);
-                        setView('practice_area');
-                        setActiveCustomQuiz(null);
+                        handleUpdateStudentProgress(newProgress, studentProgress); setView('practice_area'); setActiveCustomQuiz(null);
                     }}
                     onSaveSimulado={(simulado) => {
                         const newProgress = { ...studentProgress, simulados: [...(studentProgress.simulados || []), simulado] };
@@ -683,57 +545,10 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     }}
                     onStartSimulado={(simulado) => { setActiveSimulado(simulado); setQuizInstanceKey(Date.now()); setView('simulado_player'); }}
                     onDeleteSimulado={(simuladoId) => {
-                        if (window.confirm("Tem certeza que deseja apagar este simulado?")) {
+                        if (window.confirm("Apagar este simulado?")) {
                             const newProgress = { ...studentProgress, simulados: (studentProgress.simulados || []).filter(s => s.id !== simuladoId) };
                             handleUpdateStudentProgress(newProgress, studentProgress);
                         }
                     }}
                      saveSimuladoAttempt={(attempt) => {
-                        setActiveSimulado(prev => {
-                            if (!prev) return null;
-                            const newAttempts = [...(prev.attempts || []), attempt];
-                            return { ...prev, attempts: newAttempts };
-                        });
-                    }}
-                    handleSimuladoComplete={(finalAttempts) => {
-                        const newProgress = Gamification.processSimuladoCompletion(studentProgress, activeSimulado!.id, finalAttempts, addXp);
-                        handleUpdateStudentProgress(newProgress, studentProgress);
-                        setView('practice_area');
-                        setActiveSimulado(null);
-                    }}
-                />
-            </main>
-
-            <ConfirmModal 
-                isOpen={!!confirmDeleteMessageId}
-                onClose={() => setConfirmDeleteMessageId(null)}
-                onConfirm={executeDeleteMessage}
-                title="Descartar Aviso"
-                message="Tem certeza que deseja descartar este aviso? Ele não aparecerá mais para você."
-                variant="danger"
-                confirmLabel="Descartar"
-            />
-
-            <XpToastDisplay toasts={xpToasts} />
-            <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId: string) => {
-                const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
-                handleUpdateStudentProgress(newProgress, studentProgress);
-            }} onGameError={() => addXp(-Gamification.XP_CONFIG.GAME_ERROR_PENALTY)} />
-            <LevelUpModal isOpen={isLevelUpModalOpen} onClose={() => setIsLevelUpModalOpen(false)} newLevel={newLevelInfo.level} levelTitle={newLevelInfo.title} />
-            <BadgeAwardModal isOpen={awardedBadges.length > 0} onClose={() => setAwardedBadges(prev => prev.slice(1))} badges={awardedBadges} />
-             <NewMessageModal isOpen={isNewMessageModalOpen} onClose={() => setIsNewMessageModalOpen(false)} teachers={teacherProfiles} onSendMessage={async (teacherId, message) => {
-                await FirebaseService.addMessage({ senderId: user.id, teacherId, studentId: user.id, message });
-            }} />
-            {isChatModalOpen && selectedTopic && (
-                 <div className="fixed bottom-4 right-4 h-[60vh] w-[400px] z-50 bg-gray-800 rounded-lg shadow-2xl border border-gray-700 flex flex-col">
-                    <div className="flex justify-between items-center p-2 border-b border-gray-700 bg-gray-900/50 rounded-t-lg"><h3 className="font-bold text-sm">Assistente IA</h3><button onClick={() => setIsChatModalOpen(false)} className="text-gray-400 hover:text-white">&times;</button></div>
-                    <TopicChat subject={selectedSubject!} topic={selectedSubtopic || selectedTopic} isVisible={isChatModalOpen} />
-                </div>
-            )}
-            <StudentCustomQuizCreatorModal isOpen={isCustomQuizCreatorOpen} onClose={setIsCustomQuizCreatorOpen.bind(null, false)} onSave={(quiz) => {
-                const newProgress = { ...studentProgress, customQuizzes: [...(studentProgress.customQuizzes || []), quiz] };
-                handleUpdateStudentProgress(newProgress, studentProgress);
-            }}/>
-        </div>
-    );
-};
+                        setActiveSimulado(prev => { if (!prev)

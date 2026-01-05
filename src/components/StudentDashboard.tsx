@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 // FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../types';
@@ -20,7 +19,15 @@ import { getLocalDateISOString, getBrasiliaDate } from '../utils';
 import * as GeminiService from '../services/geminiService';
 import { ArrowRightIcon } from './Icons';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
+window.androidGoBack = () => {
+  if (window.customGoBack && typeof window.customGoBack === 'function') {
+    return window.customGoBack();
+  }
+  return false;
+};
+
+// FIX: Added 'settings' to ViewType to ensure compatibility with StudentHeader's expectations and resolve type mismatch errors.
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
     id: number;
@@ -363,12 +370,20 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         }
     };
 
-    if (isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-900"><Spinner /></div>;
+    if (isLoading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center bg-gray-900">
+                <Spinner />
+            </div>
+        );
+    }
+
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
 
     return (
         <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-6 lg:p-8">
-            <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={setView} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
+            {/* FIX: Wrapped setView in an arrow function to fix type mismatch error between setState and StudentHeader expectations. */}
+            <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={(v) => setView(v)} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
             <main>
                 {view !== 'dashboard' && !isPreview && (
                     <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
@@ -464,7 +479,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     onOpenChatModal={() => setIsChatModalOpen(true)}
                     // FIX: Passed handleDeleteMessage to StudentViewRouter.
                     onDeleteMessage={handleDeleteMessage}
-                    setView={setView}
+                    // FIX: Wrapped setView in an arrow function to fix type mismatch error.
+                    setView={(v) => setView(v)}
                     setActiveChallenge={setActiveChallenge}
                     onSaveDailyChallengeAttempt={saveDailyChallengeAttempt}
                     handleGameComplete={(gameId: string) => {

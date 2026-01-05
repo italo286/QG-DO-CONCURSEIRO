@@ -27,7 +27,7 @@ export const DailySchedule: React.FC<{
         const timer = setInterval(() => {
             const now = getBrasiliaDate();
             setCurrentMinutes(now.getUTCHours() * 60 + now.getUTCMinutes());
-        }, 1000);
+        }, 30000); // Atualiza a cada 30 segundos
         return () => clearInterval(timer);
     }, []);
 
@@ -57,9 +57,7 @@ export const DailySchedule: React.FC<{
     };
 
     const handleSaveEdit = (time: string) => {
-        if (onUpdateRoutine) {
-            onUpdateRoutine(todayIndex, time, editValue);
-        }
+        if (onUpdateRoutine) onUpdateRoutine(todayIndex, time, editValue);
         setEditingSlot(null);
     };
 
@@ -97,7 +95,6 @@ export const DailySchedule: React.FC<{
                 </div>
             ) : (
                 <div className="relative ml-1">
-                    {/* LINHA DE FUNDO DA TIMELINE */}
                     <div className="absolute left-[11px] top-4 bottom-4 w-[1px] bg-cyan-500/10" />
 
                     <div className="space-y-6">
@@ -110,63 +107,50 @@ export const DailySchedule: React.FC<{
                             const nextTime = sortedTimes[index + 1];
                             const nextItemMinutes = nextTime ? timeToMinutes(nextTime) : 1440;
                             
-                            // LÓGICA CORRIGIDA: Só é active se o relógio já bateu o tempo do item E ainda não chegou no próximo
                             const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
-                            const isPast = currentMinutes >= nextItemMinutes;
+                            const isPast = currentTotalMinutes >= nextItemMinutes;
 
                             return (
                                 <div key={time} className="relative pl-10 group">
-                                    {/* LINHA DE CONEXÃO: SÓ BRILHA SE O ITEM JÁ FOI COMPLETADO (PASSO PASSADO) */}
-                                    {index < sortedTimes.length - 1 && (
-                                        <div className={`absolute left-[11px] top-6 h-[calc(100%+1.5rem)] w-[1px] transition-all duration-700 
-                                            ${isPast ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-cyan-500/10'}`} 
-                                        />
-                                    )}
+                                    <div className={`absolute left-[11px] top-6 h-[calc(100%+1.5rem)] w-[1px] transition-all duration-700 
+                                        ${isActive ? 'bg-cyan-400 shadow-[0_0_10px_cyan]' : 'bg-cyan-500/10'}`} 
+                                    />
 
-                                    {/* CÍRCULO DA TIMELINE */}
                                     <div className={`absolute left-0 top-1 w-6 h-6 rounded-full border-4 border-[#0a0f1d] z-10 transition-all duration-500 flex items-center justify-center 
                                         ${isActive ? 'bg-cyan-400 shadow-[0_0_20px_cyan] scale-110' : 
-                                          isPast ? 'bg-cyan-800 border-cyan-400/50' : 'bg-gray-800 border-gray-700'}`}>
+                                          isPast ? 'bg-cyan-900 border-cyan-500/20' : 'bg-gray-800 border-gray-700'}`}>
                                         <div className={`w-1.5 h-1.5 rounded-full ${isActive ? 'bg-white animate-pulse' : 'bg-transparent'}`} />
                                     </div>
 
                                     <div className="space-y-2">
                                         <div className="flex items-center gap-3">
-                                            <span className={`text-base font-black font-mono tracking-tighter uppercase transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-800' : 'text-gray-600'}`}>
+                                            <span className={`text-base font-black font-mono tracking-tighter transition-colors ${isActive ? 'text-cyan-400' : isPast ? 'text-cyan-900' : 'text-gray-600'}`}>
                                                 {time}
                                             </span>
-                                            {isActive && <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">EM ANDAMENTO</span>}
+                                            {isActive && (
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-[8px] bg-cyan-400 text-black px-2 py-0.5 rounded-sm font-black uppercase tracking-widest animate-pulse">MISSÃO ATIVA</span>
+                                                </div>
+                                            )}
                                         </div>
                                         
                                         <div className={`p-4 rounded-2xl border transition-all duration-500 relative overflow-hidden
-                                            ${isActive ? 'border-cyan-400/40 bg-cyan-400/5 shadow-2xl' : 
+                                            ${isActive ? 'border-cyan-400/60 bg-cyan-400/10 shadow-[0_0_30px_rgba(6,182,212,0.1)] ring-1 ring-cyan-400/30' : 
                                               isPast ? 'border-gray-800 bg-gray-900/40 opacity-40' : 'border-white/5 bg-gray-900/10'}`}>
                                             
                                             <div className="flex justify-between items-center gap-3">
                                                 <div className="flex gap-4 items-center min-w-0 flex-grow">
                                                     {editingSlot === time ? (
                                                         <div className="flex items-center gap-2 w-full">
-                                                            <input 
-                                                                autoFocus
-                                                                type="text" 
-                                                                value={editValue} 
-                                                                onChange={(e) => setEditValue(e.target.value)}
-                                                                onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(time)}
-                                                                className="bg-gray-800 border border-cyan-500/50 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none focus:ring-2 focus:ring-cyan-500/30"
-                                                            />
-                                                            <button onClick={() => handleSaveEdit(time)} className="p-1.5 bg-green-500/20 text-green-400 rounded-lg hover:bg-green-500/30">
-                                                                <CheckIcon className="h-4 w-4" />
-                                                            </button>
-                                                            <button onClick={() => setEditingSlot(null)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg hover:bg-red-500/30">
-                                                                <XCircleIcon className="h-4 w-4" />
-                                                            </button>
+                                                            <input autoFocus type="text" value={editValue} onChange={(e) => setEditValue(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit(time)} className="bg-gray-800 border border-cyan-500/50 rounded-lg px-3 py-1.5 text-sm text-white w-full outline-none" />
+                                                            <button onClick={() => handleSaveEdit(time)} className="p-1.5 bg-green-500/20 text-green-400 rounded-lg"><CheckIcon className="h-4 w-4" /></button>
+                                                            <button onClick={() => setEditingSlot(null)} className="p-1.5 bg-red-500/20 text-red-400 rounded-lg"><XCircleIcon className="h-4 w-4" /></button>
                                                         </div>
                                                     ) : (
                                                         <>
                                                             <button 
                                                                 onClick={() => handleStartEdit(time, topicInfo?.name || content)}
                                                                 className={`p-2.5 rounded-xl flex-shrink-0 transition-all ${isActive ? 'bg-cyan-400 text-black shadow-lg scale-105' : 'bg-gray-800 text-gray-500 hover:text-cyan-400'}`}
-                                                                title="Editar este compromisso"
                                                             >
                                                                 <PencilIcon className="h-4 w-4" />
                                                             </button>
@@ -175,7 +159,7 @@ export const DailySchedule: React.FC<{
                                                                     "{topicInfo?.name || content}"
                                                                 </p>
                                                                 {topicInfo && (
-                                                                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-widest mt-1 truncate">
+                                                                    <p className={`text-[10px] font-black uppercase tracking-widest mt-1 truncate ${isActive ? 'text-cyan-500/70' : 'text-gray-600'}`}>
                                                                         {topicInfo.subjectName}
                                                                     </p>
                                                                 )}
@@ -186,7 +170,7 @@ export const DailySchedule: React.FC<{
                                                 {topicInfo && editingSlot !== time && (
                                                     <button 
                                                         onClick={() => onNavigateToTopic(content)}
-                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-400 text-black shadow-xl scale-110' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
+                                                        className={`p-3 rounded-xl transition-all ${isActive ? 'bg-cyan-500 text-white shadow-[0_0_15px_rgba(6,182,212,0.5)] scale-110' : 'bg-gray-800 text-gray-600 hover:text-white'}`}
                                                     >
                                                         <ArrowRightIcon className="h-4 w-4" />
                                                     </button>
@@ -202,10 +186,7 @@ export const DailySchedule: React.FC<{
             )}
 
             <div className="mt-8 pt-4 border-t border-gray-800 flex justify-center">
-                 <button 
-                    onClick={onViewFullSchedule}
-                    className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-cyan-400 transition-colors group"
-                 >
+                 <button onClick={onViewFullSchedule} className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.2em] text-gray-500 hover:text-cyan-400 transition-colors group">
                     Ver Cronograma Completo
                     <ArrowRightIcon className="h-3 w-3 group-hover:translate-x-1 transition-transform" />
                  </button>
