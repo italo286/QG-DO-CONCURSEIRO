@@ -134,45 +134,19 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    const getPageTitle = (): string => {
-        switch (view) {
-            case 'dashboard': return 'Início';
-            case 'daily_challenge_quiz':
-                const challengeName = activeChallengeType === 'portuguese' ? 'Português' : 
-                                    activeChallengeType === 'glossary' ? 'Glossário' : 
-                                    activeChallengeType === 'review' ? 'Revisão' : 'Desafio';
-                return `Missão: ${challengeName}`;
-            case 'daily_challenge_results': return 'Resultados';
-            case 'course': return selectedCourseName || 'Curso';
-            case 'subject': return selectedSubjectName || 'Disciplina';
-            case 'topic': return selectedTopicName || 'Estudo';
-            case 'schedule': return 'Agenda';
-            case 'performance': return 'Meu Score';
-            case 'reviews': return 'Revisões';
-            case 'practice_area': return 'Prática';
-            case 'settings': return 'Configurações';
-            default: return 'QG';
-        }
-    };
-
-    const pageTitle = getPageTitle();
-
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
             <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-2">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + TÍTULO COMPOSTO */}
+                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (SEM NOME DA PÁGINA) */}
                 <div className="flex items-center gap-3 lg:gap-5 flex-1 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-9 w-auto rounded-lg" />
                     </button>
                     <div className="hidden lg:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
-                    <div className="flex flex-col justify-center min-w-0">
-                        <span className="text-sm md:text-base xl:text-lg font-black text-white uppercase tracking-tighter leading-none italic truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                    <div className="min-w-0">
+                        <span className="text-base md:text-lg xl:text-xl font-black text-white uppercase tracking-tighter leading-none truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
                             QG do concurseiro
-                        </span>
-                        <span className="text-[10px] md:text-xs font-bold text-cyan-500 uppercase tracking-widest leading-none mt-1 truncate pr-4 opacity-90">
-                            {pageTitle}
                         </span>
                     </div>
                 </div>
@@ -242,7 +216,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </div>
 
-                    {/* MENU USUÁRIO */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
