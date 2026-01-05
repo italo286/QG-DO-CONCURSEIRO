@@ -135,110 +135,113 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_15px_50px_-15px_rgba(0,0,0,0.8)] h-24">
-            {/* CONTAINER COM MARGENS AUMENTADAS (px-10 a lg:px-32) E ESPAÇAMENTO EQUALIZADO (justify-between) */}
-            <div className="w-full h-full px-10 md:px-16 lg:px-32 flex items-center justify-between">
+            {/* CONTAINER COM SIMETRIA LATERAL (px equilibrado) E ADAPTABILIDADE (justify-between) */}
+            <div className="w-full h-full px-6 sm:px-12 md:px-16 lg:px-24 flex items-center justify-between gap-2">
                 
                 {/* 1. LOGO + DIVISOR */}
-                <div className="flex items-center gap-4 flex-shrink-0">
+                <div className="flex items-center gap-3 lg:gap-6 flex-shrink-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-11 lg:h-13 w-auto rounded-lg" />
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 lg:h-13 w-auto rounded-lg" />
                     </button>
-                    <div className="h-10 w-[1px] bg-white/10"></div>
+                    <div className="h-12 w-[1px] bg-white/10 hidden xs:block"></div>
                 </div>
 
-                {/* 2. TÍTULO DO SITE */}
-                <div className="flex-shrink-0 hidden md:block">
-                    <span className="text-xl lg:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter leading-none drop-shadow-[0_0_20px_rgba(255,255,255,0.15)]">
+                {/* 2. TÍTULO (Escala Automática) */}
+                <div className="flex-shrink-0 hidden sm:block">
+                    <span className="text-lg md:text-xl lg:text-3xl font-black text-white uppercase tracking-tighter leading-none drop-shadow-2xl">
                         QG DO CONCURSEIRO
                     </span>
                 </div>
 
-                {/* 3. HUD DE NÍVEL */}
+                {/* 3. HUD NÍVEL (Escala Automática) */}
                 <div className="flex-shrink-0">
-                    <button onClick={() => onSetView('performance')} className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group">
-                        <div className="relative h-11 w-11 lg:h-13 lg:w-13">
-                            <div className="absolute -top-1 -right-1 z-20 bg-orange-600 rounded-full p-1 shadow-[0_0_10px_rgba(234,88,12,0.8)]">
-                                <FireIcon className="h-2.5 w-2.5 text-white animate-pulse" />
+                    <button onClick={() => onSetView('performance')} className="flex items-center gap-2 lg:gap-4 hover:bg-white/5 p-1.5 lg:p-2 rounded-2xl transition-all group">
+                        <div className="relative h-10 w-10 lg:h-14 lg:w-14">
+                            <div className="absolute -top-1 -right-1 z-20 bg-orange-600 rounded-full p-0.5 lg:p-1 shadow-lg">
+                                <FireIcon className="h-2.5 lg:h-3.5 w-2.5 lg:w-3.5 text-white animate-pulse" />
                             </div>
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="4" />
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="100 100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center leading-none">
-                                <span className="text-[14px] lg:text-[16px] font-black text-white">{level}</span>
-                                <span className="text-[6px] font-black text-cyan-500/80 uppercase">LVL</span>
+                                <span className="text-[12px] lg:text-[16px] font-black text-white">{level}</span>
+                                <span className="text-[5px] lg:text-[7px] font-black text-cyan-500/80 uppercase">LVL</span>
                             </div>
                         </div>
                         <div className="hidden lg:flex flex-col text-left leading-none">
-                            <span className="text-[12px] lg:text-[14px] font-black text-white uppercase italic tracking-tighter group-hover:text-cyan-400">{levelTitle}</span>
+                            <span className="text-[12px] lg:text-[15px] font-black text-white uppercase italic tracking-tighter group-hover:text-cyan-400 transition-colors">{levelTitle}</span>
                             <span className="text-[9px] font-black text-cyan-400/60 uppercase tracking-widest mt-1">+{nextLevelXp} XP</span>
                         </div>
                     </button>
                 </div>
 
-                {/* 4. HUD DE ACERTO */}
-                <div className="flex-shrink-0">
-                    <button onClick={() => onSetView('performance')} className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group">
+                {/* 4. HUD ACERTO (Escala Automática) */}
+                <div className="flex-shrink-0 hidden md:block">
+                    <button onClick={() => onSetView('performance')} className="flex items-center gap-2 lg:gap-4 hover:bg-white/5 p-1.5 lg:p-2 rounded-2xl transition-all group text-left">
                         <div className={`relative h-10 w-10 lg:h-12 lg:w-12 ${accTheme.shadow} rounded-full`}>
                             <svg className="h-full w-full -rotate-90" viewBox="0 0 36 36">
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
                                 <circle cx="18" cy="18" r="16" fill="none" stroke={accTheme.stroke} strokeWidth="3" strokeDasharray="100 100" strokeDashoffset={100 - globalAccuracy} strokeLinecap="round" />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <span className={`text-[11px] lg:text-[13px] font-black ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
+                                <span className={`text-[10px] lg:text-[12px] font-black ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
                             </div>
                         </div>
-                        <div className="hidden lg:flex flex-col text-left leading-none">
-                            <span className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1">ACERTO EM QUESTÕES</span>
-                            <span className={`text-[12px] font-black uppercase italic ${accTheme.text}`}>{accTheme.label}</span>
+                        <div className="flex flex-col leading-none">
+                            <span className="text-[8px] lg:text-[10px] font-black text-gray-500 uppercase tracking-widest mb-1">ACERTO EM QUESTÕES</span>
+                            <span className={`text-[11px] lg:text-[13px] font-black uppercase italic ${accTheme.text}`}>{accTheme.label}</span>
                         </div>
                     </button>
                 </div>
 
-                {/* 5. HUD RELÓGIO (PÍLULA) */}
-                <div className="flex-shrink-0 hidden xl:flex items-center h-12 bg-black/50 rounded-full border border-white/10 px-8 gap-8 shadow-inner">
+                {/* 5. HUD RELÓGIO PÍLULA (Escala Automática) */}
+                <div className="flex-shrink-0 hidden lg:flex items-center h-12 bg-black/50 rounded-full border border-white/10 px-6 xl:px-10 gap-6 xl:gap-10 shadow-inner">
                     <div className="flex flex-col items-center">
-                        <span className="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em] mb-0.5">HORA</span>
-                        <span className="text-[14px] font-mono font-bold text-white">
+                        <span className="text-[7px] xl:text-[8px] font-black text-gray-500 uppercase tracking-[0.2em] mb-0.5">HORA</span>
+                        <span className="text-[13px] xl:text-[15px] font-mono font-bold text-white">
                             {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
                     <div className="w-[1px] h-6 bg-white/10"></div>
                     <div className="flex flex-col items-center">
-                        <span className="text-[7px] font-black text-cyan-500 uppercase tracking-[0.2em] mb-0.5">SESSÃO</span>
-                        <span className="text-[14px] font-mono font-bold text-cyan-400">
+                        <span className="text-[7px] xl:text-[8px] font-black text-cyan-500 uppercase tracking-[0.2em] mb-0.5">SESSÃO</span>
+                        <span className="text-[13px] xl:text-[15px] font-mono font-bold text-cyan-400">
                             {formatTime(studySeconds)}
                         </span>
                     </div>
                 </div>
 
-                {/* 6. PERFIL USUÁRIO */}
-                <div ref={navRef} className="flex-shrink-0 relative">
+                {/* 6. PERFIL USUÁRIO (Escala Automática) */}
+                <div ref={navRef} className="flex-shrink-0 relative flex items-center gap-3">
                     <button 
                         onClick={() => setIsNavOpen(prev => !prev)} 
-                        className={`flex items-center gap-3 p-1.5 pr-5 rounded-full bg-gray-800/30 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-xl' : ''}`}
+                        className={`flex items-center gap-2 lg:gap-4 p-1 lg:p-1.5 pr-3 lg:pr-6 rounded-full bg-gray-800/30 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-xl' : ''}`}
                     >
                         <div className="relative">
-                            <div className="h-9 w-9 lg:h-10 lg:w-10 rounded-full overflow-hidden border-2 border-cyan-500/20">
+                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full overflow-hidden border-2 border-cyan-500/20">
                                 {user.avatarUrl ? (
                                     <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
                                 ) : (
                                     <UserCircleIcon className="h-full w-full text-gray-700 p-1" />
                                 )}
                             </div>
-                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
+                            <div className="absolute bottom-0 right-0 w-2.5 lg:w-3 h-2.5 lg:h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
                         </div>
-                        <div className="hidden sm:flex flex-col text-left">
-                            <span className="text-[12px] font-black text-white uppercase truncate max-w-[90px] leading-tight">{user.name || user.username}</span>
-                            <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none mt-1">
+                        <div className="hidden xs:flex flex-col text-left">
+                            <span className="text-[10px] lg:text-[13px] font-black text-white uppercase truncate max-w-[70px] lg:max-w-[100px] leading-tight tracking-tight">{user.name || user.username}</span>
+                            <span className="text-[7px] lg:text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none mt-1">
                                 {getUserSublabel()}
                             </span>
                         </div>
                         <ChevronDownIcon className={`h-4 w-4 text-gray-600 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                     </button>
 
+                    {/* DIVISOR FINAL DIREITO (Garante simetria com a borda) */}
+                    <div className="h-12 w-[1px] bg-white/20 hidden sm:block"></div>
+
                     {isNavOpen && (
-                        <div className="absolute right-0 mt-4 w-60 bg-[#020617] border border-white/10 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] z-50 overflow-hidden backdrop-blur-2xl animate-fade-in">
+                        <div className="absolute right-0 top-full mt-4 w-60 bg-[#020617] border border-white/10 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] z-50 overflow-hidden backdrop-blur-2xl animate-fade-in">
                             <div className="p-4 bg-white/5 border-b border-white/5">
                                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Navegação Central</p>
                             </div>
@@ -259,9 +262,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     )}
                 </div>
-
-                {/* LINHA FINAL VERTICAL */}
-                <div className="flex-shrink-0 h-12 w-[1px] bg-white/20 hidden sm:block"></div>
             </div>
         </header>
     );
