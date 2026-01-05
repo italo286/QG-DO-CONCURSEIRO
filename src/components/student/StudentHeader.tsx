@@ -7,6 +7,16 @@ import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
+// FIX: Added navigationItems definition to resolve "Cannot find name 'navigationItems'" error.
+const navigationItems: { label: string; view: ViewType }[] = [
+    { label: 'Painel Inicial', view: 'dashboard' },
+    { label: 'Cronograma', view: 'schedule' },
+    { label: 'Meu Desempenho', view: 'performance' },
+    { label: 'Revisões', view: 'reviews' },
+    { label: 'Área de Prática', view: 'practice_area' },
+    { label: 'Configurações de Perfil', view: 'settings' },
+];
+
 interface StudentHeaderProps {
     user: User;
     studentProgress: StudentProgress;
@@ -72,17 +82,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return totalAnswered > 0 ? (totalCorrect / totalAnswered) * 100 : 0;
     }, [studentProgress]);
 
-    const getAccuracyColor = (acc: number) => {
-        if (acc < 50) return 'text-rose-500';
-        if (acc < 75) return 'text-amber-400';
-        return 'text-cyan-400';
+    const getAccuracyTheme = (acc: number) => {
+        if (acc < 50) return { text: 'text-rose-500', stroke: '#f43f5e', shadow: 'shadow-[0_0_12px_rgba(244,63,94,0.4)]', label: 'Crítico' };
+        if (acc < 75) return { text: 'text-amber-400', stroke: '#fbbf24', shadow: 'shadow-[0_0_12px_rgba(251,191,36,0.4)]', label: 'Estável' };
+        return { text: 'text-cyan-400', stroke: '#22d3ee', shadow: 'shadow-[0_0_15px_rgba(34,211,238,0.5)]', label: 'Elite' };
     };
 
-    const getAccuracyStroke = (acc: number) => {
-        if (acc < 50) return '#f43f5e';
-        if (acc < 75) return '#fbbf24';
-        return '#22d3ee';
-    };
+    const accTheme = getAccuracyTheme(globalAccuracy);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -95,6 +101,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     }, [isNavOpen]);
 
     useEffect(() => {
+        const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+        return () => clearInterval(interval);
+    }, []);
+
+    useEffect(() => {
         const todayStr = getLocalDateISOString(getBrasiliaDate());
         const savedDate = localStorage.getItem('study_timer_date');
         const savedSeconds = localStorage.getItem('study_timer_seconds');
@@ -103,12 +114,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             setStudySeconds(parseInt(savedSeconds, 10));
         } else {
             localStorage.setItem('study_timer_date', todayStr);
-            localStorage.setItem('study_timer_seconds', '0');
             setStudySeconds(0);
         }
 
-        const interval = setInterval(() => {
-            setCurrentTime(new Date());
+        const timer = setInterval(() => {
             setStudySeconds(prev => {
                 const next = prev + 1;
                 localStorage.setItem('study_timer_seconds', next.toString());
@@ -116,7 +125,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
             });
         }, 1000);
 
-        return () => clearInterval(interval);
+        return () => clearInterval(timer);
     }, []);
 
     const formatTime = (totalSeconds: number) => {
@@ -128,103 +137,86 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
     const getViewTitle = () => {
         switch (view) {
-            case 'dashboard': return 'Início';
-            case 'schedule': return 'Cronograma';
-            case 'performance': return 'Meu Desempenho';
-            case 'reviews': return 'Revisões';
-            case 'games': return 'Jogos';
-            case 'practice_area': return 'Área de Prática';
-            case 'settings': return 'Configurações';
-            case 'daily_challenge_quiz':
-                if (activeChallengeType === 'portuguese') return 'Português';
-                if (activeChallengeType === 'glossary') return 'Glossário';
-                if (activeChallengeType === 'review') return 'Revisão Diária';
-                return 'Desafio Diário';
-            case 'topic': return selectedTopicName || 'Tópico';
-            case 'subject': return selectedSubjectName || 'Disciplina';
-            case 'course': return selectedCourseName || 'Curso';
-            default: return 'Painel';
+            case 'dashboard': return 'Central';
+            case 'schedule': return 'Agenda';
+            case 'performance': return 'Score';
+            case 'reviews': return 'Revisão';
+            case 'practice_area': return 'Prática';
+            case 'daily_challenge_quiz': return 'Missão';
+            case 'topic': return 'Estudo';
+            default: return 'QG';
         }
     };
 
-    const navigationItems = [
-        { label: 'Início', view: 'dashboard' as const },
-        { label: 'Revisões', view: 'reviews' as const },
-        { label: 'Prática', view: 'practice_area' as const },
-        { label: 'Cronograma', view: 'schedule' as const },
-        { label: 'Desempenho', view: 'performance' as const },
-        { label: 'Configurações', view: 'settings' as const },
-    ];
-
     return (
-        <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
-            <div className="max-w-[1920px] mx-auto h-20 px-4 md:px-6 flex items-center justify-between gap-4">
+        <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)]">
+            <div className="max-w-[1920px] mx-auto h-20 px-4 lg:px-8 flex items-center justify-between gap-4">
                 
-                {/* 1. LOGO E TÍTULO */}
-                <div className="flex items-center gap-4 flex-shrink-0">
-                    <button onClick={onGoHome} className="hover:scale-105 transition-transform flex-shrink-0">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 md:h-12 w-auto rounded-md" />
+                {/* 1. BRANDING E LOCALIZAÇÃO */}
+                <div className="flex items-center gap-6 flex-shrink-0">
+                    <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300">
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg shadow-2xl" />
                     </button>
-                    <div className="hidden lg:block min-w-0">
-                        <h1 className="text-xl font-black text-white uppercase tracking-tighter leading-none truncate max-w-[140px] xl:max-w-xs italic">
+                    <div className="hidden xl:block h-8 w-[1px] bg-white/10"></div>
+                    <div className="hidden lg:block">
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic flex items-center gap-2">
+                            <span className="text-cyan-500 font-mono text-sm not-italic opacity-40">01</span>
                             {getViewTitle()}
                         </h1>
                     </div>
                 </div>
 
-                {/* 2. CORE DE PERFORMANCE (NÍVEL CIRCULAR + ACURÁCIA) */}
-                <div className="flex items-center gap-6 md:gap-10 flex-grow justify-center max-w-2xl">
+                {/* 2. HUD CENTRAL (PERFORMANCE) */}
+                <div className="flex items-center gap-10 xl:gap-16 flex-grow justify-center">
                     
-                    {/* WIDGET NÍVEL CIRCULAR (CORE) */}
+                    {/* LEVEL CORE */}
                     <div className="flex items-center gap-4 group">
                         <div className="relative h-14 w-14 flex-shrink-0">
-                            {/* Ofensiva Badge (Criatividade) */}
                             {streak > 0 && (
-                                <div className="absolute -top-1 -right-1 z-20 bg-orange-500 rounded-full p-1 shadow-lg animate-pulse border border-gray-900">
+                                <div className="absolute -top-1 -right-1 z-20 bg-orange-500 rounded-full p-1 shadow-[0_0_15px_rgba(249,115,22,0.6)] animate-pulse border border-[#020617]">
                                     <FireIcon className="h-3 w-3 text-white" />
                                 </div>
                             )}
-                            
                             <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
-                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="4" />
                                 <circle 
                                     cx="18" cy="18" r="16" fill="none" 
                                     stroke="#06b6d4" 
-                                    strokeWidth="3" 
+                                    strokeWidth="4" 
                                     strokeDasharray="100 100" 
                                     strokeDashoffset={100 - progressPercent}
                                     strokeLinecap="round"
-                                    className="transition-all duration-1000 ease-out shadow-[0_0_15px_rgba(6,182,212,0.5)]"
+                                    className="transition-all duration-1000 ease-out"
                                 />
                             </svg>
                             <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                <span className="text-lg font-black text-white leading-none">{level}</span>
-                                <span className="text-[6px] font-black text-cyan-500 uppercase tracking-tighter">LVL</span>
+                                <span className="text-lg font-black text-white leading-none tracking-tighter">{level}</span>
+                                <span className="text-[7px] font-black text-cyan-500/60 uppercase">LVL</span>
                             </div>
-                            {/* Glow pulse effect */}
-                            <div className="absolute inset-0 rounded-full bg-cyan-500/10 animate-pulse -z-10"></div>
+                            <div className="absolute inset-0 rounded-full bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors shadow-inner"></div>
                         </div>
                         
-                        <div className="hidden xs:flex flex-col">
-                            <span className="text-[7px] font-black text-cyan-500 uppercase tracking-[0.2em] leading-none mb-0.5">Patente Atual</span>
-                            <span className="text-xs font-black text-white uppercase tracking-tighter italic leading-none truncate mb-1.5">{levelTitle}</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
-                                <div className="h-1 w-1 rounded-full bg-gray-700"></div>
-                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">+{nextLevelXp} PARA UP</span>
+                        <div className="hidden sm:flex flex-col">
+                            <span className="text-[8px] font-black text-cyan-500/50 uppercase tracking-[0.2em] mb-0.5">Status da Patente</span>
+                            <span className="text-sm font-black text-white uppercase tracking-tighter italic leading-none">{levelTitle}</span>
+                            <div className="mt-1.5 flex items-center gap-2">
+                                <div className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
+                                    <span className="text-[8px] font-mono font-bold text-gray-500">{studentProgress.xp} XP</span>
+                                </div>
+                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">+{nextLevelXp} P/ UP</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* ACURÁCIA (RADAR) */}
-                    <div className="flex items-center gap-4 flex-shrink-0 group cursor-help" title="Sua taxa de acerto global">
-                        <div className="relative h-12 w-12">
+                    {/* ACCURACY RADAR */}
+                    <div className="flex items-center gap-4 flex-shrink-0 group cursor-help">
+                        <div className={`relative h-12 w-12 ${accTheme.shadow} rounded-full transition-all duration-500`}>
                             <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
-                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="2.5" />
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="3" />
                                 <circle 
                                     cx="18" cy="18" r="16" fill="none" 
-                                    stroke={getAccuracyStroke(globalAccuracy)} 
-                                    strokeWidth="2.5" 
+                                    stroke={accTheme.stroke} 
+                                    strokeWidth="3" 
                                     strokeDasharray="100 100" 
                                     strokeDashoffset={100 - globalAccuracy}
                                     strokeLinecap="round"
@@ -232,75 +224,86 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 />
                             </svg>
                             <div className="absolute inset-0 flex items-center justify-center">
-                                <span className={`text-[10px] font-black italic ${getAccuracyColor(globalAccuracy)}`}>
+                                <span className={`text-[10px] font-black italic ${accTheme.text}`}>
                                     {Math.round(globalAccuracy)}%
                                 </span>
                             </div>
                         </div>
-                        <div className="hidden sm:flex flex-col">
-                            <span className="text-[7px] font-black text-gray-500 uppercase tracking-widest leading-none mb-0.5 text-right">Precisão</span>
-                            <span className={`text-[10px] font-black uppercase tracking-tighter italic leading-none text-right ${getAccuracyColor(globalAccuracy)}`}>
-                                {globalAccuracy >= 85 ? 'Elite' : globalAccuracy >= 70 ? 'Pro' : globalAccuracy >= 50 ? 'Estável' : 'Alerta'}
+                        <div className="hidden md:flex flex-col">
+                            <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-0.5 text-right">Precisão</span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest italic leading-none text-right ${accTheme.text}`}>
+                                {accTheme.label}
                             </span>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. RELÓGIO E SESSÃO */}
-                <div className="hidden xl:flex items-center h-11 bg-black/40 rounded-2xl border border-white/5 divide-x divide-white/5 flex-shrink-0 px-1">
-                    <div className="px-4 flex flex-col items-center justify-center">
-                        <span className="text-[7px] font-black text-gray-600 uppercase tracking-widest mb-0.5">Relógio</span>
-                        <span className="text-xs font-mono font-black text-white leading-none">
-                            {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                        </span>
+                {/* 3. TIME & SESSION & PROFILE */}
+                <div className="flex items-center gap-4 xl:gap-8 flex-shrink-0">
+                    
+                    {/* INFO CAPSULE */}
+                    <div className="hidden xl:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1">
+                        <div className="px-4 flex flex-col items-center border-r border-white/5">
+                            <span className="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em]">Relógio</span>
+                            <span className="text-xs font-mono font-black text-white">
+                                {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                        </div>
+                        <div className="px-4 flex flex-col items-center">
+                            <span className="text-[7px] font-black text-cyan-500 uppercase tracking-[0.2em]">Sessão</span>
+                            <span className="text-xs font-mono font-black text-cyan-400">
+                                {formatTime(studySeconds)}
+                            </span>
+                        </div>
                     </div>
-                    <div className="px-4 flex flex-col items-center justify-center">
-                        <span className="text-[7px] font-black text-cyan-500/70 uppercase tracking-widest mb-0.5">Sessão</span>
-                        <span className="text-xs font-mono font-black text-cyan-400 leading-none">
-                            {formatTime(studySeconds)}
-                        </span>
-                    </div>
-                </div>
 
-                {/* 4. USER PILL */}
-                <div className="flex items-center flex-shrink-0 ml-2">
+                    {/* PROFILE HUD PILL */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
-                            className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full bg-gray-800/50 border border-white/10 hover:bg-gray-700/70 transition-all group"
+                            className={`flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full bg-gray-800/40 border border-white/10 hover:bg-gray-800/60 hover:border-cyan-500/30 transition-all group shadow-lg ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800' : ''}`}
                         >
-                            <div className="h-9 w-9 md:h-10 md:w-10 rounded-full overflow-hidden border-2 border-cyan-500/20 shadow-lg flex-shrink-0 transition-transform group-hover:scale-105">
-                                {user.avatarUrl ? (
-                                    <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
-                                ) : (
-                                    <UserCircleIcon className="h-full w-full text-gray-600 p-1" />
-                                )}
+                            <div className="relative">
+                                <div className="h-9 w-9 md:h-10 md:w-10 rounded-full overflow-hidden border-2 border-cyan-500/20 shadow-xl transition-transform group-hover:scale-105">
+                                    {user.avatarUrl ? (
+                                        <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
+                                    ) : (
+                                        <UserCircleIcon className="h-full w-full text-gray-600 p-1" />
+                                    )}
+                                </div>
+                                <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#020617] shadow-sm"></div>
                             </div>
                             <div className="hidden sm:flex flex-col text-left">
-                                <span className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-tight leading-none truncate max-w-[100px]">
+                                <span className="text-[11px] font-black text-white uppercase tracking-tight leading-none truncate max-w-[90px]">
                                     {user.name || user.username}
                                 </span>
-                                <span className="text-[7px] font-bold text-cyan-500 uppercase tracking-widest mt-1">
+                                <span className="text-[8px] font-bold text-cyan-500 uppercase tracking-widest mt-1 opacity-70">
                                     {user.gender === 'feminine' ? 'Concurseira' : 'Concurseiro'}
                                 </span>
                             </div>
-                            <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
+                            <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform duration-300 ${isNavOpen ? 'rotate-180 text-cyan-400' : ''}`} />
                         </button>
 
                         {isNavOpen && (
-                            <div className="absolute right-0 mt-3 w-56 bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in ring-1 ring-white/10">
-                                {navigationItems.map(item => (
-                                    <button 
-                                        key={item.view} 
-                                        onClick={() => { onSetView(item.view); setIsNavOpen(false); }} 
-                                        className={`w-full text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-colors flex items-center gap-3 ${view === item.view ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:bg-gray-900 hover:text-white'}`}
-                                    >
-                                        {item.view === 'settings' && <Cog6ToothIcon className="h-4 w-4" />}
-                                        {item.label}
-                                    </button>
-                                ))}
-                                <div className="border-t border-white/5 my-1"></div>
-                                <button onClick={onLogout} className="w-full text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-colors">Encerrar Conexão</button>
+                            <div className="absolute right-0 mt-4 w-60 bg-[#020617] border border-white/10 rounded-2xl shadow-[0_20px_50px_rgba(0,0,0,0.8)] z-50 overflow-hidden animate-fade-in backdrop-blur-xl">
+                                <div className="p-4 bg-white/5 border-b border-white/5">
+                                    <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest">Navegação QG</p>
+                                </div>
+                                <div className="py-2">
+                                    {navigationItems.map(item => (
+                                        <button 
+                                            key={item.view} 
+                                            onClick={() => { onSetView(item.view); setIsNavOpen(false); }} 
+                                            className={`w-full text-left px-5 py-3 text-[10px] font-black uppercase tracking-[0.15em] transition-all flex items-center gap-3 ${view === item.view ? 'bg-cyan-500/10 text-cyan-400 border-l-2 border-cyan-500' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
+                                        >
+                                            {item.view === 'settings' && <Cog6ToothIcon className="h-4 w-4" />}
+                                            {item.label}
+                                        </button>
+                                    ))}
+                                </div>
+                                <div className="p-2 border-t border-white/5 bg-black/20">
+                                    <button onClick={onLogout} className="w-full text-center py-2 text-[9px] font-black uppercase tracking-[0.2em] text-rose-500 hover:bg-rose-500/10 rounded-lg transition-colors italic">Desconectar do Sistema</button>
+                                </div>
                             </div>
                         )}
                     </div>
