@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge } from '../../types';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, TeacherMessage } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
@@ -18,6 +18,7 @@ import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
+import { NotificationToast, NotificationItem } from './NotificationToast';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
@@ -62,6 +63,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [isGeneratingAllChallenges, setIsGeneratingAllChallenges] = useState(false);
     const [challengeGenerationStatus, setChallengeGenerationStatus] = useState<string>('');
     const [confirmDeleteMessageId, setConfirmDeleteMessageId] = useState<string | null>(null);
+    
+    // Notificações Pop-up
+    const [activeNotifications, setActiveNotifications] = useState<NotificationItem[]>([]);
+    const notifiedScheduleItems = useRef<Set<string>>(new Set());
+    const lastMessageIds = useRef<Set<string>>(new Set());
+    const scheduleAudio = useRef(new Audio('https://cdn.pixabay.com/audio/2025/11/26/audio_debacce7b2.mp3'));
+    const messageAudio = useRef(new Audio('https://cdn.pixabay.com/audio/2025/06/22/audio_99092c829e.mp3'));
 
     const {
         isLoading,
@@ -75,6 +83,95 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         messages,
         teacherProfiles
     } = useStudentData(user, isPreview);
+
+    // --- Lógica de Notificações Pop-up ---
+    const addNotification = useCallback((notif: Omit<NotificationItem, 'id'>) => {
+        const id = `notif-${Date.now()}`;
+        setActiveNotifications(prev => [...prev, { ...notif, id }]);
+        
+        // Auto-remover após 8 segundos
+        setTimeout(() => {
+            setActiveNotifications(prev => prev.filter(n => n.id !== id));
+        }, 8000);
+    }, []);
+
+    const removeNotification = (id: string) => {
+        setActiveNotifications(prev => prev.filter(n => n.id !== id));
+    };
+
+    // Monitorar Agenda
+    useEffect(() => {
+        if (isPreview || !studyPlan || !studyPlan.activePlanId) return;
+
+        const checkSchedule = () => {
+            const now = getBrasiliaDate();
+            const todayIndex = now.getUTCDay();
+            const timeStr = now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', hour12: false });
+            const dayKey = `${todayIndex}-${timeStr}`;
+
+            const activePlan = studyPlan.plans.find(p => p.id === studyPlan.activePlanId);
+            if (!activePlan) return;
+
+            const currentTask = activePlan.weeklyRoutine[todayIndex]?.[timeStr];
+
+            if (currentTask && !notifiedScheduleItems.current.has(dayKey)) {
+                notifiedScheduleItems.current.add(dayKey);
+                
+                let taskName = currentTask;
+                // Tentar traduzir ID de tópico para nome real
+                for (const sub of allSubjects) {
+                    const topic = sub.topics.find(t => t.id === currentTask);
+                    if (topic) { taskName = topic.name; break; }
+                    for (const t of sub.topics) {
+                        const st = t.subtopics.find(s => s.id === currentTask);
+                        if (st) { taskName = st.name; break; }
+                    }
+                }
+
+                addNotification({
+                    type: 'schedule',
+                    title: 'Hora de Estudar!',
+                    message: `Seu compromisso "${taskName}" começou.`
+                });
+                scheduleAudio.current.play().catch(() => console.log('Interação do usuário necessária para som'));
+            }
+        };
+
+        const interval = setInterval(checkSchedule, 30000); // Checa a cada 30 segundos
+        checkSchedule();
+        return () => clearInterval(interval);
+    }, [studyPlan, allSubjects, isPreview, addNotification]);
+
+    // Monitorar Novos Avisos e Mensagens
+    useEffect(() => {
+        if (isPreview || !messages.length) return;
+
+        const currentIds = new Set(messages.map(m => m.id));
+        
+        // Primeira carga: apenas armazena os IDs existentes para não notificar tudo retroativamente
+        if (lastMessageIds.current.size === 0) {
+            lastMessageIds.current = currentIds;
+            return;
+        }
+
+        const newMessages = messages.filter(m => !lastMessageIds.current.has(m.id));
+
+        if (newMessages.length > 0) {
+            newMessages.forEach(msg => {
+                const isBroadcast = msg.studentId === null;
+                const teacher = teacherProfiles.find(t => t.id === msg.teacherId);
+                const teacherName = teacher?.name || 'Professor';
+
+                addNotification({
+                    type: isBroadcast ? 'announcement' : 'message',
+                    title: isBroadcast ? 'Novo Aviso Publicado' : 'Nova Mensagem do Professor',
+                    message: isBroadcast ? msg.message : `${teacherName} te enviou uma mensagem.`
+                });
+            });
+            messageAudio.current.play().catch(() => console.log('Interação do usuário necessária para som'));
+            lastMessageIds.current = currentIds;
+        }
+    }, [messages, teacherProfiles, isPreview, addNotification]);
 
     const handleBack = useCallback((): boolean => {
         if (view === 'topic') {
@@ -434,6 +531,17 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 onGoHome={() => setView('dashboard')} 
             />
             
+            {/* CONTAINER DE NOTIFICAÇÕES POP-UP CENTRALIZADO NO TOPO */}
+            <div className="fixed top-8 left-1/2 -translate-x-1/2 z-[70] flex flex-col gap-4 pointer-events-none items-center w-full max-w-lg px-4">
+                {activeNotifications.map(notification => (
+                    <NotificationToast 
+                        key={notification.id} 
+                        notification={notification} 
+                        onClose={removeNotification} 
+                    />
+                ))}
+            </div>
+
             <main className="p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
                 {view !== 'dashboard' && !isPreview && (
                     <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all">
