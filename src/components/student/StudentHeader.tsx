@@ -7,7 +7,6 @@ import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
-// FIX: Added navigationItems definition to resolve "Cannot find name 'navigationItems'" error.
 const navigationItems: { label: string; view: ViewType }[] = [
     { label: 'Painel Inicial', view: 'dashboard' },
     { label: 'Cronograma', view: 'schedule' },
@@ -55,7 +54,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const nextLevelXp = LEVEL_XP_REQUIREMENT - xpCurrentLevel;
     const streak = studentProgress.dailyChallengeStreak?.current || 0;
 
-    // Cálculo da Precisão Global
+    // Cálculo da Precisão Global (Média de todos os acertos)
     const globalAccuracy = useMemo(() => {
         let totalCorrect = 0;
         let totalAnswered = 0;
@@ -152,7 +151,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)]">
             <div className="max-w-[1920px] mx-auto h-20 px-4 lg:px-8 flex items-center justify-between gap-4">
                 
-                {/* 1. BRANDING E LOCALIZAÇÃO */}
+                {/* 1. BRANDING */}
                 <div className="flex items-center gap-6 flex-shrink-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg shadow-2xl" />
@@ -166,11 +165,14 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 2. HUD CENTRAL (PERFORMANCE) */}
-                <div className="flex items-center gap-10 xl:gap-16 flex-grow justify-center">
-                    
-                    {/* LEVEL CORE */}
-                    <div className="flex items-center gap-4 group">
+                {/* 2. HUD CENTRAL (CLICÁVEL PARA DETALHES) */}
+                <button 
+                    onClick={() => onSetView('performance')}
+                    className="flex items-center gap-10 xl:gap-16 flex-grow justify-center hover:bg-white/5 py-1 px-4 rounded-2xl transition-all group"
+                    title="Clique para ver seu desempenho detalhado"
+                >
+                    {/* LEVEL CORE (XP) */}
+                    <div className="flex items-center gap-4">
                         <div className="relative h-14 w-14 flex-shrink-0">
                             {streak > 0 && (
                                 <div className="absolute -top-1 -right-1 z-20 bg-orange-500 rounded-full p-1 shadow-[0_0_15px_rgba(249,115,22,0.6)] animate-pulse border border-[#020617]">
@@ -193,24 +195,21 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 <span className="text-lg font-black text-white leading-none tracking-tighter">{level}</span>
                                 <span className="text-[7px] font-black text-cyan-500/60 uppercase">LVL</span>
                             </div>
-                            <div className="absolute inset-0 rounded-full bg-cyan-500/5 group-hover:bg-cyan-500/10 transition-colors shadow-inner"></div>
+                            <div className="absolute inset-0 rounded-full bg-cyan-500/5 group-hover:bg-cyan-500/15 transition-colors shadow-inner"></div>
                         </div>
                         
-                        <div className="hidden sm:flex flex-col">
-                            <span className="text-[8px] font-black text-cyan-500/50 uppercase tracking-[0.2em] mb-0.5">Status da Patente</span>
-                            <span className="text-sm font-black text-white uppercase tracking-tighter italic leading-none">{levelTitle}</span>
+                        <div className="hidden sm:flex flex-col text-left">
+                            <span className="text-[8px] font-black text-cyan-500/50 uppercase tracking-[0.2em] mb-0.5">Progresso de Nível</span>
+                            <span className="text-sm font-black text-white uppercase tracking-tighter italic leading-none group-hover:text-cyan-400 transition-colors">{levelTitle}</span>
                             <div className="mt-1.5 flex items-center gap-2">
-                                <div className="px-1.5 py-0.5 rounded bg-white/5 border border-white/5">
-                                    <span className="text-[8px] font-mono font-bold text-gray-500">{studentProgress.xp} XP</span>
-                                </div>
-                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">+{nextLevelXp} P/ UP</span>
+                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">+{nextLevelXp} XP P/ UP</span>
                             </div>
                         </div>
                     </div>
 
-                    {/* ACCURACY RADAR */}
-                    <div className="flex items-center gap-4 flex-shrink-0 group cursor-help">
-                        <div className={`relative h-12 w-12 ${accTheme.shadow} rounded-full transition-all duration-500`}>
+                    {/* ACCURACY RADAR (QUESTÕES) */}
+                    <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className={`relative h-12 w-12 ${accTheme.shadow} rounded-full transition-all duration-500 group-hover:scale-105`}>
                             <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.03)" strokeWidth="3" />
                                 <circle 
@@ -229,19 +228,17 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 </span>
                             </div>
                         </div>
-                        <div className="hidden md:flex flex-col">
-                            <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-0.5 text-right">Precisão</span>
-                            <span className={`text-[10px] font-black uppercase tracking-widest italic leading-none text-right ${accTheme.text}`}>
+                        <div className="hidden md:flex flex-col text-right">
+                            <span className="text-[8px] font-black text-gray-600 uppercase tracking-[0.2em] mb-0.5">Acerto em Questões</span>
+                            <span className={`text-[10px] font-black uppercase tracking-widest italic leading-none ${accTheme.text}`}>
                                 {accTheme.label}
                             </span>
                         </div>
                     </div>
-                </div>
+                </button>
 
-                {/* 3. TIME & SESSION & PROFILE */}
+                {/* 3. TIME & PROFILE */}
                 <div className="flex items-center gap-4 xl:gap-8 flex-shrink-0">
-                    
-                    {/* INFO CAPSULE */}
                     <div className="hidden xl:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1">
                         <div className="px-4 flex flex-col items-center border-r border-white/5">
                             <span className="text-[7px] font-black text-gray-500 uppercase tracking-[0.2em]">Relógio</span>
@@ -257,7 +254,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </div>
 
-                    {/* PROFILE HUD PILL */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
