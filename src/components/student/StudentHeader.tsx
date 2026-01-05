@@ -148,10 +148,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
-            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-start gap-6 lg:gap-10">
+            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-6 flex items-center justify-start gap-3 lg:gap-5">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (SEM flex-1 PARA APROXIMAR DO CENTRO) */}
-                <div className="flex items-center gap-4 lg:gap-6 flex-shrink-0 min-w-0">
+                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (ESPAÇO MÍNIMO) */}
+                <div className="flex items-center gap-3 lg:gap-4 flex-shrink-0 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg" />
                     </button>
@@ -163,12 +163,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 2. CENTRO: HUD DE PERFORMANCE */}
-                <div className="hidden md:flex items-center gap-6 lg:gap-10 flex-shrink-0">
+                {/* 2. CENTRO: HUD DE PERFORMANCE (AGRUPADO AO TÍTULO) */}
+                <div className="hidden md:flex items-center gap-3 lg:gap-6 flex-shrink-0">
                     {/* LEVEL HUD */}
                     <button 
                         onClick={() => onSetView('performance')}
-                        className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group"
+                        className="flex items-center gap-2 hover:bg-white/5 p-1 rounded-2xl transition-all group"
                         title="Ver nível e XP"
                     >
                         <div className="relative h-12 w-12 flex-shrink-0">
@@ -195,7 +195,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     {/* ACCURACY HUD */}
                     <button 
                         onClick={() => onSetView('performance')}
-                        className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group"
+                        className="flex items-center gap-2 hover:bg-white/5 p-1 rounded-2xl transition-all group"
                         title="Ver acerto em questões"
                     >
                         <div className={`relative h-11 w-11 ${accTheme.shadow} rounded-full transition-all group-hover:scale-105 flex-shrink-0`}>
@@ -214,11 +214,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </button>
                 </div>
 
-                {/* ESPAÇADOR FLEXÍVEL - MOVE O PERFIL PARA A DIREITA MAS MANTÉM OS ITENS ANTERIORES JUNTOS */}
+                {/* ESPAÇADOR FLEXÍVEL - EMPURRA O RELÓGIO E PERFIL PARA A EXTREMIDADE DIREITA */}
                 <div className="flex-grow"></div>
 
                 {/* 3. LADO DIREITO: TEMPO + PERFIL */}
-                <div className="flex items-center gap-3 lg:gap-5 flex-shrink-0">
+                <div className="flex items-center gap-3 lg:gap-4 flex-shrink-0">
                     {/* RELÓGIO (MD+) */}
                     <div className="hidden md:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1 px-4 gap-4">
                         <div className="flex flex-col items-center">
@@ -240,7 +240,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
-                            className={`flex items-center gap-3 p-1 pr-4 rounded-full bg-gray-800/40 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-lg' : ''}`}
+                            className={`flex items-center gap-2 p-1 pr-3 rounded-full bg-gray-800/40 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-lg' : ''}`}
                         >
                             <div className="relative">
                                 <div className="h-9 w-9 rounded-full overflow-hidden border-2 border-cyan-500/20 shadow-inner">
@@ -253,7 +253,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 <div className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
                             </div>
                             <div className="hidden sm:flex flex-col text-left">
-                                <span className="text-[11px] font-black text-white uppercase truncate max-w-[100px] leading-tight">{user.name || user.username}</span>
+                                <span className="text-[11px] font-black text-white uppercase truncate max-w-[90px] leading-tight">{user.name || user.username}</span>
                                 <span className="text-[8px] font-bold text-cyan-500 uppercase tracking-widest leading-none mt-0.5">
                                     {getUserSublabel()}
                                 </span>
