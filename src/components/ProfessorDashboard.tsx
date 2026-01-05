@@ -14,7 +14,6 @@ import { ProfessorReviewsDashboard } from './professor/ProfessorReviewsDashboard
 import { EditProfileModal } from './student/EditProfileModal';
 import { ProfessorSubjectsView } from './professor/ProfessorSubjectsView';
 import { ProfessorDiagnosticTool } from './professor/ProfessorDiagnosticTool';
-import { StudentHeader } from './student/StudentHeader';
 
 export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; onUpdateUser: (user: User) => void; }> = ({ user, onLogout, onUpdateUser }) => {
     const [courses, setCourses] = useState<Course[]>([]);
@@ -22,7 +21,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     const [students, setStudents] = useState<User[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
-    const [view, setView] = useState<'courses' | 'subjects' | 'reviews' | 'scheduler' | 'performance' | 'diagnostics' | 'edit_course' | 'edit_subject'>('courses');
+    const [view, setView] = useState<'courses' | 'edit_course' | 'edit_subject' | 'scheduler' | 'performance' | 'reviews' | 'subjects' | 'diagnostics'>('courses');
     const [selectedCourse, setSelectedCourse] = useState<Course | null>(null);
     const [selectedSubject, setSelectedSubject] = useState<Subject | null>(null);
 
@@ -35,6 +34,8 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+    const [isNavOpen, setIsNavOpen] = useState(false);
+    const navRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         setIsLoading(true);
@@ -50,6 +51,18 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
         return () => unsubscribers.forEach(unsub => unsub());
     }, [user.id]);
     
+     useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (navRef.current && !navRef.current.contains(event.target as Node)) {
+                setIsNavOpen(false);
+            }
+        };
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
+    }, []);
+
     const handleCourseSelect = (course: Course) => {
         const fullCourseData = courses.find(c => c.id === course.id);
         if (fullCourseData) {
@@ -106,6 +119,14 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
         setToastMessage(`Disciplina '${newSubjectName}' criada com sucesso!`);
     };
     
+    const handleCloseNewCourseModal = useCallback(() => {
+        setIsNewCourseModalOpen(false);
+    }, []);
+
+    const handleCloseNewSubjectModal = useCallback(() => {
+        setIsNewSubjectModalOpen(false);
+    }, []);
+
     const handleProfileSave = (updatedUser: User) => {
         onUpdateUser(updatedUser);
     };
@@ -115,28 +136,24 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
              return <div className="flex justify-center items-center h-64"><Spinner /></div>;
         }
 
-        if (view === 'edit_course' && selectedCourse) {
-            const courseForEditor = courses.find(c => c.id === selectedCourse.id);
-            if (courseForEditor) {
-                return <ProfessorCourseEditor
-                    course={courseForEditor}
-                    allSubjects={subjects}
-                    allStudents={students}
-                    onBack={handleBackToDashboard}
-                    setToastMessage={setToastMessage}
-                />;
-            }
+        const courseForEditor = courses.find(c => c.id === selectedCourse?.id);
+        if (view === 'edit_course' && courseForEditor) {
+            return <ProfessorCourseEditor
+                course={courseForEditor}
+                allSubjects={subjects}
+                allStudents={students}
+                onBack={handleBackToDashboard}
+                setToastMessage={setToastMessage}
+            />;
         }
 
-        if (view === 'edit_subject' && selectedSubject) {
-            const subjectForEditor = subjects.find(s => s.id === selectedSubject.id);
-            if (subjectForEditor) {
-                return <ProfessorSubjectEditor 
-                    subject={subjectForEditor} 
-                    onBack={() => setView('subjects')}
-                    setToastMessage={setToastMessage}
-                />;
-            }
+        const subjectForEditor = subjects.find(s => s.id === selectedSubject?.id);
+        if (view === 'edit_subject' && subjectForEditor) {
+            return <ProfessorSubjectEditor 
+                subject={subjectForEditor} 
+                onBack={() => setView('subjects')}
+                setToastMessage={setToastMessage}
+            />;
         }
 
         if (view === 'scheduler') {
@@ -164,97 +181,139 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
         }
         
         return (
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-fade-in">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <section className="lg:col-span-2 space-y-8" aria-labelledby="courses-heading">
-                    <div className="flex justify-between items-center px-2">
-                        <h2 id="courses-heading" className="text-3xl font-black text-white uppercase italic tracking-tighter">Meus Cursos</h2>
-                        <Button onClick={() => setIsNewCourseModalOpen(true)} className="rounded-xl px-6">
+                    <div className="flex justify-between items-center">
+                        <h2 id="courses-heading" className="text-2xl font-bold text-white">Meus Cursos</h2>
+                        <Button onClick={() => setIsNewCourseModalOpen(true)}>
                             <PlusIcon className="h-5 w-5 mr-2" aria-hidden="true"/>
                             Novo Curso
                         </Button>
                     </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {courses.map(course => (
-                            <Card key={course.id} onClick={() => handleCourseSelect(course)} className="group hover:border-cyan-500/50 transition-all duration-500 flex flex-col !p-0 overflow-hidden bg-gray-900/60 shadow-2xl rounded-[2.2rem] hover:translate-y-[-4px]">
+                            <Card key={course.id} onClick={() => handleCourseSelect(course)} className="hover:border-cyan-500/50 transition-all duration-300 flex flex-col !p-0 overflow-hidden">
                                 {course.imageUrl ? (
-                                    <div className="relative h-48 overflow-hidden">
-                                        <img src={course.imageUrl} alt="" className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700" />
-                                        <div className="absolute inset-0 bg-gradient-to-t from-gray-900 via-transparent to-transparent opacity-60"></div>
-                                    </div>
+                                    <img src={course.imageUrl} alt="" className="w-full h-32 object-cover" />
                                 ) : (
-                                    <div className="w-full h-48 bg-gray-800 flex items-center justify-center">
-                                        <BookOpenIcon className="h-12 w-12 text-gray-700" aria-hidden="true" />
+                                    <div className="w-full h-32 bg-gray-700 flex items-center justify-center">
+                                        <BookOpenIcon className="h-12 w-12 text-gray-500" aria-hidden="true" />
                                     </div>
                                 )}
-                                <div className="p-8 flex flex-col flex-grow">
-                                    <h3 className="text-2xl font-black text-white group-hover:text-cyan-400 transition-colors flex-grow uppercase tracking-tight italic leading-tight">{course.name}</h3>
-                                    <div className="mt-8 flex justify-around text-[10px] font-black text-gray-500 uppercase tracking-widest border-t border-gray-800/50 pt-6">
-                                        <span>{course.disciplines.length} Disciplina(s)</span>
-                                        <div className="w-px h-3 bg-gray-800"></div>
-                                        <span>{course.enrolledStudentIds.length} Aluno(s)</span>
+                                <div className="p-4 flex flex-col flex-grow">
+                                    <h3 className="text-xl font-bold text-cyan-400 flex-grow">{course.name}</h3>
+                                    <div className="mt-4 flex justify-around text-sm text-gray-400">
+                                        <span>{course.disciplines.length} disciplina(s)</span>
+                                        <span>{course.enrolledStudentIds.length} aluno(s)</span>
                                     </div>
-                                    <div className="mt-6 text-right text-cyan-400 text-[10px] font-black uppercase tracking-[0.2em] flex items-center justify-end gap-2 group-hover:translate-x-1 transition-all">
-                                        GERENCIAR <ArrowRightIcon className="h-3 w-3" aria-hidden="true" />
+                                    <div className="mt-6 text-right text-cyan-400 text-sm font-semibold">
+                                        Gerenciar <span aria-hidden="true">&rarr;</span>
                                     </div>
                                 </div>
                             </Card>
                         ))}
-                         {courses.length === 0 && !isLoading && <p className="text-gray-500 md:col-span-2 text-center p-12 border-2 border-dashed border-gray-800 rounded-[2rem] font-bold uppercase text-xs tracking-widest">Nenhum curso criado. Inicie agora mesmo.</p>}
+                         {courses.length === 0 && !isLoading && <p className="text-gray-400 md:col-span-2 text-center p-6">Nenhum curso criado. Clique em "Novo Curso" para começar.</p>}
                     </div>
                 </section>
-                <div className="lg:col-span-1 space-y-8">
-                    <section aria-label="Mural de avisos do professor">
-                        <ProfessorAnnouncements teacher={user} allStudents={students} />
-                    </section>
-                    <section aria-labelledby="subjects-quick-heading">
-                        <Card className="p-8 rounded-[2rem]">
-                            <div className="flex justify-between items-center mb-6">
-                                <h3 id="subjects-quick-heading" className="text-xl font-black text-white uppercase italic tracking-tighter">Disciplinas</h3>
-                                <Button onClick={() => setIsNewSubjectModalOpen(true)} className="p-2.5 rounded-xl text-sm" aria-label="Adicionar nova disciplina">
-                                    <PlusIcon className="h-5 w-5" />
+                <div className="lg:col-span-1 space-y-6">
+                    <section aria-labelledby="subjects-heading">
+                        <Card className="p-6">
+                            <div className="flex justify-between items-center">
+                                <h3 id="subjects-heading" className="text-xl font-bold text-white mb-4">Minhas Disciplinas</h3>
+                                <Button onClick={() => setIsNewSubjectModalOpen(true)} className="py-1 px-3 text-sm" aria-label="Adicionar nova disciplina">
+                                    <PlusIcon className="h-4 w-4" />
                                 </Button>
                             </div>
-                            <ul className="space-y-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                            <ul className="space-y-2 max-h-60 overflow-y-auto pr-2">
                                 {subjects.map(subject => (
                                     <li key={subject.id}>
                                         <button onClick={() => {
                                           setSelectedSubject(subject);
                                           setView('edit_subject');
-                                        }} className="w-full text-left p-4 bg-gray-700/30 rounded-2xl hover:bg-gray-700 transition-all border border-transparent hover:border-cyan-500/20 group">
-                                            <p className="font-black text-white uppercase tracking-tight text-sm group-hover:text-cyan-400 transition-colors">{subject.name}</p>
-                                            <p className="text-[9px] font-bold text-gray-500 uppercase tracking-widest mt-1">{subject.topics.length} tópico(s) cadastrados</p>
+                                        }} className="w-full text-left p-3 bg-gray-700/50 rounded-lg hover:bg-gray-700">
+                                            <p className="font-semibold text-gray-200">{subject.name}</p>
+                                            <p className="text-xs text-gray-400">{subject.topics.length} tópico(s)</p>
                                         </button>
                                     </li>
                                 ))}
-                                 {subjects.length === 0 && !isLoading && <p className="text-gray-600 text-center text-[10px] font-black uppercase py-4">Vazio</p>}
+                                 {subjects.length === 0 && !isLoading && <p className="text-gray-500 text-center">Nenhuma disciplina criada.</p>}
                             </ul>
                         </Card>
+                    </section>
+                    <section aria-label="Mural de avisos do professor">
+                        <ProfessorAnnouncements teacher={user} allStudents={students} />
                     </section>
                 </div>
             </div>
         );
     }
 
-    return (
-        <div className="min-h-screen bg-[#020617] text-white">
-            {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
-            
-            <StudentHeader 
-                user={user} 
-                view={view} 
-                isProfessorView={true}
-                onSetView={setView} 
-                onLogout={onLogout} 
-                onGoHome={() => setView('courses')} 
-            />
+    const navigationItems = [
+        { label: 'Cursos', view: 'courses' as const },
+        { label: 'Disciplinas', view: 'subjects' as const },
+        { label: 'Revisões', view: 'reviews' as const },
+        { label: 'Planejamento', view: 'scheduler' as const },
+        { label: 'Desempenho', view: 'performance' as const },
+        { label: 'Diagnóstico', view: 'diagnostics' as const },
+    ];
 
-            <main className="p-8 max-w-[1920px] mx-auto pb-20">
+    return (
+        <div className="p-8 max-w-7xl mx-auto">
+            {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
+            <header className="flex justify-between items-center mb-8">
+                <div className="flex items-center gap-4">
+                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
+                    <div>
+                        <h1 className="text-3xl font-bold text-white">Painel do Professor</h1>
+                        <p className="text-gray-400">Gerencie seus cursos, disciplinas e alunos.</p>
+                    </div>
+                </div>
+                 <div className="flex items-center space-x-4">
+                    <div ref={navRef} className="relative">
+                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600">
+                            <span>Navegação</span>
+                            <ChevronDownIcon className={`h-4 w-4 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
+                        </button>
+                        {isNavOpen && (
+                            <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                                {navigationItems.map(item => (
+                                    <button
+                                        key={item.view}
+                                        onClick={() => {
+                                            setSelectedCourse(null);
+                                            setSelectedSubject(null);
+                                            setView(item.view);
+                                            setIsNavOpen(false);
+                                        }}
+                                        className={`w-full text-left px-4 py-2 text-sm ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}
+                                    >
+                                        {item.label}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                     <div className="w-px h-6 bg-gray-600" aria-hidden="true"></div>
+                     <button onClick={() => setIsProfileModalOpen(true)} className="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-700">
+                         {user.avatarUrl ? (
+                            <img src={user.avatarUrl} alt={`Avatar de ${user.name}`} className="h-10 w-10 rounded-full object-cover" />
+                        ) : (
+                            <UserCircleIcon className="h-10 w-10 text-gray-500" aria-hidden="true" />
+                        )}
+                        <span className="text-gray-300">Olá, {user.name || user.username}</span>
+                        <PencilIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                    </button>
+                    <button onClick={onLogout} className="flex items-center text-sm text-cyan-400 hover:text-cyan-300">
+                        <LogoutIcon className="h-5 w-5 mr-1" aria-hidden="true" />
+                        Sair
+                    </button>
+                </div>
+            </header>
+            
+            <main>
                 {view !== 'courses' && view !== 'subjects' && (
-                    <button 
-                        onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} 
-                        className="text-cyan-400 hover:text-cyan-300 mb-8 flex items-center bg-gray-800/40 px-5 py-2.5 rounded-xl border border-white/5 transition-all shadow-lg"
-                    >
+                    <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
@@ -262,7 +321,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                 {renderContent()}
             </main>
 
-            <Modal isOpen={isNewCourseModalOpen} onClose={() => setIsNewCourseModalOpen(false)} title="Criar Novo Curso">
+            <Modal isOpen={isNewCourseModalOpen} onClose={handleCloseNewCourseModal} title="Criar Novo Curso">
                 <form onSubmit={handleSaveNewCourse} className="space-y-4">
                     <div>
                         <label htmlFor="new-course-name" className="block text-sm font-medium text-gray-300">Nome do Curso</label>
@@ -287,7 +346,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                     </div>
                 </form>
             </Modal>
-             <Modal isOpen={isNewSubjectModalOpen} onClose={() => setIsNewSubjectModalOpen(false)} title="Criar Nova Disciplina">
+             <Modal isOpen={isNewSubjectModalOpen} onClose={handleCloseNewSubjectModal} title="Criar Nova Disciplina">
                 <form onSubmit={handleSaveNewSubject} className="space-y-4">
                     <div>
                         <label htmlFor="new-subject-name" className="block text-sm font-medium text-gray-300">Nome da Disciplina</label>
