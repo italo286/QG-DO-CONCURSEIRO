@@ -161,20 +161,19 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
             <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-2">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + TÍTULO */}
-                <div className="flex items-center gap-3 lg:gap-6 flex-1 min-w-0">
+                {/* 1. LADO ESQUERDO: BRANDING + TÍTULO COMPOSTO */}
+                <div className="flex items-center gap-3 lg:gap-5 flex-1 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-9 w-auto rounded-lg" />
                     </button>
-                    <div className="hidden xl:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
-                    <div className="min-w-0">
-                        {/* 
-                            ADICIONADO pr-4: O itálico inclina a última letra para a direita. 
-                            Sem esse padding, o 'truncate' corta o final da letra.
-                        */}
-                        <h1 className="text-lg md:text-xl xl:text-2xl font-black text-white uppercase tracking-tighter leading-tight italic truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                    <div className="hidden lg:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
+                    <div className="flex flex-col justify-center min-w-0">
+                        <span className="text-sm md:text-base xl:text-lg font-black text-white uppercase tracking-tighter leading-none italic truncate pr-4 drop-shadow-[0_0_8px_rgba(255,255,255,0.1)]">
+                            QG do concurseiro
+                        </span>
+                        <span className="text-[10px] md:text-xs font-bold text-cyan-500 uppercase tracking-widest leading-none mt-1 truncate pr-4 opacity-90">
                             {pageTitle}
-                        </h1>
+                        </span>
                     </div>
                 </div>
 
@@ -243,6 +242,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </div>
 
+                    {/* MENU USUÁRIO */}
                     <div ref={navRef} className="relative">
                         <button 
                             onClick={() => setIsNavOpen(prev => !prev)} 
