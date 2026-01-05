@@ -129,11 +129,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none truncate max-w-[150px] xl:max-w-xs">
                             {getViewTitle()}
                         </h1>
-                        <p className="text-[8px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">High Performance Ed.</p>
                     </div>
                 </div>
 
-                {/* 2. WIDGET DE NÍVEL (RESTAURADO COM PONTUAÇÃO) */}
+                {/* 2. WIDGET DE NÍVEL */}
                 <div className="flex-grow max-w-[160px] md:max-w-xs lg:max-w-md flex items-center gap-3 md:gap-4 mx-2 md:mx-4">
                     <div className="relative flex-shrink-0">
                         <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full"></div>
