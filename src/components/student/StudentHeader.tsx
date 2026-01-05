@@ -94,12 +94,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
-            <div className="max-w-[1920px] mx-auto h-20 px-6 flex items-center justify-between gap-8">
+            <div className="max-w-[1920px] mx-auto h-20 px-4 md:px-6 flex items-center justify-between gap-2 md:gap-4">
                 
                 {/* 1. LOGO E TÍTULO */}
-                <div className="flex items-center gap-4 flex-shrink-0 min-w-max">
-                    <button onClick={onGoHome} className="hover:scale-105 transition-transform">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-15 rounded-md" />
+                <div className="flex items-center gap-3 flex-shrink-0">
+                    <button onClick={onGoHome} className="hover:scale-105 transition-transform flex-shrink-0">
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-8 md:h-10 w-auto rounded-md" />
                     </button>
                     <div className="hidden lg:block">
                         <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none">
@@ -109,55 +109,56 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 2. WIDGET DE NÍVEL (CENTRALIZADO E INTEGRADO) */}
-                <div className="flex-grow max-w-2xl hidden md:flex items-center gap-5">
+                {/* 2. WIDGET DE NÍVEL (COMPACTADO PARA TABLETS) */}
+                <div className="flex-grow max-w-[160px] md:max-w-xs lg:max-w-md flex items-center gap-3 md:gap-4">
                     <div className="relative flex-shrink-0">
-                        <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
-                        <div className="relative h-14 w-14 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
-                            <span className="text-2xl font-black text-white">{level}</span>
+                        <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full"></div>
+                        <div className="relative h-10 w-10 md:h-12 md:w-12 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_10px_rgba(6,182,212,0.4)]">
+                            <span className="text-lg md:text-xl font-black text-white">{level}</span>
                         </div>
                     </div>
                     <div className="flex-grow min-w-0">
                         <div className="flex flex-col mb-1">
-                            <span className="text-[8px] font-black text-cyan-500 uppercase tracking-[0.3em]">Nível Atual</span>
-                            <span className="text-xl font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
+                            <span className="text-[7px] md:text-[8px] font-black text-cyan-500 uppercase tracking-[0.2em] md:tracking-[0.3em] leading-none mb-0.5">Nível</span>
+                            <span className="text-xs md:text-lg font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
                         </div>
                         <div className="space-y-1">
-                            <div className="flex justify-between items-end">
-                                <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
-                                <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">{xpCurrentLevel} / {LEVEL_XP_REQUIREMENT}</span>
+                            {/* Barra de progresso curta e funcional */}
+                            <div className="h-[2px] bg-gray-900 rounded-full overflow-hidden border border-white/5">
+                                <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_8px_cyan] transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
                             </div>
-                            <div className="h-1 bg-gray-900 rounded-full overflow-hidden p-0.5 border border-white/5">
-                                <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_10px_cyan]" style={{ width: `${progressPercent}%` }}></div>
+                            <div className="flex justify-between items-center">
+                                <span className="text-[6px] md:text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP</span>
+                                <span className="text-[6px] md:text-[8px] font-black text-cyan-400 uppercase tracking-widest">{xpCurrentLevel}/{LEVEL_XP_REQUIREMENT}</span>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* 3. RELÓGIO E STATUS DE SESSÃO */}
-                <div className="hidden xl:flex items-center h-12 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5">
-                    <div className="px-5 flex flex-col items-center justify-center">
-                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Relógio</span>
-                        <span className="text-sm font-mono font-black text-white leading-none">
+                {/* 3. RELÓGIO E STATUS DE SESSÃO (VISÍVEL EM TABLETS) */}
+                <div className="hidden md:flex items-center h-10 md:h-12 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5 flex-shrink-0">
+                    <div className="px-3 md:px-5 flex flex-col items-center justify-center">
+                        <span className="text-[7px] md:text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Relógio</span>
+                        <span className="text-xs md:text-sm font-mono font-black text-white leading-none">
                             {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                         </span>
                     </div>
-                    <div className="px-5 flex flex-col items-center justify-center">
-                        <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+                    <div className="px-3 md:px-5 flex flex-col items-center justify-center">
+                        <span className="text-[7px] md:text-[8px] font-black text-cyan-500 uppercase tracking-widest mb-0.5 flex items-center gap-1">
                             <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
                             Sessão
                         </span>
-                        <span className="text-sm font-mono font-black text-cyan-400 leading-none drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
+                        <span className="text-xs md:text-sm font-mono font-black text-cyan-400 leading-none drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
                             {formatTime(studySeconds)}
                         </span>
                     </div>
                 </div>
 
                 {/* 4. MENU E PERFIL */}
-                <div className="flex items-center space-x-4 flex-shrink-0">
+                <div className="flex items-center space-x-2 md:space-x-4 flex-shrink-0">
                     <div ref={navRef} className="relative">
-                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl bg-gray-800 border border-white/5 hover:bg-gray-700 transition-all text-gray-300">
-                            <span>Menu</span>
+                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-1 md:space-x-2 px-3 md:px-5 py-2 md:py-2.5 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-xl bg-gray-800 border border-white/5 hover:bg-gray-700 transition-all text-gray-300">
+                            <span className="hidden sm:inline">Menu</span>
                             <ChevronDownIcon className={`h-3 w-3 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isNavOpen && (
@@ -173,8 +174,8 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         )}
                     </div>
 
-                    <button onClick={onOpenProfile} className="h-12 w-12 rounded-2xl bg-gray-900 border border-white/10 flex items-center justify-center hover:border-cyan-500/50 transition-all shadow-xl overflow-hidden group">
-                        {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover group-hover:scale-110 transition-transform" /> : <UserCircleIcon className="h-8 w-8 text-gray-700" />}
+                    <button onClick={onOpenProfile} className="h-10 w-10 md:h-12 md:w-12 rounded-2xl bg-gray-900 border border-white/10 flex items-center justify-center hover:border-cyan-500/50 transition-all shadow-xl overflow-hidden group">
+                        {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover group-hover:scale-110 transition-transform" /> : <UserCircleIcon className="h-6 md:h-8 w-6 md:w-8 text-gray-700" />}
                     </button>
                 </div>
             </div>
