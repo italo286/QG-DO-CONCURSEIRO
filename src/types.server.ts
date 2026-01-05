@@ -8,6 +8,7 @@ export interface User {
   role: UserRole;
   avatarUrl?: string;
   fcmToken?: string; // Armazena o ID do dispositivo para Push Notifications
+  gender?: 'masculine' | 'feminine';
 }
 
 export interface PdfFile {

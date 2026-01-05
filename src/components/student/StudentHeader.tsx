@@ -152,10 +152,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 3. RELÓGIO (DESKTOP) */}
+                {/* 3. RELÓGIO E SESSÃO (DESKTOP) */}
                 <div className="hidden xl:flex items-center h-10 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5 flex-shrink-0">
                     <div className="px-3 flex flex-col items-center justify-center">
-                        <span className="text-[7px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Sessão</span>
+                        <span className="text-[7px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Relógio</span>
+                        <span className="text-xs font-mono font-black text-white leading-none">
+                            {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    <div className="px-3 flex flex-col items-center justify-center">
+                        <span className="text-[7px] font-black text-cyan-500 uppercase tracking-widest mb-0.5">Sessão</span>
                         <span className="text-xs font-mono font-black text-cyan-400 leading-none">
                             {formatTime(studySeconds)}
                         </span>
@@ -180,7 +186,9 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 <span className="text-[10px] md:text-[11px] font-black text-white uppercase tracking-tight leading-none">
                                     {user.name || user.username}
                                 </span>
-                                <span className="text-[7px] font-bold text-cyan-500 uppercase tracking-widest mt-1">Concurseiro</span>
+                                <span className="text-[7px] font-bold text-cyan-500 uppercase tracking-widest mt-1">
+                                    {user.gender === 'feminine' ? 'Concurseira' : 'Concurseiro'}
+                                </span>
                             </div>
                             <ChevronDownIcon className={`h-4 w-4 text-gray-500 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                         </button>
