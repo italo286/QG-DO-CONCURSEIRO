@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
 import { UserCircleIcon, ChevronDownIcon, Cog6ToothIcon } from '../Icons';
@@ -43,6 +43,52 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const xpCurrentLevel = studentProgress.xp % LEVEL_XP_REQUIREMENT;
     const progressPercent = (xpCurrentLevel / LEVEL_XP_REQUIREMENT) * 100;
     const nextLevelXp = LEVEL_XP_REQUIREMENT - xpCurrentLevel;
+
+    // Cálculo da Precisão Global (Média de todos os acertos)
+    const globalAccuracy = useMemo(() => {
+        let totalCorrect = 0;
+        let totalAnswered = 0;
+
+        // 1. Acertos por Tópicos
+        Object.values(studentProgress.progressByTopic || {}).forEach(subject => {
+            Object.values(subject).forEach(topic => {
+                (topic.lastAttempt || []).forEach(attempt => {
+                    totalAnswered++;
+                    if (attempt.isCorrect) totalCorrect++;
+                });
+            });
+        });
+
+        // 2. Acertos em Sessões de Revisão
+        (studentProgress.reviewSessions || []).forEach(session => {
+            (session.attempts || []).forEach(attempt => {
+                totalAnswered++;
+                if (attempt.isCorrect) totalCorrect++;
+            });
+        });
+
+        // 3. Acertos em Simulados
+        (studentProgress.simulados || []).forEach(simulado => {
+            (simulado.attempts || []).forEach(attempt => {
+                totalAnswered++;
+                if (attempt.isCorrect) totalCorrect++;
+            });
+        });
+
+        return totalAnswered > 0 ? (totalCorrect / totalAnswered) * 100 : 0;
+    }, [studentProgress]);
+
+    const getAccuracyColor = (acc: number) => {
+        if (acc < 50) return 'text-rose-500';
+        if (acc < 75) return 'text-amber-400';
+        return 'text-cyan-400';
+    };
+
+    const getAccuracyStroke = (acc: number) => {
+        if (acc < 50) return '#f43f5e'; // rose-500
+        if (acc < 75) return '#fbbf24'; // amber-400
+        return '#22d3ee'; // cyan-400
+    };
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -132,27 +178,62 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 2. WIDGET DE NÍVEL */}
-                <div className="flex-grow max-w-[160px] md:max-w-xs lg:max-w-md flex items-center gap-3 md:gap-4 mx-2 md:mx-4">
-                    <div className="relative flex-shrink-0">
-                        <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full"></div>
-                        <div className="relative h-10 w-10 md:h-11 md:w-11 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
-                            <span className="text-lg md:text-xl font-black text-white">{level}</span>
+                {/* 2. WIDGET DE NÍVEL E ACURÁCIA */}
+                <div className="flex-grow max-w-[300px] md:max-w-xs lg:max-w-lg flex items-center gap-4 md:gap-8 mx-2 md:mx-4">
+                    {/* NÍVEL */}
+                    <div className="flex items-center gap-3 flex-grow min-w-0">
+                        <div className="relative flex-shrink-0">
+                            <div className="absolute inset-0 bg-cyan-500/20 blur-lg rounded-full"></div>
+                            <div className="relative h-10 w-10 md:h-11 md:w-11 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                                <span className="text-lg md:text-xl font-black text-white">{level}</span>
+                            </div>
+                        </div>
+                        <div className="flex-grow min-w-0 hidden xs:block">
+                            <div className="flex flex-col mb-1">
+                                <span className="text-[7px] md:text-[8px] font-black text-cyan-500 uppercase tracking-[0.2em] leading-none mb-0.5">Nível</span>
+                                <span className="text-xs md:text-sm font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
+                            </div>
+                            <div className="space-y-1">
+                                <div className="h-[3px] bg-gray-900 rounded-full overflow-hidden border border-white/5">
+                                    <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_8px_cyan] transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
+                                </div>
+                                <div className="flex justify-between items-center">
+                                    <span className="text-[6px] md:text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP</span>
+                                    <span className="text-[6px] md:text-[8px] font-black text-cyan-400 uppercase tracking-widest">+{nextLevelXp} PARA UP</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
-                    <div className="flex-grow min-w-0">
-                        <div className="flex flex-col mb-1">
-                            <span className="text-[7px] md:text-[8px] font-black text-cyan-500 uppercase tracking-[0.2em] leading-none mb-0.5">Nível</span>
-                            <span className="text-xs md:text-sm font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
+
+                    {/* ACURÁCIA GLOBAL (WIDGET GRÁFICO) */}
+                    <div className="flex items-center gap-3 flex-shrink-0 group cursor-help" title="Sua taxa de acerto global em todas as questões">
+                        <div className="relative h-10 w-10 md:h-12 md:w-12">
+                            <svg className="h-full w-full -rotate-90 transform" viewBox="0 0 36 36">
+                                <circle cx="18" cy="18" r="16" fill="none" stroke="currentColor" strokeWidth="3" className="text-gray-800" />
+                                <circle 
+                                    cx="18" cy="18" r="16" fill="none" 
+                                    stroke={getAccuracyStroke(globalAccuracy)} 
+                                    strokeWidth="3" 
+                                    strokeDasharray="100 100" 
+                                    strokeDashoffset={100 - globalAccuracy}
+                                    strokeLinecap="round"
+                                    className="transition-all duration-1000 ease-out"
+                                />
+                                {globalAccuracy >= 80 && (
+                                    <circle cx="18" cy="18" r="16" fill="none" stroke={getAccuracyStroke(globalAccuracy)} strokeWidth="1" className="animate-ping opacity-20" />
+                                )}
+                            </svg>
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <span className={`text-[9px] md:text-[10px] font-black italic ${getAccuracyColor(globalAccuracy)}`}>
+                                    {Math.round(globalAccuracy)}%
+                                </span>
+                            </div>
                         </div>
-                        <div className="space-y-1">
-                            <div className="h-[3px] bg-gray-900 rounded-full overflow-hidden border border-white/5">
-                                <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_8px_cyan] transition-all duration-1000 ease-out" style={{ width: `${progressPercent}%` }}></div>
-                            </div>
-                            <div className="flex justify-between items-center">
-                                <span className="text-[6px] md:text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
-                                <span className="text-[6px] md:text-[8px] font-black text-cyan-400 uppercase tracking-widest">FALTAM {nextLevelXp} XP</span>
-                            </div>
+                        <div className="hidden lg:flex flex-col">
+                            <span className="text-[7px] font-black text-gray-500 uppercase tracking-widest leading-none mb-0.5">Precisão</span>
+                            <span className={`text-[10px] font-black uppercase tracking-tighter italic leading-none ${getAccuracyColor(globalAccuracy)}`}>
+                                {globalAccuracy >= 85 ? 'Elite' : globalAccuracy >= 70 ? 'Pro' : globalAccuracy >= 50 ? 'Estável' : 'Alerta'}
+                            </span>
                         </div>
                     </div>
                 </div>
