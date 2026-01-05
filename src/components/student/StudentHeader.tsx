@@ -54,7 +54,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const nextLevelXp = LEVEL_XP_REQUIREMENT - xpCurrentLevel;
     const streak = studentProgress.dailyChallengeStreak?.current || 0;
 
-    // Cálculo da Precisão Global (Média de todos os acertos)
+    // Cálculo da Precisão Global
     const globalAccuracy = useMemo(() => {
         let totalCorrect = 0;
         let totalAnswered = 0;
@@ -134,33 +134,59 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    const getViewTitle = () => {
+    // Função aprimorada para retornar Título e Código de Setor
+    const getPageContext = (): { title: string; code: string } => {
         switch (view) {
-            case 'dashboard': return 'Central';
-            case 'schedule': return 'Agenda';
-            case 'performance': return 'Score';
-            case 'reviews': return 'Revisão';
-            case 'practice_area': return 'Prática';
-            case 'daily_challenge_quiz': return 'Missão';
-            case 'topic': return 'Estudo';
-            default: return 'QG';
+            case 'dashboard': 
+                return { title: 'Início', code: '01' };
+            case 'daily_challenge_quiz':
+                const challengeName = activeChallengeType === 'portuguese' ? 'Português' : 
+                                    activeChallengeType === 'glossary' ? 'Glossário' : 
+                                    activeChallengeType === 'review' ? 'Revisão' : 'Desafio';
+                return { title: `Missão: ${challengeName}`, code: '03' };
+            case 'daily_challenge_results':
+                return { title: 'Resultados', code: '03' };
+            case 'course':
+                return { title: selectedCourseName || 'Curso', code: '02' };
+            case 'subject':
+                return { title: selectedSubjectName || 'Disciplina', code: '02' };
+            case 'topic':
+                return { title: selectedTopicName || 'Estudo', code: '02' };
+            case 'schedule':
+                return { title: 'Agenda', code: '05' };
+            case 'performance':
+                return { title: 'Meu Score', code: '04' };
+            case 'reviews':
+                return { title: 'Revisões', code: '06' };
+            case 'practice_area':
+                return { title: 'Prática', code: '07' };
+            case 'settings':
+                return { title: 'Configurações', code: '08' };
+            default:
+                return { title: 'QG', code: '00' };
         }
     };
+
+    const pageContext = getPageContext();
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)]">
             <div className="max-w-[1920px] mx-auto h-20 px-4 lg:px-8 flex items-center justify-between gap-4">
                 
-                {/* 1. BRANDING */}
-                <div className="flex items-center gap-6 flex-shrink-0">
-                    <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300">
+                {/* 1. BRANDING E LOCALIZAÇÃO DINÂMICA */}
+                <div className="flex items-center gap-6 flex-shrink-0 min-w-0">
+                    <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg shadow-2xl" />
                     </button>
-                    <div className="hidden xl:block h-8 w-[1px] bg-white/10"></div>
-                    <div className="hidden lg:block">
-                        <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic flex items-center gap-2">
-                            <span className="text-cyan-500 font-mono text-sm not-italic opacity-40">01</span>
-                            {getViewTitle()}
+                    <div className="hidden xl:block h-8 w-[1px] bg-white/10 flex-shrink-0"></div>
+                    <div className="hidden lg:block min-w-0">
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tighter leading-none italic flex items-center gap-3">
+                            <span className="text-cyan-500 font-mono text-sm not-italic opacity-40 flex-shrink-0">
+                                {pageContext.code}
+                            </span>
+                            <span className="truncate max-w-[200px] xl:max-w-[350px] drop-shadow-[0_0_8px_rgba(255,255,255,0.2)]">
+                                {pageContext.title}
+                            </span>
                         </h1>
                     </div>
                 </div>
@@ -168,7 +194,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 {/* 2. HUD CENTRAL (CLICÁVEL PARA DETALHES) */}
                 <button 
                     onClick={() => onSetView('performance')}
-                    className="flex items-center gap-10 xl:gap-16 flex-grow justify-center hover:bg-white/5 py-1 px-4 rounded-2xl transition-all group"
+                    className="flex items-center gap-8 xl:gap-16 flex-grow justify-center hover:bg-white/5 py-1 px-4 rounded-2xl transition-all group"
                     title="Clique para ver seu desempenho detalhado"
                 >
                     {/* LEVEL CORE (XP) */}
