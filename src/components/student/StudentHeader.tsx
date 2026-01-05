@@ -12,7 +12,9 @@ interface StudentHeaderProps {
     studentProgress: StudentProgress;
     view: ViewType;
     selectedTopicName?: string;
+    selectedSubjectName?: string;
     selectedCourseName?: string;
+    activeChallengeType?: 'review' | 'glossary' | 'portuguese' | null;
     onSetView: (view: ViewType) => void;
     onOpenProfile: () => void;
     onLogout: () => void;
@@ -24,7 +26,9 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     studentProgress,
     view,
     selectedTopicName,
+    selectedSubjectName,
     selectedCourseName,
+    activeChallengeType,
     onSetView,
     onOpenProfile,
     onLogout,
@@ -83,6 +87,30 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
+    const getViewTitle = () => {
+        switch (view) {
+            case 'dashboard': return 'Início';
+            case 'schedule': return 'Cronograma';
+            case 'performance': return 'Meu Desempenho';
+            case 'reviews': return 'Revisões';
+            case 'games': return 'Jogos';
+            case 'practice_area': return 'Área de Prática';
+            case 'review_quiz': return 'Quiz de Revisão';
+            case 'custom_quiz_player': return 'Quiz IA';
+            case 'simulado_player': return 'Simulado';
+            case 'daily_challenge_results': return 'Desempenho do Desafio';
+            case 'daily_challenge_quiz':
+                if (activeChallengeType === 'portuguese') return 'Português';
+                if (activeChallengeType === 'glossary') return 'Glossário';
+                if (activeChallengeType === 'review') return 'Revisão Diária';
+                return 'Desafio Diário';
+            case 'topic': return selectedTopicName || 'Tópico';
+            case 'subject': return selectedSubjectName || 'Disciplina';
+            case 'course': return selectedCourseName || 'Curso';
+            default: return 'Painel';
+        }
+    };
+
     const navigationItems = [
         { label: 'Início', view: 'dashboard' as const },
         { label: 'Revisões', view: 'reviews' as const },
@@ -96,14 +124,14 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
             <div className="max-w-[1920px] mx-auto h-20 px-4 md:px-6 flex items-center justify-between gap-2 md:gap-4">
                 
-                {/* 1. LOGO E TÍTULO */}
+                {/* 1. LOGO E TÍTULO DINÂMICO */}
                 <div className="flex items-center gap-3 flex-shrink-0">
                     <button onClick={onGoHome} className="hover:scale-105 transition-transform flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-8 md:h-10 w-auto rounded-md" />
                     </button>
-                    <div className="hidden lg:block">
-                        <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none">
-                            {view === 'dashboard' ? 'Painel do Aluno' : (selectedTopicName || selectedCourseName || 'QG')}
+                    <div className="hidden lg:block min-w-0">
+                        <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none truncate max-w-[200px] xl:max-w-md">
+                            {getViewTitle()}
                         </h1>
                         <p className="text-[8px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">High Performance Ed.</p>
                     </div>

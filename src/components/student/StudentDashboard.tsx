@@ -425,7 +425,19 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
 
     return (
         <div className="bg-gray-900 text-white min-h-screen">
-            <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={setView} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
+            <StudentHeader 
+                user={user} 
+                studentProgress={studentProgress} 
+                view={view} 
+                selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} 
+                selectedSubjectName={selectedSubject?.name}
+                selectedCourseName={selectedCourse?.name} 
+                activeChallengeType={activeChallenge?.type}
+                onSetView={setView} 
+                onOpenProfile={() => setIsProfileModalOpen(true)} 
+                onLogout={onLogout} 
+                onGoHome={() => setView('dashboard')} 
+            />
             
             <main className="p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
                 {view !== 'dashboard' && !isPreview && (
