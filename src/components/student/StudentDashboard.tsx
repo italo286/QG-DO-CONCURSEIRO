@@ -95,6 +95,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         setActiveNotifications(prev => prev.filter(n => n.id !== id));
     };
 
+    // Cronograma: Lógica unificada com o relógio de Brasília
     useEffect(() => {
         if (isPreview || !studyPlan || !studyPlan.activePlanId) return;
 
@@ -116,6 +117,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 const nextTime = sortedTimes[i + 1];
                 const nextMinutes = nextTime ? (parseInt(nextTime.split(':')[0]) * 60 + parseInt(nextTime.split(':')[1])) : 1440;
 
+                // O slot só é ativo se os minutos atuais baterem exatamente com o intervalo programado
                 if (currentTotalMinutes >= slotMinutes && currentTotalMinutes < nextMinutes) {
                     activeTimeSlot = sortedTimes[i];
                     break;

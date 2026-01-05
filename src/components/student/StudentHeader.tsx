@@ -1,7 +1,8 @@
+
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
-import { UserCircleIcon, ChevronDownIcon, Cog6ToothIcon, FireIcon } from '../Icons';
+import { UserCircleIcon, ChevronDownIcon, FireIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
@@ -24,7 +25,6 @@ interface StudentHeaderProps {
     selectedCourseName?: string;
     activeChallengeType?: 'review' | 'glossary' | 'portuguese' | null;
     onSetView: (view: ViewType) => void;
-    // FIX: Added missing onOpenProfile prop to StudentHeaderProps interface to resolve type mismatch in StudentDashboard.
     onOpenProfile: () => void;
     onLogout: () => void;
     onGoHome: () => void;
@@ -34,18 +34,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     user,
     studentProgress,
     view,
-    selectedTopicName,
-    selectedSubjectName,
-    selectedCourseName,
-    activeChallengeType,
     onSetView,
-    onOpenProfile,
     onLogout,
     onGoHome,
 }) => {
     const [isNavOpen, setIsNavOpen] = useState(false);
     const navRef = useRef<HTMLDivElement>(null);
-    const [currentTime, setCurrentTime] = useState(new Date());
+    const [currentBrTime, setCurrentBrTime] = useState(() => getBrasiliaDate());
     const [studySeconds, setStudySeconds] = useState(0);
 
     // Cálculos de Gamificação
@@ -105,8 +100,9 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isNavOpen]);
 
+    // Relógio sincronizado com Brasília
     useEffect(() => {
-        const interval = setInterval(() => setCurrentTime(new Date()), 1000);
+        const interval = setInterval(() => setCurrentBrTime(getBrasiliaDate()), 1000);
         return () => clearInterval(interval);
     }, []);
 
@@ -155,7 +151,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 <div className="flex items-center gap-4 lg:gap-6 min-w-0">
                     <button onClick={onGoHome} className="flex items-center gap-8 hover:scale-125 active:scale-105 transition-all duration-300 flex-shrink-0 group">
                         <img src="https://i.postimg.cc/2SXH3JRq/T1.png" alt="Logo" className="h-16 w-auto rounded-lg" />
-                        
                     </button>
 
                     <div className="hidden md:flex items-center gap-14 lg:gap-0">
@@ -208,12 +203,12 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 </div>
 
                 <div className="flex items-center gap-8 lg:gap-7 flex-shrink-0">
-                    {/* RELÓGIO E SESSÃO */}
+                    {/* RELÓGIO E SESSÃO - Agora usando Brasília Time para o Relógio do Topo */}
                     <div className="hidden md:flex items-center h-15 bg-black/40 rounded-full border border-white/5 p-1 px-5 gap-6 shadow-inner">
                         <div className="flex flex-col items-center">
-                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">HORÁRIO</span>
+                            <span className="text-[10px] font-black text-gray-500 uppercase tracking-[0.2em]">HORÁRIO QG</span>
                             <span className="text-[20px] font-mono font-bold text-white leading-tight">
-                                {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                                {currentBrTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                             </span>
                         </div>
                         <div className="w-[1px] h-6 bg-white/10"></div>

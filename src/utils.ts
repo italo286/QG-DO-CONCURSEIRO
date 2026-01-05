@@ -155,15 +155,33 @@ export const markdownToHtml = (text: string): string => {
     return html;
 };
 
+/**
+ * Retorna a data e hora atual no fuso horário de Brasília (America/Sao_Paulo).
+ * Utiliza a API Intl para garantir consistência entre o que o usuário vê (relógio)
+ * e a lógica do sistema (cronograma/notificações).
+ */
 export const getBrasiliaDate = (): Date => {
+    const now = new Date();
     try {
-        const brString = new Date().toLocaleString("en-US", { timeZone: "America/Sao_Paulo" });
-        return new Date(brString);
+        const formatter = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            year: 'numeric', month: 'numeric', day: 'numeric',
+            hour: 'numeric', minute: 'numeric', second: 'numeric',
+            hour12: false
+        });
+        const parts = formatter.formatToParts(now);
+        const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0');
+        
+        // Criamos um objeto Date que "finge" ser local para facilitargetHours/getMinutes, 
+        // mas com os valores numéricos reais de Brasília.
+        const brDate = new Date();
+        brDate.setFullYear(getPart('year'), getPart('month') - 1, getPart('day'));
+        brDate.setHours(getPart('hour'), getPart('minute'), getPart('second'), now.getMilliseconds());
+        return brDate;
     } catch (e) {
-        // Fallback robusto se a timezone falhar
-        const now = new Date();
-        const offset = -3; // Brasilia é UTC-3
-        return new Date(now.getTime() + (offset * 3600000) + (now.getTimezoneOffset() * 60000));
+        // Fallback para UTC-3 caso a API Intl falhe (raro em browsers modernos)
+        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+        return new Date(utc + (3600000 * -3));
     }
 };
 
