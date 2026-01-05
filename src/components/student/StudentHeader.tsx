@@ -72,6 +72,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                 if (attempt.isCorrect) totalCorrect++;
             });
         });
+        (studentProgress.reviewChallenge?.sessionAttempts || []).forEach(attempt => {
+            totalAnswered++;
+            if (attempt.isCorrect) totalCorrect++;
+        });
         (studentProgress.simulados || []).forEach(simulado => {
             (simulado.attempts || []).forEach(attempt => {
                 totalAnswered++;
@@ -134,7 +138,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     };
 
-    // Lógica para rótulo de gênero e cargo
     const getUserSublabel = () => {
         const isFem = user.gender === 'feminine';
         if (user.role === 'professor') {
@@ -145,23 +148,23 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
 
     return (
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
-            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-between gap-4">
+            <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-8 flex items-center justify-start gap-6 lg:gap-10">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (GRANDE E SEM ITÁLICO) */}
-                <div className="flex items-center gap-4 lg:gap-6 flex-1 min-w-0">
+                {/* 1. LADO ESQUERDO: BRANDING + NOME DO APP (SEM flex-1 PARA APROXIMAR DO CENTRO) */}
+                <div className="flex items-center gap-4 lg:gap-6 flex-shrink-0 min-w-0">
                     <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg" />
                     </button>
                     <div className="hidden lg:block h-10 w-[1px] bg-white/10 flex-shrink-0"></div>
                     <div className="min-w-0">
-                        <span className="text-xl md:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter leading-none truncate pr-4 drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
+                        <span className="text-xl md:text-2xl xl:text-3xl font-black text-white uppercase tracking-tighter leading-none truncate drop-shadow-[0_0_15px_rgba(255,255,255,0.1)]">
                             QG do concurseiro
                         </span>
                     </div>
                 </div>
 
-                {/* 2. CENTRO: HUD DE PERFORMANCE (ESPAÇAMENTO OTIMIZADO) */}
-                <div className="hidden md:flex items-center gap-6 lg:gap-12 flex-shrink-0">
+                {/* 2. CENTRO: HUD DE PERFORMANCE */}
+                <div className="hidden md:flex items-center gap-6 lg:gap-10 flex-shrink-0">
                     {/* LEVEL HUD */}
                     <button 
                         onClick={() => onSetView('performance')}
@@ -189,7 +192,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                         </div>
                     </button>
 
-                    {/* ACCURACY HUD - ADICIONADO NOMES E STATUS */}
+                    {/* ACCURACY HUD */}
                     <button 
                         onClick={() => onSetView('performance')}
                         className="flex items-center gap-3 hover:bg-white/5 p-2 rounded-2xl transition-all group"
@@ -211,7 +214,10 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </button>
                 </div>
 
-                {/* 3. LADO DIREITO: TEMPO + PERFIL (COM RÓTULO DE GÊNERO/CARGO) */}
+                {/* ESPAÇADOR FLEXÍVEL - MOVE O PERFIL PARA A DIREITA MAS MANTÉM OS ITENS ANTERIORES JUNTOS */}
+                <div className="flex-grow"></div>
+
+                {/* 3. LADO DIREITO: TEMPO + PERFIL */}
                 <div className="flex items-center gap-3 lg:gap-5 flex-shrink-0">
                     {/* RELÓGIO (MD+) */}
                     <div className="hidden md:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1 px-4 gap-4">
