@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
-import { LogoutIcon, UserCircleIcon, ChevronDownIcon } from '../Icons';
+import { UserCircleIcon, ChevronDownIcon } from '../Icons';
 import { getBrasiliaDate, getLocalDateISOString } from '../../utils';
 
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
@@ -35,7 +35,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     const [currentTime, setCurrentTime] = useState(new Date());
     const [studySeconds, setStudySeconds] = useState(0);
 
-    // Cálculos de Gamificação
+    // Cálculos de Gamificação para o Cabeçalho
     const level = calculateLevel(studentProgress.xp);
     const levelTitle = getLevelTitle(level);
     const xpCurrentLevel = studentProgress.xp % LEVEL_XP_REQUIREMENT;
@@ -93,76 +93,88 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     ];
 
     return (
-        <header className="flex flex-col mb-10 gap-6">
-            <div className="flex justify-between items-center gap-6">
+        <header className="fixed top-0 left-0 right-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
+            <div className="max-w-[1920px] mx-auto h-20 px-6 flex items-center justify-between gap-8">
                 
-                {/* LOGO E TÍTULO */}
-                <div className="flex items-center gap-4 flex-shrink-0">
+                {/* 1. LOGO E TÍTULO */}
+                <div className="flex items-center gap-4 flex-shrink-0 min-w-max">
                     <button onClick={onGoHome} className="hover:scale-105 transition-transform">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-15 rounded-md" />
                     </button>
-                    <div className="hidden sm:block">
-                        <h1 className="text-xl font-black text-white uppercase tracking-tighter leading-none">
+                    <div className="hidden lg:block">
+                        <h1 className="text-lg font-black text-white uppercase tracking-tighter leading-none">
                             {view === 'dashboard' ? 'Painel do Aluno' : (selectedTopicName || selectedCourseName || 'QG')}
                         </h1>
-                        <p className="text-[9px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">High Performance Ed.</p>
+                        <p className="text-[8px] text-gray-500 font-bold uppercase tracking-[0.2em] mt-1">High Performance Ed.</p>
                     </div>
                 </div>
 
-                {/* WIDGET DE NÍVEL INTEGRADO - DESIGN FIEL À IMAGEM */}
-                <div className="flex-grow max-w-lg hidden md:flex items-center gap-5 bg-black/40 border border-white/5 p-3.5 px-6 rounded-2xl shadow-2xl">
+                {/* 2. WIDGET DE NÍVEL (CENTRALIZADO E INTEGRADO) */}
+                <div className="flex-grow max-w-2xl hidden md:flex items-center gap-5">
                     <div className="relative flex-shrink-0">
-                        <div className="absolute inset-0 bg-cyan-500/10 blur-xl rounded-full"></div>
-                        <div className="relative h-14 w-14 rounded-full border-2 border-cyan-500/30 flex items-center justify-center bg-gray-950 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
+                        <div className="absolute inset-0 bg-cyan-500/20 blur-xl rounded-full"></div>
+                        <div className="relative h-14 w-14 rounded-full border-2 border-cyan-500/40 flex items-center justify-center bg-gray-950 shadow-[0_0_15px_rgba(6,182,212,0.4)]">
                             <span className="text-2xl font-black text-white">{level}</span>
                         </div>
                     </div>
                     <div className="flex-grow min-w-0">
-                        <div className="flex flex-col mb-1.5">
+                        <div className="flex flex-col mb-1">
                             <span className="text-[8px] font-black text-cyan-500 uppercase tracking-[0.3em]">Nível Atual</span>
-                            <span className="text-lg font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
+                            <span className="text-xl font-black text-white uppercase tracking-tighter italic leading-none truncate">{levelTitle}</span>
                         </div>
-                        <div className="space-y-1.5">
+                        <div className="space-y-1">
                             <div className="flex justify-between items-end">
                                 <span className="text-[8px] font-black text-gray-600 uppercase tracking-widest">{studentProgress.xp} XP TOTAL</span>
                                 <span className="text-[8px] font-black text-cyan-400 uppercase tracking-widest">{xpCurrentLevel} / {LEVEL_XP_REQUIREMENT}</span>
                             </div>
-                            <div className="h-1.5 bg-gray-900 rounded-full overflow-hidden p-[1px] border border-white/5">
-                                <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_8px_cyan]" style={{ width: `${progressPercent}%` }}></div>
+                            <div className="h-1 bg-gray-900 rounded-full overflow-hidden p-0.5 border border-white/5">
+                                <div className="h-full bg-cyan-500 rounded-full shadow-[0_0_10px_cyan]" style={{ width: `${progressPercent}%` }}></div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                {/* RELÓGIO E MENU */}
-                <div className="flex items-center space-x-4 flex-shrink-0">
-                    <div className="hidden lg:flex flex-col items-end px-4 border-r border-gray-800">
-                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Sessão Ativa</span>
-                        <span className="text-sm font-mono font-black text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
+                {/* 3. RELÓGIO E STATUS DE SESSÃO */}
+                <div className="hidden xl:flex items-center h-12 bg-black/40 rounded-xl border border-white/5 divide-x divide-white/5">
+                    <div className="px-5 flex flex-col items-center justify-center">
+                        <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest mb-0.5">Relógio</span>
+                        <span className="text-sm font-mono font-black text-white leading-none">
+                            {currentTime.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                    </div>
+                    <div className="px-5 flex flex-col items-center justify-center">
+                        <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest mb-0.5 flex items-center gap-1">
+                            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
+                            Sessão
+                        </span>
+                        <span className="text-sm font-mono font-black text-cyan-400 leading-none drop-shadow-[0_0_8px_rgba(34,211,238,0.4)]">
                             {formatTime(studySeconds)}
                         </span>
                     </div>
+                </div>
 
+                {/* 4. MENU E PERFIL */}
+                <div className="flex items-center space-x-4 flex-shrink-0">
                     <div ref={navRef} className="relative">
-                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-5 py-3 text-[10px] font-black uppercase tracking-widest rounded-xl bg-gray-800 border border-gray-700 hover:bg-gray-700 transition-all text-gray-300">
-                            <span>Navegar</span>
+                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-xl bg-gray-800 border border-white/5 hover:bg-gray-700 transition-all text-gray-300">
+                            <span>Menu</span>
                             <ChevronDownIcon className={`h-3 w-3 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isNavOpen && (
-                            <div className="absolute right-0 mt-2 w-52 bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in ring-1 ring-white/5">
+                            <div className="absolute right-0 mt-3 w-56 bg-gray-950 border border-gray-800 rounded-2xl shadow-2xl z-50 overflow-hidden animate-fade-in ring-1 ring-white/10">
                                 {navigationItems.map(item => (
-                                    <button key={item.view} onClick={() => { onSetView(item.view); setIsNavOpen(false); }} className={`w-full text-left px-6 py-3.5 text-[10px] font-black uppercase tracking-widest transition-colors ${view === item.view ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:bg-gray-800 hover:text-white'}`}>
+                                    <button key={item.view} onClick={() => { onSetView(item.view); setIsNavOpen(false); }} className={`w-full text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest transition-colors ${view === item.view ? 'bg-cyan-600 text-white' : 'text-gray-500 hover:bg-gray-900 hover:text-white'}`}>
                                         {item.label}
                                     </button>
                                 ))}
-                                <div className="border-t border-gray-800 my-1"></div>
-                                <button onClick={onLogout} className="w-full text-left px-6 py-3.5 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10">Sair do QG</button>
+                                <div className="border-t border-white/5 my-1"></div>
+                                <button onClick={onLogout} className="w-full text-left px-6 py-4 text-[10px] font-black uppercase tracking-widest text-red-500 hover:bg-red-500/10 transition-colors">Encerrar Conexão</button>
                             </div>
                         )}
                     </div>
 
-                    <button onClick={onOpenProfile} className="h-11 w-11 rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center hover:border-cyan-500/50 transition-all shadow-xl overflow-hidden group">
-                        {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover group-hover:scale-110 transition-transform" /> : <UserCircleIcon className="h-7 w-7 text-gray-500" />}
+                    <button onClick={onOpenProfile} className="h-12 w-12 rounded-2xl bg-gray-900 border border-white/10 flex items-center justify-center hover:border-cyan-500/50 transition-all shadow-xl overflow-hidden group">
+                        {user.avatarUrl ? <img src={user.avatarUrl} alt="" className="h-full w-full object-cover group-hover:scale-110 transition-transform" /> : <UserCircleIcon className="h-8 w-8 text-gray-700" />}
                     </button>
                 </div>
             </div>

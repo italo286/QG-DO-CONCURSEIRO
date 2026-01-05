@@ -424,11 +424,13 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     if (!studentProgress) return <div className="min-h-screen flex items-center justify-center bg-gray-900 text-white">Erro ao carregar dados do aluno.</div>;
 
     return (
-        <div className="bg-gray-900 text-white min-h-screen p-4 sm:p-6 lg:p-8">
+        <div className="bg-gray-900 text-white min-h-screen">
             <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={setView} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
-            <main>
+            
+            {/* Margem superior para compensar o header fixo */}
+            <main className="pt-24 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
                 {view !== 'dashboard' && !isPreview && (
-                    <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
+                    <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
                     </button>
                 )}
