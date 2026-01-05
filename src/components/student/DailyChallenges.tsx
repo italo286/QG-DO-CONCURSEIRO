@@ -21,8 +21,8 @@ const CountdownTimer: React.FC = () => {
         const calculateTimeLeft = () => {
             const now = getBrasiliaDate();
             const tomorrow = new Date(now);
-            tomorrow.setUTCDate(now.getUTCDate() + 1);
-            tomorrow.setUTCHours(0, 0, 0, 0); 
+            tomorrow.setDate(now.getDate() + 1);
+            tomorrow.setHours(0, 0, 0, 0); 
 
             const diff = tomorrow.getTime() - now.getTime();
             if (diff <= 0) return '00:00:00';
@@ -46,18 +46,19 @@ const CountdownTimer: React.FC = () => {
 };
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
-    const todayBrasilia = getBrasiliaDate();
-    const todayClean = new Date(todayBrasilia);
-    todayClean.setUTCHours(0, 0, 0, 0);
+    // Usamos apenas métodos locais para consistência total com getBrasiliaDate e getLocalDateISOString
+    const today = getBrasiliaDate();
+    const todayClean = new Date(today);
+    todayClean.setHours(0, 0, 0, 0);
 
-    const todayDayOfWeek = todayBrasilia.getUTCDay(); 
-    const weekStart = new Date(todayBrasilia);
-    weekStart.setUTCDate(todayBrasilia.getUTCDate() - todayDayOfWeek);
-    weekStart.setUTCHours(0, 0, 0, 0);
+    const dayOfWeek = today.getDay(); 
+    const weekStart = new Date(today);
+    weekStart.setDate(today.getDate() - dayOfWeek);
+    weekStart.setHours(0, 0, 0, 0);
 
     const weekDateObjects = Array.from({ length: 7 }).map((_, i) => {
         const date = new Date(weekStart.getTime());
-        date.setUTCDate(weekStart.getUTCDate() + i);
+        date.setDate(weekStart.getDate() + i);
         return date;
     });
 
@@ -66,6 +67,7 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
             {weekDateObjects.map((date, index) => {
                 const dateISO = getLocalDateISOString(date);
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
+                // Verifica se os 3 desafios foram concluídos
                 const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
                 const isPastDay = date.getTime() < todayClean.getTime();
                 const isCurrentDay = date.getTime() === todayClean.getTime();
