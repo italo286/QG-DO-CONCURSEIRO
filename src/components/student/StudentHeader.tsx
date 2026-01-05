@@ -150,13 +150,13 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
             <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-10 flex items-center justify-between">
                 
-                <div className="flex items-center gap-4 lg:gap-14 min-w-0">
+                <div className="flex items-center gap-4 lg:gap-6 min-w-0">
                     <button onClick={onGoHome} className="flex items-center gap-8 hover:scale-125 active:scale-105 transition-all duration-300 flex-shrink-0 group">
                         <img src="https://i.postimg.cc/2SXH3JRq/T1.png" alt="Logo" className="h-16 w-auto rounded-lg" />
                         
                     </button>
 
-                    <div className="hidden md:flex items-center gap-16 lg:gap-8">
+                    <div className="hidden md:flex items-center gap-14 lg:gap-0">
                         {/* LEVEL HUD */}
                         <button 
                             onClick={() => onSetView('performance')}
@@ -173,7 +173,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                     <circle cx="18" cy="18" r="16" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="100 100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    <span className="text-[14px] font-black text-white leading-none">{level}</span>
+                                    <span className="text-[16px] font-black text-white leading-none">{level}</span>
                                     <span className="text-[6px] font-black text-cyan-500/60 uppercase">LVL</span>
                                 </div>
                             </div>
@@ -194,7 +194,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                     <circle cx="18" cy="18" r="16" fill="none" stroke={accTheme.stroke} strokeWidth="3" strokeDasharray="100 100" strokeDashoffset={100 - globalAccuracy} strokeLinecap="round" />
                                 </svg>
                                 <div className="absolute inset-0 flex items-center justify-center">
-                                    <span className={`text-[10px] font-black ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
+                                    <span className={`text-[14px] font-black ${accTheme.text}`}>{Math.round(globalAccuracy)}%</span>
                                 </div>
                             </div>
                             <div className="hidden lg:flex flex-col text-left">
