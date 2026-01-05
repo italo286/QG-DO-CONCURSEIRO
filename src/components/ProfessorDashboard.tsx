@@ -261,22 +261,22 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
     return (
         <div className="p-8 max-w-7xl mx-auto">
             {toastMessage && <Toast message={toastMessage} onDismiss={() => setToastMessage(null)} />}
-            <header className="flex justify-between items-center mb-8">
+            <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
                 <div className="flex items-center gap-4">
-                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="h-12 w-17 rounded-md" />
-                    <div>
-                        <h1 className="text-3xl font-bold text-white">Painel do Professor</h1>
-                        <p className="text-gray-400">Gerencie seus cursos, disciplinas e alunos.</p>
+                    <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-14 w-auto rounded-lg shadow-xl" />
+                    <div className="flex flex-col">
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">QG DO <span className="text-cyan-400">CONCURSEIRO</span></h1>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mt-1">Base de Comando do Professor</p>
                     </div>
                 </div>
                  <div className="flex items-center space-x-4">
                     <div ref={navRef} className="relative">
-                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-4 py-2 text-sm font-medium rounded-lg bg-gray-700 hover:bg-gray-600">
-                            <span>Navegação</span>
+                        <button onClick={() => setIsNavOpen(prev => !prev)} className="flex items-center space-x-2 px-4 py-2 text-sm font-black uppercase tracking-widest rounded-lg bg-gray-800 border border-white/5 hover:bg-gray-700 transition-all">
+                            <span>Sistemas</span>
                             <ChevronDownIcon className={`h-4 w-4 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
                         </button>
                         {isNavOpen && (
-                            <div className="absolute right-0 mt-2 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-lg z-10">
+                            <div className="absolute right-0 mt-2 w-48 bg-gray-900 border border-white/10 rounded-xl shadow-2xl z-50 overflow-hidden">
                                 {navigationItems.map(item => (
                                     <button
                                         key={item.view}
@@ -286,7 +286,7 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                                             setView(item.view);
                                             setIsNavOpen(false);
                                         }}
-                                        className={`w-full text-left px-4 py-2 text-sm ${view === item.view ? 'bg-cyan-600' : 'hover:bg-gray-700'}`}
+                                        className={`w-full text-left px-5 py-3 text-xs font-black uppercase tracking-widest transition-all ${view === item.view ? 'bg-cyan-600 text-white' : 'text-gray-400 hover:bg-white/5'}`}
                                     >
                                         {item.label}
                                     </button>
@@ -294,41 +294,44 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                             </div>
                         )}
                     </div>
-                     <div className="w-px h-6 bg-gray-600" aria-hidden="true"></div>
-                     <button onClick={() => setIsProfileModalOpen(true)} className="flex items-center space-x-2 p-1 rounded-full hover:bg-gray-700">
+                     <div className="w-px h-8 bg-gray-800" aria-hidden="true"></div>
+                     <button onClick={() => setIsProfileModalOpen(true)} className="flex items-center space-x-3 p-1 rounded-full hover:bg-gray-800 transition-all">
                          {user.avatarUrl ? (
-                            <img src={user.avatarUrl} alt={`Avatar de ${user.name}`} className="h-10 w-10 rounded-full object-cover" />
+                            <img src={user.avatarUrl} alt="" className="h-10 w-10 rounded-full object-cover border-2 border-cyan-500/20" />
                         ) : (
                             <UserCircleIcon className="h-10 w-10 text-gray-500" aria-hidden="true" />
                         )}
-                        <span className="text-gray-300">Olá, {user.name || user.username}</span>
-                        <PencilIcon className="h-5 w-5 text-gray-400" aria-hidden="true" />
+                        <div className="hidden sm:flex flex-col text-left">
+                            <span className="text-xs font-black text-white uppercase tracking-tight">{user.name || user.username}</span>
+                            <span className="text-[8px] font-bold text-cyan-500 uppercase tracking-widest">Base de Comando</span>
+                        </div>
+                        <PencilIcon className="h-4 w-4 text-gray-600" aria-hidden="true" />
                     </button>
-                    <button onClick={onLogout} className="flex items-center text-sm text-cyan-400 hover:text-cyan-300">
-                        <LogoutIcon className="h-5 w-5 mr-1" aria-hidden="true" />
-                        Sair
+                    <button onClick={onLogout} className="flex items-center text-xs font-black uppercase tracking-widest text-rose-500 hover:text-rose-400 p-2">
+                        <LogoutIcon className="h-5 w-5 md:mr-1" aria-hidden="true" />
+                        <span className="hidden md:inline">Desconectar</span>
                     </button>
                 </div>
             </header>
             
             <main>
                 {view !== 'courses' && view !== 'subjects' && (
-                    <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center">
-                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar
+                    <button onClick={view.startsWith('edit_') ? () => setView(view.endsWith('course') ? 'courses' : 'subjects') : handleBackToDashboard} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all font-black text-[10px] uppercase tracking-widest">
+                        <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar para Base
                     </button>
                 )}
 
                 {renderContent()}
             </main>
 
-            <Modal isOpen={isNewCourseModalOpen} onClose={handleCloseNewCourseModal} title="Criar Novo Curso">
+            <Modal isOpen={isNewCourseModalOpen} onClose={handleCloseNewCourseModal} title="Instanciar Novo Curso">
                 <form onSubmit={handleSaveNewCourse} className="space-y-4">
                     <div>
-                        <label htmlFor="new-course-name" className="block text-sm font-medium text-gray-300">Nome do Curso</label>
+                        <label htmlFor="new-course-name" className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Nome da Operação</label>
                         <input id="new-course-name" type="text" value={newCourseName} onChange={e => setNewCourseName(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" />
                     </div>
                     <div>
-                         <label htmlFor="new-course-image-url" className="block text-sm font-medium text-gray-300">URL da Imagem de Capa (Opcional)</label>
+                         <label htmlFor="new-course-image-url" className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Capa da Operação (URL)</label>
                          <input
                             id="new-course-image-url"
                             type="url"
@@ -337,24 +340,24 @@ export const ProfessorDashboard: React.FC<{ user: User; onLogout: () => void; on
                             placeholder="https://exemplo.com/imagem.png"
                             className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500"
                          />
-                         {newCourseImageUrl && <img src={newCourseImageUrl} alt="Pré-visualização da capa" className="mt-2 h-24 w-auto rounded-md object-cover border border-gray-600" />}
+                         {newCourseImageUrl && <img src={newCourseImageUrl} alt="Pré-visualização" className="mt-4 h-32 w-full rounded-xl object-cover border border-white/10" />}
                     </div>
                     <div className="pt-4 flex justify-end">
                         <Button type="submit">
-                            Criar Curso
+                            Iniciar Operação
                         </Button>
                     </div>
                 </form>
             </Modal>
-             <Modal isOpen={isNewSubjectModalOpen} onClose={handleCloseNewSubjectModal} title="Criar Nova Disciplina">
+             <Modal isOpen={isNewSubjectModalOpen} onClose={handleCloseNewSubjectModal} title="Codificar Nova Disciplina">
                 <form onSubmit={handleSaveNewSubject} className="space-y-4">
                     <div>
-                        <label htmlFor="new-subject-name" className="block text-sm font-medium text-gray-300">Nome da Disciplina</label>
+                        <label htmlFor="new-subject-name" className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-1">Título da Disciplina</label>
                         <input id="new-subject-name" type="text" value={newSubjectName} onChange={e => setNewSubjectName(e.target.value)} required className="mt-1 block w-full bg-gray-700 border border-gray-600 rounded-md py-2 px-3 text-white focus:ring-cyan-500 focus:border-cyan-500" />
                     </div>
                     <div className="pt-4 flex justify-end">
                         <Button type="submit">
-                           Salvar
+                           Salvar Dados
                         </Button>
                     </div>
                 </form>

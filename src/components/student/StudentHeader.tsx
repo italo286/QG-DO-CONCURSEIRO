@@ -147,17 +147,16 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     };
 
     return (
-        /* ALTURA DO HEADER: Altere h-20 */
         <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/5 shadow-[0_10px_30px_-15px_rgba(0,0,0,0.5)] h-20">
-            {/* MARGENS LATERAIS: Altere px-4 lg:px-10 (px controla o padding horizontal) */}
             <div className="max-w-[1920px] mx-auto h-full px-4 lg:px-10 flex items-center justify-between">
                 
-                {/* 1. LADO ESQUERDO: BRANDING + HUD PERFORMANCE */}
-                {/* ESPAÇAMENTO ENTRE ITENS: Altere gap-4 ou gap-8 */}
                 <div className="flex items-center gap-6 lg:gap-10 min-w-0">
-                    <button onClick={onGoHome} className="hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0">
-                        {/* TAMANHO DO LOGO: Altere h-10 */}
+                    <button onClick={onGoHome} className="flex items-center gap-3 hover:scale-105 active:scale-95 transition-all duration-300 flex-shrink-0 group">
                         <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="h-10 w-auto rounded-lg" />
+                        <div className="hidden lg:flex flex-col">
+                            <span className="text-sm font-black text-white uppercase tracking-tighter italic leading-none group-hover:text-cyan-400 transition-colors">QG DO</span>
+                            <span className="text-[10px] font-black text-cyan-500 uppercase tracking-[0.2em] leading-none mt-0.5 group-hover:text-white transition-colors">CONCURSEIRO</span>
+                        </div>
                     </button>
 
                     <div className="hidden md:flex items-center gap-6 lg:gap-8">
@@ -177,13 +176,11 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                     <circle cx="18" cy="18" r="16" fill="none" stroke="#06b6d4" strokeWidth="4" strokeDasharray="100 100" strokeDashoffset={100 - progressPercent} strokeLinecap="round" />
                                 </svg>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center">
-                                    {/* TAMANHO FONTE NÍVEL: Altere text-[14px] */}
                                     <span className="text-[14px] font-black text-white leading-none">{level}</span>
                                     <span className="text-[6px] font-black text-cyan-500/60 uppercase">LVL</span>
                                 </div>
                             </div>
                             <div className="hidden lg:flex flex-col text-left">
-                                {/* TAMANHO FONTE TÍTULO: Altere text-[11px] */}
                                 <span className="text-[11px] font-black text-white uppercase italic leading-none group-hover:text-cyan-400 transition-colors">{levelTitle}</span>
                                 <span className="text-[8px] font-black text-cyan-400/70 uppercase tracking-widest mt-1">+{nextLevelXp} XP</span>
                             </div>
@@ -211,8 +208,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 2. LADO DIREITO: TEMPO + PERFIL */}
-                {/* ESPAÇAMENTO ENTRE ITENS: Altere gap-4 ou gap-8 */}
                 <div className="flex items-center gap-4 lg:gap-8 flex-shrink-0">
                     {/* RELÓGIO E SESSÃO */}
                     <div className="hidden md:flex items-center h-10 bg-black/40 rounded-full border border-white/5 p-1 px-5 gap-6 shadow-inner">
@@ -238,7 +233,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                             className={`flex items-center gap-3 p-1 pr-4 rounded-full bg-gray-800/40 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-lg' : ''}`}
                         >
                             <div className="relative">
-                                {/* TAMANHO AVATAR: Altere h-9 w-9 */}
                                 <div className="h-9 w-9 rounded-full overflow-hidden border-2 border-cyan-500/20 shadow-inner">
                                     {user.avatarUrl ? (
                                         <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
@@ -249,7 +243,6 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                                 <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#020617]"></div>
                             </div>
                             <div className="hidden sm:flex flex-col text-left">
-                                {/* TAMANHO FONTE NOME: Altere text-[11px] */}
                                 <span className="text-[11px] font-black text-white uppercase truncate max-w-[110px] leading-tight">{user.name || user.username}</span>
                                 <span className="text-[8px] font-bold text-cyan-500 uppercase tracking-widest leading-none mt-1">
                                     {getUserSublabel()}

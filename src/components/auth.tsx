@@ -1,3 +1,4 @@
+
 import React, { useState, useId } from 'react';
 import { auth } from '../firebaseConfig';
 import * as FirebaseService from '../services/firebaseService';
@@ -19,7 +20,6 @@ const LoginForm: React.FC = () => {
         setIsLoading(true);
         try {
             await auth.signInWithEmailAndPassword(email, password);
-            // onAuthStateChanged in App.tsx will handle the rest
         } catch (err: any) {
             setError('Email ou senha inválidos.');
             console.error(err);
@@ -76,11 +76,7 @@ const RegisterForm: React.FC = () => {
         try {
             const userCredential = await auth.createUserWithEmailAndPassword(email, password);
             const user = userCredential.user;
-            
-            // Create user profile in Firestore
             await FirebaseService.createUserProfile(user!.uid, email, name, role);
-
-            // onAuthStateChanged in App.tsx will handle the rest
         } catch (err: any) {
             if (err.code === 'auth/email-already-in-use') {
                 setError('Este email já está em uso.');
@@ -128,17 +124,19 @@ export const LoginPage: React.FC = () => {
     const [isLoginView, setIsLoginView] = useState(true);
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-gray-900">
+        <div className="min-h-screen flex items-center justify-center bg-gray-900 p-4">
             <main>
-                <Card className="w-full max-w-md p-8">
-                     <div className="text-center mb-8">
-                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo QG do concurseiro" className="mx-auto h-24 w-auto rounded-md shadow-lg" />
+                <Card className="w-full max-w-md p-8 bg-gray-800/80 backdrop-blur-xl border-white/5 shadow-2xl">
+                    <div className="text-center mb-10">
+                        <img src="https://i.ibb.co/FbmLfsBw/Google-AI-Studio-2025-08-10-T15-45-10.png" alt="Logo" className="mx-auto h-20 w-auto rounded-xl shadow-lg mb-4" />
+                        <h1 className="text-2xl font-black text-white uppercase tracking-tighter italic leading-none">QG DO <span className="text-cyan-400">CONCURSEIRO</span></h1>
+                        <p className="text-[10px] font-black text-gray-500 uppercase tracking-[0.3em] mt-2">Plataforma de Alta Performance</p>
                     </div>
                     
-                    <div className="flex border-b border-gray-700 mb-6" role="tablist" aria-label="Formulário de acesso">
+                    <div className="flex border-b border-gray-700 mb-8" role="tablist" aria-label="Formulário de acesso">
                         <button 
                             onClick={() => setIsLoginView(true)} 
-                            className={`w-1/2 py-3 text-sm font-medium ${isLoginView ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}
+                            className={`w-1/2 py-3 text-xs font-black uppercase tracking-widest ${isLoginView ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-white'}`}
                             role="tab"
                             aria-selected={isLoginView}
                             aria-controls="login-panel"
@@ -148,7 +146,7 @@ export const LoginPage: React.FC = () => {
                         </button>
                         <button 
                             onClick={() => setIsLoginView(false)} 
-                            className={`w-1/2 py-3 text-sm font-medium ${!isLoginView ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-400 hover:text-white'}`}
+                            className={`w-1/2 py-3 text-xs font-black uppercase tracking-widest ${!isLoginView ? 'text-cyan-400 border-b-2 border-cyan-400' : 'text-gray-500 hover:text-white'}`}
                             role="tab"
                             aria-selected={!isLoginView}
                             aria-controls="register-panel"
@@ -159,11 +157,11 @@ export const LoginPage: React.FC = () => {
                     </div>
                     
                     {isLoginView ? (
-                        <div id="login-panel" role="tabpanel" aria-labelledby="login-tab">
+                        <div id="login-panel" role="tabpanel" aria-labelledby="login-tab" className="animate-fade-in">
                             <LoginForm />
                         </div>
                     ) : (
-                         <div id="register-panel" role="tabpanel" aria-labelledby="register-tab">
+                         <div id="register-panel" role="tabpanel" aria-labelledby="register-tab" className="animate-fade-in">
                             <RegisterForm />
                         </div>
                     )}
