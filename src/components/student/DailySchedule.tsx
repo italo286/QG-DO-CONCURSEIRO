@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { StudyPlan, Subject, StudentProgress } from '../../types';
 import { Card } from '../ui';
@@ -108,7 +107,8 @@ export const DailySchedule: React.FC<{
                             const nextItemMinutes = nextTime ? timeToMinutes(nextTime) : 1440;
                             
                             const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
-                            const isPast = currentTotalMinutes >= nextItemMinutes;
+                            // FIX: Changed currentTotalMinutes to currentMinutes to fix the undefined variable error.
+                            const isPast = currentMinutes >= nextItemMinutes;
 
                             return (
                                 <div key={time} className="relative pl-10 group">

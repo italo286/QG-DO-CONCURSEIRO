@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { User, StudentProgress } from '../../types';
 import { calculateLevel, getLevelTitle, LEVEL_XP_REQUIREMENT } from '../../gamification';
@@ -25,6 +24,8 @@ interface StudentHeaderProps {
     selectedCourseName?: string;
     activeChallengeType?: 'review' | 'glossary' | 'portuguese' | null;
     onSetView: (view: ViewType) => void;
+    // FIX: Added missing onOpenProfile prop to StudentHeaderProps interface to resolve type mismatch in StudentDashboard.
+    onOpenProfile: () => void;
     onLogout: () => void;
     onGoHome: () => void;
 }
@@ -38,6 +39,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     selectedCourseName,
     activeChallengeType,
     onSetView,
+    onOpenProfile,
     onLogout,
     onGoHome,
 }) => {

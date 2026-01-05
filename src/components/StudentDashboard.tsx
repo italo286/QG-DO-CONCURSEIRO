@@ -391,6 +391,8 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     </button>
                 )}
                 <StudentViewRouter
+                    // FIX: Passed missing onUpdateUser prop to StudentViewRouter.
+                    onUpdateUser={onUpdateUser}
                     // FIX: Passed missing onDeleteMessage prop to fix the reported error.
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
