@@ -19,7 +19,7 @@ import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
     id: number;
@@ -44,7 +44,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
     const [selectedReview, setSelectedReview] = useState<ReviewSession | null>(null);
     const [activeCustomQuiz, setActiveCustomQuiz] = useState<CustomQuiz | null>(null);
     const [activeSimulado, setActiveSimulado] = useState<Simulado | null>(null);
-    const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
     const [isGamePlayerOpen, setIsGamePlayerOpen] = useState(false);
     const [playingGame, setPlayingGame] = useState<{ game: MiniGame, topicId: string } | null>(null);
     const [isLevelUpModalOpen, setIsLevelUpModalOpen] = useState(false);
@@ -94,7 +93,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             setSelectedCourse(null);
             return true;
         }
-        if (['schedule', 'performance', 'reviews', 'games', 'practice_area'].includes(view)) {
+        if (['schedule', 'performance', 'reviews', 'games', 'practice_area', 'settings'].includes(view)) {
             setView('dashboard');
             return true;
         }
@@ -201,7 +200,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 const foundSubtopic = topic.subtopics.find(st => st.id === topicId);
 
                 if (foundTopic || foundSubtopic) {
-                    // Localiza a qual curso essa disciplina pertence
                     const associatedCourse = enrolledCourses.find(c => 
                         c.disciplines.some(d => d.subjectId === subject.id)
                     );
@@ -214,7 +212,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                     setSelectedTopic(topic);
                     setSelectedSubtopic(foundSubtopic || null);
                     
-                    // Persiste o histórico ao navegar
                     if (studentProgress) {
                         const newProgress = { ...studentProgress, lastAccessedTopicId: topicId };
                         handleUpdateStudentProgress(newProgress, studentProgress);
@@ -252,7 +249,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             setActiveChallenge(prev => prev ? { ...prev, sessionAttempts: challenge.sessionAttempts || [] } : null);
             
-            FirebaseService.saveStudentProgress(newProgress); // Fire-and-forget save
+            FirebaseService.saveStudentProgress(newProgress);
             return newProgress;
         });
     };
@@ -319,7 +316,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             
             FirebaseService.saveStudentProgress(newProgress);
             
-            // Side effects after state update
             setTimeout(() => {
                 setXpToasts(prev => [...prev, ...xpToastsToAdd]);
                 setTimeout(() => setXpToasts(prev => prev.filter(t => !xpToastsToAdd.some(tt => tt.id === t.id))), 3000);
@@ -434,7 +430,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 selectedCourseName={selectedCourse?.name} 
                 activeChallengeType={activeChallenge?.type}
                 onSetView={setView} 
-                onOpenProfile={() => setIsProfileModalOpen(true)} 
                 onLogout={onLogout} 
                 onGoHome={() => setView('dashboard')} 
             />
@@ -453,6 +448,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
                 )}
                 <StudentViewRouter
                     view={view} isPreview={isPreview} currentUser={user} studentProgress={studentProgress} allSubjects={allSubjects} allStudents={allStudents} allStudentProgress={allStudentProgress} enrolledCourses={enrolledCourses} fullStudyPlan={studyPlan} messages={messages} teacherProfiles={teacherProfiles} selectedCourse={selectedCourse} selectedSubject={selectedSubject} selectedTopic={selectedTopic} selectedSubtopic={selectedSubtopic} selectedReview={selectedReview} activeChallenge={activeChallenge} dailyChallengeResults={dailyChallengeResults} isGeneratingReview={isGeneratingReview} isSplitView={isSplitView} isSidebarCollapsed={isSidebarCollapsed} quizInstanceKey={quizInstanceKey} activeCustomQuiz={activeCustomQuiz} activeSimulado={activeSimulado} isGeneratingAllChallenges={isGeneratingAllChallenges}
+                    onUpdateUser={onUpdateUser}
                     onAcknowledgeMessage={(messageId) => FirebaseService.acknowledgeMessage(messageId, user.id)}
                     onCourseSelect={handleCourseSelect}
                     onSubjectSelect={handleSubjectSelect}
@@ -611,7 +607,6 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
             />
 
             <XpToastDisplay toasts={xpToasts} />
-            <EditProfileModal isOpen={isProfileModalOpen} onClose={() => setIsProfileModalOpen(false)} user={user} onSave={onUpdateUser} />
             <StudentGamePlayerModal isOpen={isGamePlayerOpen} onClose={() => setIsGamePlayerOpen(false)} game={playingGame?.game || null} onGameComplete={(gameId: string) => {
                 const newProgress = Gamification.processGameCompletion(studentProgress, playingGame!.topicId, gameId, addXp);
                 handleUpdateStudentProgress(newProgress, studentProgress);

@@ -11,8 +11,9 @@ import { StudentReviewsView } from './StudentReviewsView';
 import { QuizView } from './QuizView';
 import { DailyChallengeResultsView } from './views/DailyChallengeResultsView';
 import { StudentPracticeAreaView } from './views/StudentPracticeAreaView';
+import { EditProfileModal } from './EditProfileModal';
 
-type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
+type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 interface StudentViewRouterProps {
     view: ViewType;
@@ -40,6 +41,7 @@ interface StudentViewRouterProps {
     activeCustomQuiz: CustomQuiz | null;
     activeSimulado: Simulado | null;
     isGeneratingAllChallenges: boolean;
+    onUpdateUser: (user: User) => void;
     onAcknowledgeMessage: (messageId: string) => void;
     onCourseSelect: (course: Course) => void;
     onSubjectSelect: (subject: Subject) => void;
@@ -112,9 +114,22 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
     }, [props.allSubjects]);
 
     switch (props.view) {
+        case 'settings':
+            return (
+                <div className="max-w-2xl mx-auto space-y-6 animate-fade-in">
+                    <h2 className="text-3xl font-black text-white uppercase tracking-tighter italic mb-8">Configurações de Perfil</h2>
+                    <div className="bg-gray-800/40 p-8 rounded-[2rem] border border-gray-700/50 shadow-2xl">
+                        <EditProfileModal 
+                            isOpen={true} 
+                            onClose={() => props.setView('dashboard')} 
+                            user={props.currentUser} 
+                            onSave={props.onUpdateUser} 
+                        />
+                    </div>
+                </div>
+            );
         case 'daily_challenge_quiz':
             if (!props.activeChallenge) return null;
-            // Rigor: Determinar timer e tentativas com base nas configurações avançadas do aluno
             const type = props.activeChallenge.type;
             let duration: number | 'unlimited' = 'unlimited';
             let attempts: number | 'unlimited' = 'unlimited';
@@ -149,7 +164,6 @@ export const StudentViewRouter: React.FC<StudentViewRouterProps> = (props) => {
             return <CourseView {...props} course={props.selectedCourse} currentUserId={props.currentUser.id} />;
         case 'subject':
             if (!props.selectedSubject || !props.selectedCourse) return null;
-            // FIX: Added missing onToggleTopicCompletion prop to SubjectView to fix reported type error.
             return <SubjectView 
                 subject={props.selectedSubject} 
                 studentProgress={props.studentProgress} 
