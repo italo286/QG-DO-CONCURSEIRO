@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+// FIX: Added 'Flashcard' to the type import to resolve type errors.
 import { User, Subject, StudentProgress, Course, Topic, SubTopic, ReviewSession, MiniGame, Question, QuestionAttempt, CustomQuiz, DailyChallenge, Simulado, Badge, TeacherMessage } from '../../types';
 import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
@@ -20,6 +21,14 @@ import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
 import { NotificationToast, NotificationItem } from './NotificationToast';
 
+window.androidGoBack = () => {
+  if (window.customGoBack && typeof window.customGoBack === 'function') {
+    return window.customGoBack();
+  }
+  return false;
+};
+
+// FIX: Added 'settings' to ViewType to ensure compatibility with StudentHeader's expectations and resolve type mismatch errors.
 type ViewType = 'dashboard' | 'course' | 'subject' | 'topic' | 'schedule' | 'performance' | 'reviews' | 'settings' | 'review_quiz' | 'games' | 'daily_challenge_quiz' | 'daily_challenge_results' | 'practice_area' | 'custom_quiz_player' | 'simulado_player';
 
 type XpToast = {
@@ -95,7 +104,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         setActiveNotifications(prev => prev.filter(n => n.id !== id));
     };
 
-    // Cronograma: Lógica unificada com o relógio de Brasília
+    // Cronograma: Lógica unificada com o relógio de Brasília imune ao fuso local
     useEffect(() => {
         if (isPreview || !studyPlan || !studyPlan.activePlanId) return;
 

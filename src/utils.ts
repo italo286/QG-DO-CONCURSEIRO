@@ -156,12 +156,21 @@ export const markdownToHtml = (text: string): string => {
 };
 
 /**
- * Retorna a data e hora atual no fuso horário de Brasília (America/Sao_Paulo).
- * Utiliza a API Intl de forma granular para evitar erros de arredondamento de strings
- * e garantir que o objeto Date resultante tenha os valores literais de Brasília.
+ * Retorna a data e hora atual no fuso horário de Brasília (UTC-3).
+ * Este método é imune a variações de fuso horário local da máquina do usuário.
  */
 export const getBrasiliaDate = (): Date => {
     const now = new Date();
+    // Obtém o tempo UTC em milissegundos
+    const utcMillis = now.getTime() + (now.getTimezoneOffset() * 60000);
+    // Brasília é UTC-3
+    const brMillis = utcMillis + (3600000 * -3);
+    
+    const brDate = new Date(brMillis);
+    
+    // Para garantir que getHours/getMinutes funcionem como "locais" na lógica do app,
+    // precisamos levar em conta que o Date acima ainda é interpretado pelo timezone do browser.
+    // Usamos Intl para extrair os componentes reais e reconstruir um Date "limpo".
     try {
         const formatter = new Intl.DateTimeFormat('en-US', {
             timeZone: 'America/Sao_Paulo',
@@ -172,15 +181,12 @@ export const getBrasiliaDate = (): Date => {
         const parts = formatter.formatToParts(now);
         const getPart = (type: string) => parseInt(parts.find(p => p.type === type)?.value || '0');
         
-        // Criamos um novo objeto Date e setamos os campos individualmente baseados em Brasília
-        const brDate = new Date();
-        brDate.setFullYear(getPart('year'), getPart('month') - 1, getPart('day'));
-        brDate.setHours(getPart('hour'), getPart('minute'), getPart('second'), now.getMilliseconds());
-        return brDate;
+        const finalBrDate = new Date();
+        finalBrDate.setFullYear(getPart('year'), getPart('month') - 1, getPart('day'));
+        finalBrDate.setHours(getPart('hour'), getPart('minute'), getPart('second'), now.getMilliseconds());
+        return finalBrDate;
     } catch (e) {
-        // Fallback robusto
-        const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-        return new Date(utc + (3600000 * -3));
+        return brDate;
     }
 };
 

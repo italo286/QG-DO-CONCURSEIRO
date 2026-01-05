@@ -15,25 +15,22 @@ export const DailySchedule: React.FC<{
     onUpdateRoutine?: (day: number, time: string, content: string | null) => void;
 }> = ({ fullStudyPlan, subjects, studentProgress, onNavigateToTopic, onToggleTopicCompletion, onViewFullSchedule, onUpdateRoutine }) => {
     
-    const [currentMinutes, setCurrentMinutes] = useState(() => {
-        const nowBr = getBrasiliaDate();
-        return nowBr.getHours() * 60 + nowBr.getMinutes();
-    });
+    // Usamos um Date objeto completo como fonte de verdade
+    const [currentBrTime, setCurrentBrTime] = useState(() => getBrasiliaDate());
 
     const [editingSlot, setEditingSlot] = useState<string | null>(null);
     const [editValue, setEditValue] = useState('');
 
     useEffect(() => {
         const timer = setInterval(() => {
-            const nowBr = getBrasiliaDate();
-            setCurrentMinutes(nowBr.getHours() * 60 + nowBr.getMinutes());
-        }, 1000); // Atualiza a cada segundo para precisão máxima
+            setCurrentBrTime(getBrasiliaDate());
+        }, 1000); // Sincronização a cada segundo
         return () => clearInterval(timer);
     }, []);
 
+    const currentMinutesTotal = currentBrTime.getHours() * 60 + currentBrTime.getMinutes();
     const activePlan = (fullStudyPlan.plans || []).find(p => p.id === fullStudyPlan.activePlanId);
-    const nowBr = getBrasiliaDate();
-    const todayIndex = nowBr.getDay();
+    const todayIndex = currentBrTime.getDay();
 
     const getTopicInfo = (topicId: string): { name: string; subjectName: string; subjectId: string } | null => {
         for (const subject of subjects) {
@@ -85,7 +82,7 @@ export const DailySchedule: React.FC<{
                     <h3 className="text-3xl font-black text-white uppercase tracking-tighter italic leading-none">Agenda</h3>
                 </div>
                 <p className="text-[10px] text-cyan-400 font-black uppercase tracking-[0.3em] ml-5 opacity-70">
-                    {nowBr.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
+                    {currentBrTime.toLocaleDateString('pt-BR', { weekday: 'short', day: '2-digit', month: 'short' })}
                 </p>
             </div>
 
@@ -107,9 +104,9 @@ export const DailySchedule: React.FC<{
                             const nextTimeStr = sortedTimes[index + 1];
                             const nextItemMinutes = nextTimeStr ? timeToMinutes(nextTimeStr) : 1440;
                             
-                            // Lógica rigorosa de ativação baseada em minutos totais de Brasília
-                            const isActive = currentMinutes >= itemMinutes && currentMinutes < nextItemMinutes;
-                            const isPast = currentMinutes >= nextItemMinutes;
+                            // Lógica rigorosa de status baseada no relógio sincronizado
+                            const isActive = currentMinutesTotal >= itemMinutes && currentMinutesTotal < nextItemMinutes;
+                            const isPast = currentMinutesTotal >= nextItemMinutes;
 
                             return (
                                 <div key={time} className="relative pl-10 group">
