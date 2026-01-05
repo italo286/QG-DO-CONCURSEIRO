@@ -233,34 +233,34 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
                     </div>
                 </div>
 
-                {/* 5. PERFIL USUÁRIO (NOME E SUB-RÓTULO AO LADO DO AVATAR) */}
+                {/* 5. PERFIL USUÁRIO - ESTILO REFERÊNCIA VISUAL */}
                 <div ref={navRef} className="flex-shrink-0 relative flex items-center gap-3">
                     <button 
                         onClick={() => setIsNavOpen(prev => !prev)} 
-                        className={`flex items-center gap-2 lg:gap-4 p-1 lg:p-1.5 pr-3 lg:pr-6 rounded-full bg-gray-800/30 border border-white/10 hover:border-cyan-500/30 transition-all ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-xl' : ''}`}
+                        className={`flex items-center gap-3 lg:gap-4 p-1.5 lg:p-2 pr-4 lg:pr-8 rounded-full bg-gray-900/60 border border-white/10 hover:border-cyan-500/40 transition-all duration-300 ${isNavOpen ? 'ring-2 ring-cyan-500/20 bg-gray-800 shadow-[0_0_30px_rgba(0,0,0,0.5)]' : ''}`}
                     >
-                        <div className="relative">
-                            <div className="h-8 w-8 lg:h-10 lg:w-10 rounded-full overflow-hidden border-2 border-cyan-500/20">
+                        <div className="relative flex-shrink-0">
+                            <div className="h-10 w-10 lg:h-12 lg:w-12 rounded-full overflow-hidden border-2 border-cyan-500/60 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                                 {user.avatarUrl ? (
                                     <img src={user.avatarUrl} alt="" className="h-full w-full object-cover" />
                                 ) : (
                                     <UserCircleIcon className="h-full w-full text-gray-700 p-1" />
                                 )}
                             </div>
-                            <div className="absolute bottom-0 right-0 w-2.5 lg:w-3 h-2.5 lg:h-3 bg-green-500 rounded-full border-2 border-[#020617]"></div>
+                            <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-[#020617] shadow-lg"></div>
                         </div>
-                        <div className="hidden xs:flex flex-col text-left">
-                            <span className="text-[10px] lg:text-[13px] font-black text-white uppercase truncate max-w-[70px] lg:max-w-[100px] leading-tight tracking-tight">
-                                {user.name || user.username}
+                        <div className="hidden xs:flex flex-col text-left leading-tight">
+                            <span className="text-sm lg:text-base font-black text-white uppercase tracking-tight">
+                                {(user.name || user.username).split(' ')[0]}
                             </span>
-                            <span className="text-[7px] lg:text-[8px] font-black text-cyan-500 uppercase tracking-widest leading-none mt-1">
+                            <span className="text-[10px] lg:text-[11px] font-black text-cyan-400 uppercase tracking-widest mt-0.5">
                                 {getUserSublabel()}
                             </span>
                         </div>
-                        <ChevronDownIcon className={`h-4 w-4 text-gray-600 transition-transform ${isNavOpen ? 'rotate-180' : ''}`} />
+                        <ChevronDownIcon className={`h-4 w-4 text-gray-500 ml-1 transition-transform duration-300 ${isNavOpen ? 'rotate-180 text-white' : ''}`} />
                     </button>
 
-                    <div className="h-12 w-[1px] bg-white/20 hidden sm:block"></div>
+                    <div className="h-12 w-[1px] bg-white/10 hidden sm:block"></div>
 
                     {isNavOpen && (
                         <div className="absolute right-0 top-full mt-4 w-64 bg-[#020617] border border-white/10 rounded-3xl shadow-[0_30px_60px_-15px_rgba(0,0,0,1)] z-50 overflow-hidden backdrop-blur-2xl animate-fade-in">
