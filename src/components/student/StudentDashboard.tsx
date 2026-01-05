@@ -5,16 +5,16 @@ import * as FirebaseService from '../../services/firebaseService';
 import * as Gamification from '../../gamification';
 import { useStudentData } from '../../hooks/useStudentData';
 import { Spinner, ConfirmModal } from '../ui';
-import { StudentHeader } from './StudentHeader';
-import { StudentViewRouter } from './StudentViewRouter';
-import { EditProfileModal } from './EditProfileModal';
-import { StudentGamePlayerModal } from './StudentGamePlayerModal';
-import { LevelUpModal } from './LevelUpModal';
-import { BadgeAwardModal } from './BadgeAwardModal';
-import { XpToastDisplay } from './XpToastDisplay';
-import { NewMessageModal } from './NewMessageModal';
-import { TopicChat } from './TopicChat';
-import { StudentCustomQuizCreatorModal } from './StudentCustomQuizCreatorModal';
+import { StudentHeader } from './student/StudentHeader';
+import { StudentViewRouter } from './student/StudentViewRouter';
+import { EditProfileModal } from './student/EditProfileModal';
+import { StudentGamePlayerModal } from './student/StudentGamePlayerModal';
+import { LevelUpModal } from './student/LevelUpModal';
+import { BadgeAwardModal } from './student/BadgeAwardModal';
+import { XpToastDisplay } from './student/XpToastDisplay';
+import { NewMessageModal } from './student/NewMessageModal';
+import { TopicChat } from './student/TopicChat';
+import { StudentCustomQuizCreatorModal } from './student/StudentCustomQuizCreatorModal';
 import { getLocalDateISOString, getBrasiliaDate } from '../../utils';
 import * as GeminiService from '../../services/geminiService';
 import { ArrowRightIcon } from '../Icons';
@@ -427,8 +427,7 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         <div className="bg-gray-900 text-white min-h-screen">
             <StudentHeader user={user} studentProgress={studentProgress} view={view} selectedTopicName={selectedSubtopic?.name || selectedTopic?.name} selectedCourseName={selectedCourse?.name} onSetView={setView} onOpenProfile={() => setIsProfileModalOpen(true)} onLogout={onLogout} onGoHome={() => setView('dashboard')} />
             
-            {/* Margem superior para compensar o header fixo */}
-            <main className="pt-24 p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
+            <main className="p-4 sm:p-6 lg:p-8 max-w-[1920px] mx-auto">
                 {view !== 'dashboard' && !isPreview && (
                     <button onClick={() => handleBack()} className="text-cyan-400 hover:text-cyan-300 mb-6 flex items-center bg-gray-800/50 px-4 py-2 rounded-xl border border-white/5 transition-all">
                         <ArrowRightIcon className="h-4 w-4 mr-2 transform rotate-180" aria-hidden="true" /> Voltar

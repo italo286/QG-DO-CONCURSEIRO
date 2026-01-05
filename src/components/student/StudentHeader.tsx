@@ -93,7 +93,7 @@ export const StudentHeader: React.FC<StudentHeaderProps> = ({
     ];
 
     return (
-        <header className="fixed top-0 left-0 right-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
+        <header className="sticky top-0 z-50 w-full bg-[#020617] border-b border-white/10 shadow-2xl">
             <div className="max-w-[1920px] mx-auto h-20 px-6 flex items-center justify-between gap-8">
                 
                 {/* 1. LOGO E TÍTULO */}
