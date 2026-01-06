@@ -175,9 +175,19 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
 export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
+    const prompt = `Extraia rigorosamente as questões deste PDF do TEC Concursos.
+    
+    REGRAS OBRIGATÓRIAS:
+    1. PRESERVE A ORDEM ORIGINAL das alternativas (a, b, c, d, e) exatamente como aparecem no texto fonte.
+    2. NÃO embaralhe ou altere a posição de nenhuma alternativa.
+    3. O campo 'correctAnswer' deve ser a string exata da alternativa que é o gabarito original no documento.
+    4. Mantenha a pontuação e formatação original dos enunciados.
+    
+    O objetivo é que a ordem das questões e alternativas seja uma cópia fiel do documento original.`;
+
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
-        contents: { parts: [{ text: "Extraia questões deste PDF do TEC Concursos." }, pdfPart] },
+        contents: { parts: [{ text: prompt }, pdfPart] },
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
     return parseJsonResponse(response.text ?? '', 'array');
@@ -185,9 +195,19 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
 
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    const prompt = `Extraia rigorosamente as questões deste texto do TEC Concursos:
+    
+    REGRAS OBRIGATÓRIAS:
+    1. PRESERVE A ORDEM ORIGINAL das alternativas (a, b, c, d, e) exatamente como aparecem no texto fonte.
+    2. NÃO embaralhe ou altere a posição de nenhuma alternativa.
+    3. O campo 'correctAnswer' deve ser a string exata da alternativa que é o gabarito original no documento.
+    
+    TEXTO:
+    ${text}`;
+
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
-        contents: `Extraia questões deste texto do TEC: ${text}`,
+        contents: prompt,
         config: { responseMimeType: "application/json", responseSchema: questionSchema }
     }));
     return parseJsonResponse(response.text ?? '', 'array');
