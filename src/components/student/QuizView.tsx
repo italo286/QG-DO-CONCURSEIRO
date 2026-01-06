@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Question, QuestionAttempt, StudentProgress } from '../../types';
 import { markdownToHtml } from '../../utils';
 import { Spinner, Button, Card } from '../ui';
-import { CheckCircleIcon, XCircleIcon, SparklesIcon, LightBulbIcon } from '../Icons';
+import { CheckCircleIcon, XCircleIcon, SparklesIcon, LightBulbIcon, UserCircleIcon } from '../Icons';
 
 export const QuizView: React.FC<{
     questions: Question[];
@@ -61,7 +61,6 @@ export const QuizView: React.FC<{
 
     const handleOptionClick = (option: string) => {
         if (isCurrentQuestionAnswered) return;
-        // Não permite selecionar se estiver descartada
         if (discardedOptions.has(option)) return;
         setSelectedOption(option);
     };
@@ -75,7 +74,6 @@ export const QuizView: React.FC<{
                 next.delete(option);
             } else {
                 next.add(option);
-                // Se descartou a que estava selecionada, limpa a seleção
                 if (selectedOption === option) {
                     setSelectedOption(null);
                 }
@@ -224,10 +222,22 @@ export const QuizView: React.FC<{
                 {isCurrentQuestionAnswered && (
                     <div className="mt-8 space-y-4 animate-fade-in">
                         <div className="p-6 bg-gray-900/80 rounded-3xl border border-gray-700 shadow-inner">
-                            <h4 className="font-black text-cyan-400 tracking-widest text-xs uppercase mb-3 flex items-center gap-2">
-                                <LightBulbIcon className="h-4 w-4" /> Justificativa do Mestre
-                            </h4>
-                            <div className="text-sm text-gray-300 leading-relaxed italic" dangerouslySetInnerHTML={{ __html: markdownToHtml(questionToDisplay.justification) }}></div>
+                            <div className="flex justify-between items-start mb-4">
+                                <h4 className="font-black text-cyan-400 tracking-widest text-xs uppercase flex items-center gap-2">
+                                    <LightBulbIcon className="h-4 w-4" /> Justificativa do Mestre
+                                </h4>
+                                {questionToDisplay.commentSource === 'tec' && (
+                                    <div className="flex items-center gap-2 bg-gray-800 px-3 py-1 rounded-full border border-gray-700">
+                                        <UserCircleIcon className="h-3.5 w-3.5 text-gray-500" />
+                                        <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Comentário de um professor do TEC</span>
+                                    </div>
+                                )}
+                            </div>
+                            {/* Renderizamos como HTML puro pois o Gemini gerou tags HTML para preservar LaTeX */}
+                            <div 
+                                className="text-sm text-gray-300 leading-relaxed italic prose prose-invert prose-sm max-w-none" 
+                                dangerouslySetInnerHTML={{ __html: questionToDisplay.justification }}
+                            />
                             
                             <div className="mt-6 pt-6 border-t border-gray-800 flex justify-end items-center">
                                 <span className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">ID: {questionToDisplay.id.split('-')[0]}</span>

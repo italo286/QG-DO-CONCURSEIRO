@@ -12,6 +12,7 @@ import { BankProfileEditor } from './BankProfileEditor';
 import { AiBulkGameGeneratorModal } from './AiBulkGameGeneratorModal';
 import { ProfessorQuestionEditorModal } from './ProfessorQuestionEditorModal';
 import { AiBulkTopicContentGeneratorModal } from './AiBulkTopicContentGeneratorModal';
+import { AiTecJustificationModal } from './AiTecJustificationModal';
 
 export const ProfessorTopicEditor: React.FC<{
     isOpen: boolean;
@@ -26,6 +27,7 @@ export const ProfessorTopicEditor: React.FC<{
 
     const [isQuestionModalOpen, setIsQuestionModalOpen] = useState(false);
     const [isTecModalOpen, setIsTecModalOpen] = useState(false);
+    const [isTecJustificationModalOpen, setIsTecJustificationModalOpen] = useState(false);
     const [isGameModalOpen, setIsGameModalOpen] = useState(false);
     const [editingGame, setEditingGame] = useState<MiniGame | null>(null);
     const [isFlashcardModalOpen, setIsFlashcardModalOpen] = useState(false);
@@ -65,7 +67,7 @@ export const ProfessorTopicEditor: React.FC<{
     };
     
     const saveGeneratedQuestions = (questions: Omit<Question, 'id'>[], isTecExtraction: boolean) => {
-        const newQuestions = questions.map(q => ({...q, id: `q${Date.now()}${Math.random()}`}));
+        const newQuestions = questions.map(q => ({...q, id: `q${Date.now()}${Math.random()}`, isTec: isTecExtraction }));
         setEditingTopic(prev => {
             if (!prev) return prev;
             if (isTecExtraction) {
@@ -73,6 +75,18 @@ export const ProfessorTopicEditor: React.FC<{
             } else {
                 return {...prev, questions: [...prev.questions, ...newQuestions]}
             }
+        });
+    };
+
+    const handleApplyTecJustifications = (justifications: string[]) => {
+        setEditingTopic(prev => {
+            if (!prev || !prev.tecQuestions) return prev;
+            const updatedTecQuestions = prev.tecQuestions.map((q, idx) => ({
+                ...q,
+                justification: justifications[idx],
+                commentSource: 'tec' as const
+            }));
+            return { ...prev, tecQuestions: updatedTecQuestions };
         });
     };
 
@@ -269,7 +283,18 @@ export const ProfessorTopicEditor: React.FC<{
                      <div className="p-4 bg-gray-900/50 rounded-lg">
                         <div className="flex justify-between items-center mb-2">
                             <h4 className="font-semibold text-gray-300">Questões (Extraídas do TEC) ({(editingTopic.tecQuestions || []).length})</h4>
-                            <button onClick={() => handleBulkDelete('tecQuestions', 'Questões (TEC)')} className="p-1 text-gray-400 hover:text-red-400" title="Excluir todas as questões do TEC"><TrashIcon className="h-4 w-4" /></button>
+                            <div className="flex gap-2">
+                                {editingTopic.tecQuestions && editingTopic.tecQuestions.length > 0 && (
+                                    <button 
+                                        onClick={() => setIsTecJustificationModalOpen(true)}
+                                        className="text-[10px] font-black uppercase text-cyan-400 hover:text-cyan-300 flex items-center gap-1"
+                                        title="Importar Justificativas LaTeX"
+                                    >
+                                        <GeminiIcon className="h-3 w-3" /> JUSTIF.
+                                    </button>
+                                )}
+                                <button onClick={() => handleBulkDelete('tecQuestions', 'Questões (TEC)')} className="p-1 text-gray-400 hover:text-red-400" title="Excluir todas as questões do TEC"><TrashIcon className="h-4 w-4" /></button>
+                            </div>
                         </div>
                         <ul className="space-y-2 max-h-40 overflow-y-auto text-sm pr-2">
                             {(editingTopic.tecQuestions || []).map((q, i) => (
@@ -352,6 +377,14 @@ export const ProfessorTopicEditor: React.FC<{
 
             <AiQuestionGeneratorModal isOpen={isQuestionModalOpen} onClose={handleCloseQuestionModal} onSaveQuestions={saveGeneratedQuestions} isTecExtraction={false} />
             <AiQuestionGeneratorModal isOpen={isTecModalOpen} onClose={handleCloseTecModal} onSaveQuestions={saveGeneratedQuestions} isTecExtraction={true} />
+            
+            <AiTecJustificationModal 
+                isOpen={isTecJustificationModalOpen} 
+                onClose={() => setIsTecJustificationModalOpen(false)} 
+                onApply={handleApplyTecJustifications}
+                questionCount={editingTopic.tecQuestions?.length || 0}
+            />
+
             <ProfessorGameEditorModal isOpen={isGameModalOpen} onClose={handleCloseGameModal} onSave={handleSaveGame} game={editingGame} />
             <AiBulkGameGeneratorModal 
                 isOpen={isBulkGameModalOpen}

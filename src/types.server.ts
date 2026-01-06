@@ -44,6 +44,7 @@ export interface Question {
   subjectName?: string;
   topicName?: string;
   isTec?: boolean;
+  commentSource?: 'tec' | 'ai' | 'manual'; // Fonte do comentário
 }
 
 export interface QuestionAttempt {

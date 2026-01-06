@@ -2,7 +2,7 @@
 import React, { useState, useId } from 'react';
 import { Question } from '../../types';
 import { Button } from '../ui';
-import { CheckCircleIcon, XCircleIcon } from '../Icons';
+import { CheckCircleIcon, XCircleIcon, UserCircleIcon } from '../Icons';
 import { markdownToHtml } from '../../utils';
 
 export const InteractiveAiQuestion: React.FC<{ question: Omit<Question, 'id'> }> = ({ question }) => {
@@ -88,7 +88,6 @@ export const InteractiveAiQuestion: React.FC<{ question: Omit<Question, 'id'> }>
                                 <label
                                     htmlFor={`${baseId}-q-o${i}`}
                                     onClick={(e) => {
-                                        // Prevenir que o clique duplo seja interpretado como dois cliques simples rápidos que marcariam e desmarcariam o rádio
                                         if (e.detail > 1) e.preventDefault();
                                         handleOptionClick(option);
                                     }}
@@ -120,12 +119,23 @@ export const InteractiveAiQuestion: React.FC<{ question: Omit<Question, 'id'> }>
             
             {isAnswered && (
                 <div className="mt-6 p-4 bg-gray-900/50 rounded-lg animate-fade-in">
-                    <div className="flex items-center gap-2 mb-2">
-                         {isCorrect ? <CheckCircleIcon className="h-6 w-6 text-green-400" /> : <XCircleIcon className="h-6 w-6 text-red-400" />}
-                         <h4 className="font-bold text-lg">{isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta'}</h4>
+                    <div className="flex justify-between items-center mb-4">
+                        <div className="flex items-center gap-2">
+                            {isCorrect ? <CheckCircleIcon className="h-6 w-6 text-green-400" /> : <XCircleIcon className="h-6 w-6 text-red-400" />}
+                            <h4 className="font-bold text-lg">{isCorrect ? 'Resposta Correta!' : 'Resposta Incorreta'}</h4>
+                        </div>
+                        {question.commentSource === 'tec' && (
+                            <div className="flex items-center gap-2 bg-gray-800 px-2 py-1 rounded-full border border-gray-700">
+                                <UserCircleIcon className="h-3 w-3 text-gray-500" />
+                                <span className="text-[8px] font-black text-gray-500 uppercase tracking-widest">Professor do TEC</span>
+                            </div>
+                        )}
                     </div>
-                    <h5 className="font-bold text-cyan-400">Justificativa:</h5>
-                    <div className="mt-1 text-gray-300" dangerouslySetInnerHTML={{ __html: markdownToHtml(question.justification) }}></div>
+                    <h5 className="font-bold text-cyan-400 text-sm mb-1 uppercase tracking-widest">Justificativa:</h5>
+                    <div 
+                        className="mt-1 text-gray-300 prose prose-invert prose-sm max-w-none" 
+                        dangerouslySetInnerHTML={{ __html: question.commentSource === 'tec' ? question.justification : markdownToHtml(question.justification) }} 
+                    />
                 </div>
             )}
         </div>

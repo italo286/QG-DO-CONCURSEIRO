@@ -56,6 +56,63 @@ async function retryWithBackoff<T>(
     throw new Error('Não foi possível obter resposta da IA após várias tentativas.');
 }
 
+const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'object'): T => {
+    try {
+        let cleanJsonString = jsonString.trim();
+        
+        // Remove markdown code blocks if present
+        if (cleanJsonString.includes('```')) {
+            const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
+            const match = codeBlockRegex.exec(cleanJsonString);
+            if (match && match[1]) cleanJsonString = match[1].trim();
+        }
+        
+        const parsed = JSON.parse(cleanJsonString);
+        if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error("A IA não retornou uma lista conforme esperado.");
+        return parsed;
+    } catch(e) {
+        console.error("Erro ao processar JSON da IA. Conteúdo bruto:", jsonString);
+        throw new Error("A resposta da IA não está em um formato válido. Tente reduzir o volume de dados enviado.");
+    }
+}
+
+/**
+ * Converte comentários LaTeX em HTML estilizado para as questões do TEC.
+ */
+export const parseTecJustificationsFromLatex = async (latexText: string): Promise<string[]> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
+    const prompt = `Analise o seguinte documento LaTeX contendo comentários de questões.
+    Sua tarefa é extrair as justificativas de cada questão na ordem em que aparecem.
+    
+    REGRAS DE CONVERSÃO PARA CADA COMENTÁRIO:
+    1. Converta comandos LaTeX de estilo para HTML:
+       - \\textbf{...} -> <strong>...</strong>
+       - \\textit{...} -> <em>...</em>
+       - \\textcolor[RGB]{R,G,B}{...} -> <span style="color: rgb(R,G,B)">...</span>
+       - \\textcolor{colorName}{...} -> <span style="color: colorName">...</span>
+    2. Preserve quebras de linha (\\) como <br/>.
+    3. Preserve parágrafos (espaço duplo ou comandos de seção) separando-os com tags <p>.
+    4. Remova o enunciado e as alternativas (\\textsf{a) ...}), focando APENAS no texto explicativo do comentário.
+    5. Ignore comandos de preâmbulo (\\documentclass, \\usepackage, etc.) e metadados (\\title, \\author).
+    6. Identifique cada bloco de comentário geralmente começando após as alternativas.
+    
+    Retorne um ARRAY JSON de strings, onde cada string é o HTML purificado do comentário de uma questão.
+    
+    Exemplo de saída: ["<p>O <strong>intervalo</strong> de células...</p>", "<p>A função <em>MAIOR</em>...</p>"]
+    
+    DOCUMENTO LATEX:
+    ${latexText}`;
+
+    const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
+        model: MODEL_TEXT,
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+    }));
+    
+    return parseJsonResponse(response.text ?? '[]', 'array');
+};
+
 const questionSchema = {
     type: Type.ARRAY,
     items: {
@@ -81,26 +138,6 @@ const questionSchema = {
       required: ["statement", "options", "correctAnswer", "justification"],
     },
 };
-
-const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'object'): T => {
-    try {
-        let cleanJsonString = jsonString.trim();
-        
-        // Remove markdown code blocks if present
-        if (cleanJsonString.includes('```')) {
-            const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
-            const match = codeBlockRegex.exec(cleanJsonString);
-            if (match && match[1]) cleanJsonString = match[1].trim();
-        }
-        
-        const parsed = JSON.parse(cleanJsonString);
-        if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error("A IA não retornou uma lista conforme esperado.");
-        return parsed;
-    } catch(e) {
-        console.error("Erro ao processar JSON da IA. Conteúdo bruto:", jsonString);
-        throw new Error("A resposta da IA não está em um formato válido. Tente reduzir o volume de dados enviado.");
-    }
-}
 
 export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount: number = 20, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
@@ -379,7 +416,7 @@ export const parseBulkTopicContent = async (genericName: string, rawContent: str
         Conteúdo para análise:
         ${rawContent}`;
     } else {
-        prompt = `Analise a seguinte lista de arquivos e links para o tópico base "${genericName}". 
+        prompt = `Analise the following lista de arquivos e links para o tópico base "${genericName}". 
         Identifique os pares de arquivos correspondentes (ex: o PDF e o Vídeo de uma mesma aula).
         Agrupe os arquivos logicamente.
         IMPORTANTE: Para o campo 'name' de vídeos e PDFs, limpe os nomes originais removendo extensões (.mp4, .pdf) e prefixos redundantes de organização como "Vídeo 1 - ", "Video 02 -", "Aula 3:", etc. Deixe apenas o título descritivo do assunto (ex: de "Vídeo 1 - Sílaba Tônica.mp4" para "Sílaba Tônica").
