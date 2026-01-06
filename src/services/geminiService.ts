@@ -99,8 +99,6 @@ export const parseTecJustificationsFromLatex = async (latexText: string): Promis
     
     Retorne um ARRAY JSON de strings, onde cada string é o HTML purificado do comentário de uma questão.
     
-    Exemplo de saída: ["<p>O <strong>intervalo</strong> de células...</p>", "<p>A função <em>MAIOR</em>...</p>"]
-    
     DOCUMENTO LATEX:
     ${latexText}`;
 
@@ -177,13 +175,14 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     const prompt = `Extraia rigorosamente as questões deste PDF do TEC Concursos.
     
-    REGRAS OBRIGATÓRIAS:
-    1. PRESERVE A ORDEM ORIGINAL das alternativas (a, b, c, d, e) exatamente como aparecem no texto fonte.
-    2. NÃO embaralhe ou altere a posição de nenhuma alternativa.
-    3. O campo 'correctAnswer' deve ser a string exata da alternativa que é o gabarito original no documento.
-    4. Mantenha a pontuação e formatação original dos enunciados.
+    REGRAS DE FORMATAÇÃO E ESTRUTURA:
+    1. PRESERVE ESTILOS: Use HTML para manter negritos (<strong>), itálicos (<em>) e cores (<span style="color:rgb(...)">).
+    2. PRESERVE O LAYOUT: Mantenha quebras de linha (<br/>) e parágrafos (<p>) exatamente como no original.
+    3. TABELAS/PLANILHAS: Se houver representação de planilhas Excel por texto, use tags de código ou preserve as quebras de linha para manter o alinhamento visual.
+    4. ORDEM: NÃO embaralhe as alternativas. Mantenha a ordem (a, b, c, d, e).
+    5. GABARITO: O 'correctAnswer' deve ser o texto exato da alternativa correta.
     
-    O objetivo é que a ordem das questões e alternativas seja uma cópia fiel do documento original.`;
+    O objetivo é que o enunciado e alternativas sejam uma cópia fiel da aparência do documento.`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
@@ -195,12 +194,16 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
 
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Extraia rigorosamente as questões deste texto do TEC Concursos:
+    const prompt = `Extraia rigorosamente as questões deste texto do TEC Concursos (pode conter comandos LaTeX ou texto bruto).
     
-    REGRAS OBRIGATÓRIAS:
-    1. PRESERVE A ORDEM ORIGINAL das alternativas (a, b, c, d, e) exatamente como aparecem no texto fonte.
-    2. NÃO embaralhe ou altere a posição de nenhuma alternativa.
-    3. O campo 'correctAnswer' deve ser a string exata da alternativa que é o gabarito original no documento.
+    REGRAS DE FORMATAÇÃO E ESTRUTURA:
+    1. CONVERTA ESTILOS PARA HTML:
+       - Negrito (\\textbf{...} ou similar) -> <strong>...</strong>
+       - Itálico (\\textit{...} ou similar) -> <em>...</em>
+       - Cores (\\textcolor{...}{...}) -> <span style="color:...">...</span>
+    2. PRESERVE QUEBRAS DE LINHA: Use <br/> para quebras únicas e <p> para parágrafos.
+    3. ORDEM: Preserve a posição original das alternativas e do gabarito.
+    4. LIMPEZA: Remova apenas comandos de controle do LaTeX (como \\textsf{}), mantendo o texto interno e sua formatação.
     
     TEXTO:
     ${text}`;
