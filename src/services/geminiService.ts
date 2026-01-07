@@ -2,9 +2,9 @@
 import { GoogleGenAI, Type, Chat, GenerateContentResponse } from "@google/genai";
 import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, Flashcard, EditalInfo, MiniGameType, GlossaryTerm, MiniGame } from '../types';
 
-// Modelos padronizados conforme diretrizes
+// Modelos padronizados para alta performance e limites de cota elevados
 const MODEL_TEXT = 'gemini-3-flash-preview';
-const MODEL_PRO = 'gemini-3-pro-preview'; // Modelo superior para tarefas complexas de extração
+const MODEL_PRO = 'gemini-3-flash-preview'; // Alterado de Pro para Flash para estabilidade de cota
 
 /**
  * Helper for retrying API calls with exponential backoff for transient errors
@@ -328,7 +328,7 @@ export const extractQuestionsFromTecText = async (text: string, _generateJustifi
         contents: prompt,
         config: { 
             responseMimeType: "application/json", 
-            responseSchema: questionSchema,
+            responseSchema: { ...questionSchema },
             thinkingConfig: { thinkingBudget: 16000 }
         }
     }));
