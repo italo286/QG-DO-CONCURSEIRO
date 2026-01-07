@@ -100,15 +100,15 @@ const questionSchema = {
       type: Type.OBJECT,
       properties: {
         statement: { type: Type.STRING, description: "A pergunta clara e concisa baseada no texto." },
-        options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Um array com exatamente 5 alternativas de resposta." },
-        correctAnswer: { type: Type.STRING, description: "A string exata da alternativa correta." },
+        options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Um array com exatamente 5 alternativas de resposta. Não inclua prefixos como a), b), etc." },
+        correctAnswer: { type: Type.STRING, description: "O texto exato de uma das opções que representa a resposta correta. Deve ser IDÊNTICO a uma das entradas no array options." },
         justification: { type: Type.STRING, description: "Justificativa detalhada para a correta." },
         optionJustifications: {
           type: Type.ARRAY,
           items: {
             type: Type.OBJECT,
             properties: {
-              option: { type: Type.STRING, description: "O texto da alternativa." },
+              option: { type: Type.STRING, description: "O texto da alternativa (IDÊNTICO ao que está em options)." },
               justification: { type: Type.STRING, description: "Por que esta alternativa está certa ou errada." }
             },
             required: ["option", "justification"]
@@ -256,7 +256,7 @@ export const parseTecJustificationsFromLatex = async (latexText: string): Promis
 export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount: number = 20, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no PDF. Siga o schema.`;
+    const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no PDF. Siga o schema. ATENÇÃO: o campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
         contents: { parts: [{ text: prompt }, pdfPart] },
@@ -270,7 +270,7 @@ export const generateQuestionsFromPdf = async (pdfBase64: string, questionCount:
  */
 export const generateQuestionsFromText = async (text: string, questionCount: number = 20, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no texto: ${text}. Siga o schema.`;
+    const prompt = `Gere ${questionCount} questões de múltipla escolha baseadas no texto: ${text}. Siga o schema. ATENÇÃO: o campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
         contents: prompt,
@@ -286,9 +286,9 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     let contents: any;
     if (params.source.type === 'pdf') {
-        contents = { parts: [{ text: `Gere ${params.questionCount} questões customizadas. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}.` }, { inlineData: { mimeType: 'application/pdf', data: params.source.content } }] };
+        contents = { parts: [{ text: `Gere ${params.questionCount} questões customizadas. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}. ATENÇÃO: o campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções.` }, { inlineData: { mimeType: 'application/pdf', data: params.source.content } }] };
     } else {
-        contents = `Gere ${params.questionCount} questões customizadas sobre: ${params.source.content}. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}.`;
+        contents = `Gere ${params.questionCount} questões customizadas sobre: ${params.source.content}. Tipo: ${params.questionType}. Dificuldade: ${params.difficulty}. ATENÇÃO: o campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções.`;
     }
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
@@ -304,7 +304,7 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
 export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. SCANEIE O DOCUMENTO NA ÍNTEGRA e EXTRAIA TODAS AS QUESTÕES. Mantenha negritos e parágrafos via HTML. Siga o schema.`;
+    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. SCANEIE O DOCUMENTO NA ÍNTEGRA e EXTRAIA TODAS AS QUESTÕES. Mantenha negritos e parágrafos via HTML. O campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções geradas no array options.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: { parts: [{ text: prompt }, pdfPart] },
@@ -322,7 +322,7 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
  */
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. EXTRAIA TODAS AS QUESTÕES do texto a seguir. Mantenha negritos e parágrafos via HTML. Siga o schema. Texto: ${text}`;
+    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. EXTRAIA TODAS AS QUESTÕES do texto a seguir. Mantenha negritos e parágrafos via HTML. O campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções geradas no array options. Texto: ${text}`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: prompt,
@@ -396,7 +396,7 @@ export const generateGameFromText = async (text: string, type: MiniGameType): Pr
  */
 export const generatePortugueseChallenge = async (count: number): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Gere exatamente ${count} questões de Língua Portuguesa para concursos de nível superior (Gramática e Interpretação). Siga o schema.`;
+    const prompt = `Gere exatamente ${count} questões de Língua Portuguesa para concursos de nível superior (Gramática e Interpretação). Siga o schema. O campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
         contents: prompt,
