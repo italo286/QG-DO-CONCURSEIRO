@@ -4,7 +4,7 @@ import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, F
 
 // Modelos padronizados para alta performance e limites de cota elevados
 const MODEL_TEXT = 'gemini-3-flash-preview';
-const MODEL_PRO = 'gemini-3-flash-preview'; // Alterado de Pro para Flash para estabilidade de cota
+const MODEL_PRO = 'gemini-3-flash-preview'; 
 
 /**
  * Helper for retrying API calls with exponential backoff for transient errors
@@ -304,14 +304,25 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
 export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. SCANEIE O DOCUMENTO NA ÍNTEGRA e EXTRAIA TODAS AS QUESTÕES. Mantenha negritos e parágrafos via HTML. O campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções geradas no array options.`;
+    
+    // Instrução de sistema ultra-rigorosa para garantir extração total
+    const systemInstruction = `Você é um extrator de dados de alta fidelidade especializado em cadernos de questões do TEC Concursos. 
+    Sua missão é extrair TODAS as questões contidas no documento, sem exceção. 
+    PROIBIDO: Resumir, omitir, pular páginas ou parar antes do final. 
+    FORMATO: Mantenha negritos e parágrafos usando HTML simples (<b>, <p>).
+    VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
+
+    const prompt = `Extraia ABSOLUTAMENTE TODAS as questões deste PDF. Se houverem 10, 20 ou 50 questões, extraia cada uma delas. Continue processando até que a última questão do documento tenha sido incluída no array JSON.`;
+
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: { parts: [{ text: prompt }, pdfPart] },
         config: { 
+            systemInstruction,
             responseMimeType: "application/json", 
             responseSchema: questionSchema,
-            thinkingConfig: { thinkingBudget: 16000 }
+            // Reduzimos o thinking para priorizar tokens de saída (output)
+            thinkingConfig: { thinkingBudget: 0 } 
         }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
@@ -322,14 +333,23 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
  */
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Aja como um extrator de ALTA FIDELIDADE para cadernos do TEC Concursos. EXTRAIA TODAS AS QUESTÕES do texto a seguir. Mantenha negritos e parágrafos via HTML. O campo correctAnswer deve ser IDÊNTICO ao texto de uma das opções geradas no array options. Texto: ${text}`;
+    
+    const systemInstruction = `Você é um extrator de dados de alta fidelidade especializado em cadernos de questões do TEC Concursos. 
+    Sua missão é extrair TODAS as questões do texto fornecido. 
+    PROIBIDO: Resumir ou omitir itens. 
+    FORMATO: Mantenha negritos e parágrafos usando HTML.
+    VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
+
+    const prompt = `Extraia TODAS as questões contidas no seguinte texto: ${text}`;
+
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: prompt,
         config: { 
+            systemInstruction,
             responseMimeType: "application/json", 
             responseSchema: { ...questionSchema },
-            thinkingConfig: { thinkingBudget: 16000 }
+            thinkingConfig: { thinkingBudget: 0 }
         }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
@@ -516,7 +536,7 @@ export const analyzeTopicFrequencies = async (text: string, topics: { id: string
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_TEXT,
-        contents: `Cruze estes tópicos: ${JSON.stringify(topics)} com este relatório de incidência: ${text}. Atribua uma frequência ("alta", "media", "baixa", "nenhuma") para cada ID. Retorne um objeto JSON.`,
+        contents: `Cruze estes tópicos: ${JSON.stringify(topics)} com este relatório de incidência: ${text}. Atribua uma frequência ("alta", "media", "baixa", "nenhuma") for each ID. Retorne um objeto JSON.`,
         config: { responseMimeType: "application/json" }
     }));
     return parseJsonResponse(response.text ?? '{}', 'object');
