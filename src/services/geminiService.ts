@@ -69,6 +69,21 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
         }
         
         const parsed = JSON.parse(cleanJsonString);
+
+        // Se o schema retornar o novo formato de justificativas em array, convertemos de volta para o formato de objeto que o app espera
+        if (expectedType === 'array' && Array.isArray(parsed)) {
+            return parsed.map(q => {
+                if (q.optionJustifications && Array.isArray(q.optionJustifications)) {
+                    const obj: Record<string, string> = {};
+                    q.optionJustifications.forEach((item: any) => {
+                        obj[item.option] = item.justification;
+                    });
+                    q.optionJustifications = obj;
+                }
+                return q;
+            }) as unknown as T;
+        }
+
         if (expectedType === 'array' && !Array.isArray(parsed)) throw new Error("A IA não retornou uma lista conforme esperado.");
         return parsed;
     } catch(e) {
@@ -89,9 +104,16 @@ const questionSchema = {
         correctAnswer: { type: Type.STRING, description: "A string exata da alternativa correta." },
         justification: { type: Type.STRING, description: "Justificativa detalhada para a correta." },
         optionJustifications: {
-          type: Type.OBJECT,
-          additionalProperties: { type: Type.STRING },
-          description: "Mapeamento opcional de alternativa para justificativa específica."
+          type: Type.ARRAY,
+          items: {
+            type: Type.OBJECT,
+            properties: {
+              option: { type: Type.STRING, description: "O texto da alternativa." },
+              justification: { type: Type.STRING, description: "Por que esta alternativa está certa ou errada." }
+            },
+            required: ["option", "justification"]
+          },
+          description: "Lista de justificativas para cada alternativa."
         },
         errorCategory: { type: Type.STRING }
       },
@@ -286,7 +308,11 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: { parts: [{ text: prompt }, pdfPart] },
-        config: { responseMimeType: "application/json", responseSchema: questionSchema }
+        config: { 
+            responseMimeType: "application/json", 
+            responseSchema: questionSchema,
+            thinkingConfig: { thinkingBudget: 16000 }
+        }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
 };
@@ -300,7 +326,11 @@ export const extractQuestionsFromTecText = async (text: string, _generateJustifi
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
         contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: questionSchema }
+        config: { 
+            responseMimeType: "application/json", 
+            responseSchema: questionSchema,
+            thinkingConfig: { thinkingBudget: 16000 }
+        }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
 };
@@ -326,7 +356,8 @@ export const analyzeStudentDifficulties = async (questions: any[], attempts: Que
     const prompt = `Analise o desempenho do aluno. Questões: ${JSON.stringify(questions)}. Tentativas: ${JSON.stringify(attempts)}. Identifique padrões de erro e sugira pontos de estudo em Markdown.`;
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
-        contents: prompt
+        contents: prompt,
+        config: { thinkingConfig: { thinkingBudget: 8000 } }
     }));
     return response.text ?? 'Não foi possível gerar a análise no momento.';
 };
