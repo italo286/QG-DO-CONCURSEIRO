@@ -46,7 +46,6 @@ const CountdownTimer: React.FC = () => {
 };
 
 const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({ studentProgress }) => {
-    // Usamos apenas métodos locais para consistência total com getBrasiliaDate e getLocalDateISOString
     const today = getBrasiliaDate();
     const todayClean = new Date(today);
     todayClean.setHours(0, 0, 0, 0);
@@ -67,15 +66,18 @@ const WeeklyProgressTracker: React.FC<{ studentProgress: StudentProgress }> = ({
             {weekDateObjects.map((date, index) => {
                 const dateISO = getLocalDateISOString(date);
                 const completions = studentProgress.dailyChallengeCompletions?.[dateISO];
-                // Verifica se os 3 desafios foram concluídos
-                const isFullyCompleted = completions?.review && completions?.glossary && completions?.portuguese;
+                
+                // LÓGICA CORRIGIDA: Considera o dia concluído se qualquer um dos desafios foi feito.
+                // Antes exigia os 3 simultaneamente, o que causava o "X" indevido.
+                const hasAnyActivity = completions && (completions.review || completions.glossary || completions.portuguese);
+                
                 const isPastDay = date.getTime() < todayClean.getTime();
                 const isCurrentDay = date.getTime() === todayClean.getTime();
 
                 let styles = 'relative h-14 rounded-2xl flex flex-col items-center justify-center transition-all duration-500 border-2 ';
                 let statusIcon = null;
 
-                if (isFullyCompleted) {
+                if (hasAnyActivity) {
                     styles += 'bg-green-500/10 border-green-500/50 shadow-[0_0_15px_-5px_rgba(34,197,94,0.4)]';
                     statusIcon = <CheckIcon className="h-4 w-4 text-green-400" />;
                 } else if (isPastDay) {

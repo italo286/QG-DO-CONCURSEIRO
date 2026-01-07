@@ -320,55 +320,58 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ user, onLogo
         });
     };
 
-    const handleDailyChallengeComplete = (finalAttempts: QuestionAttempt[], isCatchUp: boolean = false) => {
-        if (!activeChallenge || isPreview) return;
+    const handleDailyChallengeComplete = async (finalAttempts: QuestionAttempt[], isCatchUp: boolean = false) => {
+        if (!activeChallenge || isPreview || !studentProgress) return;
         const challengeType = activeChallenge.type;
         const xpToastsToAdd: XpToast[] = [];
         let totalXpGained = 0;
+        
         const addChallengeXp = (amount: number, message?: string) => {
             totalXpGained += amount;
             if (message) xpToastsToAdd.push({ id: Date.now() + Math.random(), amount, message });
         };
 
-        setStudentProgress(prevProgress => {
-            if (!prevProgress) return null;
-            const newProgress = JSON.parse(JSON.stringify(prevProgress));
-            const challengeKey = `${challengeType}Challenge` as const;
-            const challenge = newProgress[challengeKey];
-            if (!challenge) return prevProgress;
-            challenge.isCompleted = true;
-            challenge.sessionAttempts = finalAttempts;
-            challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
-            const correctCount = finalAttempts.filter(a => a.isCorrect).length;
-            const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
-            const todayISO = getLocalDateISOString(getBrasiliaDate());
-            if (score >= 0.6) {
-                if (isCatchUp) addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
-                else {
-                    addChallengeXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
-                    const yesterdayBr = getBrasiliaDate(); yesterdayBr.setDate(yesterdayBr.getDate() - 1);
-                    const yesterdayISO = getLocalDateISOString(yesterdayBr);
-                    const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
-                    if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
-                    else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
-                    streak.lastCompletedDate = todayISO;
-                    streak.longest = Math.max(streak.current, streak.longest);
-                    newProgress.dailyChallengeStreak = streak;
-                    const streakBonus = Gamification.XP_CONFIG.STREAK_BONUS as Record<number, number>;
-                    if (streakBonus[streak.current]) addChallengeXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
-                }
-                if (!newProgress.dailyChallengeCompletions) newProgress.dailyChallengeCompletions = {};
-                if (!newProgress.dailyChallengeCompletions[todayISO]) newProgress.dailyChallengeCompletions[todayISO] = {};
-                newProgress.dailyChallengeCompletions[todayISO][challengeType] = true;
+        const newProgress = JSON.parse(JSON.stringify(studentProgress));
+        const challengeKey = `${challengeType}Challenge` as const;
+        const challenge = newProgress[challengeKey];
+        if (!challenge) return;
+
+        challenge.isCompleted = true;
+        challenge.sessionAttempts = finalAttempts;
+        challenge.attemptsMade = (challenge.attemptsMade || 0) + 1;
+        
+        const correctCount = finalAttempts.filter(a => a.isCorrect).length;
+        const score = challenge.items.length > 0 ? correctCount / challenge.items.length : 0;
+        const todayISO = getLocalDateISOString(getBrasiliaDate());
+
+        if (score >= 0.6) {
+            if (isCatchUp) {
+                addChallengeXp(Gamification.XP_CONFIG.CATCH_UP_CHALLENGE_COMPLETE, "Desafio Recuperado!");
+            } else {
+                addChallengeXp(Gamification.XP_CONFIG.DAILY_CHALLENGE_COMPLETE, "Desafio Diário Concluído!");
+                const yesterdayBr = getBrasiliaDate(); yesterdayBr.setDate(yesterdayBr.getDate() - 1);
+                const yesterdayISO = getLocalDateISOString(yesterdayBr);
+                const streak = newProgress.dailyChallengeStreak || { current: 0, longest: 0, lastCompletedDate: '' };
+                if (streak.lastCompletedDate === yesterdayISO) streak.current += 1;
+                else if (streak.lastCompletedDate !== todayISO) streak.current = 1;
+                streak.lastCompletedDate = todayISO;
+                streak.longest = Math.max(streak.current, streak.longest);
+                newProgress.dailyChallengeStreak = streak;
+                const streakBonus = Gamification.XP_CONFIG.STREAK_BONUS as Record<number, number>;
+                if (streakBonus[streak.current]) addChallengeXp(streakBonus[streak.current], `Ofensiva de ${streak.current} dias! 🔥`);
             }
-            newProgress.xp = (newProgress.xp || 0) + totalXpGained;
-            FirebaseService.saveStudentProgress(newProgress);
-            setTimeout(() => {
-                setXpToasts(prev => [...prev, ...xpToastsToAdd]);
-                setTimeout(() => setXpToasts(prev => prev.filter(t => !xpToastsToAdd.some(tt => tt.id === t.id))), 3000);
-            }, 100);
-            return newProgress;
-        });
+
+            if (!newProgress.dailyChallengeCompletions) newProgress.dailyChallengeCompletions = {};
+            if (!newProgress.dailyChallengeCompletions[todayISO]) newProgress.dailyChallengeCompletions[todayISO] = {};
+            newProgress.dailyChallengeCompletions[todayISO][challengeType] = true;
+        }
+
+        newProgress.xp = (newProgress.xp || 0) + totalXpGained;
+        
+        // Persistência unificada
+        await handleUpdateStudentProgress(newProgress, studentProgress);
+        
+        setXpToasts(prev => [...prev, ...xpToastsToAdd]);
         setDailyChallengeResults({ questions: activeChallenge.questions, sessionAttempts: finalAttempts });
     };
 
