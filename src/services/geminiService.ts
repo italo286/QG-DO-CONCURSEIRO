@@ -99,7 +99,7 @@ const questionSchema = {
     items: {
       type: Type.OBJECT,
       properties: {
-        statement: { type: Type.STRING, description: "A pergunta clara e concisa baseada no texto." },
+        statement: { type: Type.STRING, description: "A pergunta e TODO o contexto (incluindo textos complementares se houver) baseada no PDF." },
         options: { type: Type.ARRAY, items: { type: Type.STRING }, description: "Um array com exatamente 5 alternativas de resposta. Não inclua prefixos como a), b), etc." },
         correctAnswer: { type: Type.STRING, description: "O texto exato de uma das opções que representa a resposta correta. Deve ser IDÊNTICO a uma das entradas no array options." },
         justification: { type: Type.STRING, description: "Justificativa detalhada para a correta." },
@@ -306,13 +306,18 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     
     // Instrução de sistema ultra-rigorosa para garantir extração total
-    const systemInstruction = `Você é um extrator de dados de alta fidelidade especializado em cadernos de questões do TEC Concursos. 
-    Sua missão é extrair TODAS as questões contidas no documento, sem exceção. 
-    PROIBIDO: Resumir, omitir, pular páginas ou parar antes do final. 
-    FORMATO: Mantenha negritos e parágrafos usando HTML simples (<b>, <p>).
+    const systemInstruction = `Você é um extrator de dados de ALTA FIDELIDADE especializado em cadernos de questões do TEC Concursos. 
+    Sua missão é extrair TODAS as questões e TODOS os textos de apoio contidos no documento.
+    
+    REGRA DE TEXTOS COMPLEMENTARES: 
+    - Se encontrar textos identificados como "Texto para as questões de X a Y" ou textos precedendo blocos de questões, você DEVE extrair esses textos na íntegra.
+    - Você DEVE prefixar (incluir no início) esse texto compartilhado no campo 'statement' de CADA UMA das questões que dependem dele.
+    - Use HTML simples para separar o texto de apoio do enunciado da questão (ex: <div>Texto de Apoio</div><hr/><div>Enunciado</div>).
+    
+    PROIBIDO: Resumir, omitir textos de base, pular questões ou parar antes do fim do documento.
     VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
 
-    const prompt = `Extraia ABSOLUTAMENTE TODAS as questões deste PDF. Se houverem 10, 20 ou 50 questões, extraia cada uma delas. Continue processando até que a última questão do documento tenha sido incluída no array JSON.`;
+    const prompt = `Extraia ABSOLUTAMENTE TODAS as questões deste PDF, incluindo todos os textos de apoio e enunciados. Varra o documento inteiro. Não pule nenhum texto introdutório.`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
@@ -321,7 +326,6 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
             systemInstruction,
             responseMimeType: "application/json", 
             responseSchema: questionSchema,
-            // Reduzimos o thinking para priorizar tokens de saída (output)
             thinkingConfig: { thinkingBudget: 0 } 
         }
     }));
@@ -334,13 +338,17 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const systemInstruction = `Você é um extrator de dados de alta fidelidade especializado em cadernos de questões do TEC Concursos. 
-    Sua missão é extrair TODAS as questões do texto fornecido. 
-    PROIBIDO: Resumir ou omitir itens. 
-    FORMATO: Mantenha negritos e parágrafos usando HTML.
+    const systemInstruction = `Você é um extrator de dados de ALTA FIDELIDADE especializado em cadernos de questões do TEC Concursos.
+    Sua missão é extrair TODAS as questões e TODOS os textos de apoio contidos no texto fornecido.
+    
+    REGRA DE TEXTOS COMPLEMENTARES: 
+    - Se houver textos de base para múltiplas questões, você DEVE prefixar esse texto no campo 'statement' de cada questão que dele dependa.
+    - Use HTML para separar o contexto do enunciado.
+    
+    PROIBIDO: Resumir ou omitir informações contextuais.
     VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
 
-    const prompt = `Extraia TODAS as questões contidas no seguinte texto: ${text}`;
+    const prompt = `Extraia TODAS as questões contidas no seguinte texto, garantindo que textos de apoio compartilhados sejam incluídos em cada questão correspondente: ${text}`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
