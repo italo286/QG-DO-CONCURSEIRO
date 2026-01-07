@@ -305,19 +305,17 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
     
-    // Instrução de sistema ultra-rigorosa para garantir extração total
-    const systemInstruction = `Você é um extrator de dados de ALTA FIDELIDADE especializado em cadernos de questões do TEC Concursos. 
-    Sua missão é extrair TODAS as questões e TODOS os textos de apoio contidos no documento.
+    const systemInstruction = `Você é um extrator de dados de ALTA PRECISÃO e ALTA FIDELIDADE especializado no TEC Concursos. 
+    Sua tarefa é ler o PDF INTEIRO e extrair ABSOLUTAMENTE TODAS as questões.
     
-    REGRA DE TEXTOS COMPLEMENTARES: 
-    - Se encontrar textos identificados como "Texto para as questões de X a Y" ou textos precedendo blocos de questões, você DEVE extrair esses textos na íntegra.
-    - Você DEVE prefixar (incluir no início) esse texto compartilhado no campo 'statement' de CADA UMA das questões que dependem dele.
-    - Use HTML simples para separar o texto de apoio do enunciado da questão (ex: <div>Texto de Apoio</div><hr/><div>Enunciado</div>).
-    
-    PROIBIDO: Resumir, omitir textos de base, pular questões ou parar antes do fim do documento.
-    VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
+    REGRAS CRÍTICAS:
+    1. EXAUSTIVIDADE: Identifique a numeração das questões. Se o caderno vai da 1 até a 30, você DEVE extrair as 30. Nunca resuma ou pare no meio.
+    2. TEXTOS DE APOIO: Extraia integralmente textos como "Texto para as questões X a Y" e coloque-os no início do campo 'statement' de CADA questão vinculada.
+    3. FIDELIDADE: Mantenha as alternativas exatamente como estão no PDF.
+    4. GABARITO: O campo 'correctAnswer' deve ser o texto exato da opção correta.
+    5. FORMATAÇÃO: Use HTML simples (<b>, <p>, <br>) para manter a legibilidade.`;
 
-    const prompt = `Extraia ABSOLUTAMENTE TODAS as questões deste PDF, incluindo todos os textos de apoio e enunciados. Varra o documento inteiro. Não pule nenhum texto introdutório.`;
+    const prompt = `SCANEIE O DOCUMENTO ATÉ O FINAL. Extraia todas as questões contidas, garantindo que o array JSON final contenha todos os itens numerados presentes no PDF.`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
@@ -326,7 +324,9 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
             systemInstruction,
             responseMimeType: "application/json", 
             responseSchema: questionSchema,
-            thinkingConfig: { thinkingBudget: 0 } 
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+            thinkingConfig: { thinkingBudget: 2048 } 
         }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
@@ -338,17 +338,16 @@ export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJus
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     
-    const systemInstruction = `Você é um extrator de dados de ALTA FIDELIDADE especializado em cadernos de questões do TEC Concursos.
-    Sua missão é extrair TODAS as questões e TODOS os textos de apoio contidos no texto fornecido.
+    const systemInstruction = `Você é um extrator de dados de ALTA PRECISÃO especializado no TEC Concursos.
+    Sua missão é converter o texto fornecido em um array de questões completo.
     
-    REGRA DE TEXTOS COMPLEMENTARES: 
-    - Se houver textos de base para múltiplas questões, você DEVE prefixar esse texto no campo 'statement' de cada questão que dele dependa.
-    - Use HTML para separar o contexto do enunciado.
-    
-    PROIBIDO: Resumir ou omitir informações contextuais.
-    VALIDAÇÃO: O campo 'correctAnswer' deve ser idêntico ao texto de uma das opções.`;
+    REGRAS CRÍTICAS:
+    1. NÃO PULE NADA: Se o texto contém 15 questões, extraia as 15. 
+    2. CONTEXTO: Replicar textos complementares/introdutórios no 'statement' de cada questão que os utilize.
+    3. VALIDAÇÃO: 'correctAnswer' deve bater 100% com uma das strings em 'options'.
+    4. FORMATAÇÃO: Preserve parágrafos e negritos via HTML.`;
 
-    const prompt = `Extraia TODAS as questões contidas no seguinte texto, garantindo que textos de apoio compartilhados sejam incluídos em cada questão correspondente: ${text}`;
+    const prompt = `Extraia TODAS as questões deste texto: ${text}`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
         model: MODEL_PRO,
@@ -357,7 +356,9 @@ export const extractQuestionsFromTecText = async (text: string, _generateJustifi
             systemInstruction,
             responseMimeType: "application/json", 
             responseSchema: { ...questionSchema },
-            thinkingConfig: { thinkingBudget: 0 }
+            temperature: 0.1,
+            maxOutputTokens: 8192,
+            thinkingConfig: { thinkingBudget: 2048 }
         }
     }));
     return parseJsonResponse(response.text ?? '[]', 'array');
