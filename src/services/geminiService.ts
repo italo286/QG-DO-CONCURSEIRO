@@ -4,7 +4,8 @@ import { Question, StudentProgress, Subject, QuestionAttempt, Topic, SubTopic, F
 
 // Modelos padronizados conforme diretrizes
 const MODEL_TEXT = 'gemini-3-flash-preview';
-const MODEL_UTILITY = 'gemini-flash-lite-latest'; // Lite é mais resiliente para tarefas simples em massa
+const MODEL_PRO = 'gemini-3-pro-preview'; // Modelo superior para tarefas complexas de extração
+const MODEL_UTILITY = 'gemini-flash-lite-latest'; 
 
 // Helper for retrying API calls with exponential backoff for transient errors
 async function retryWithBackoff<T>(
@@ -17,7 +18,6 @@ async function retryWithBackoff<T>(
         try {
             return await apiCall();
         } catch (error: any) {
-            // Detecção robusta de erros de cota ou rede
             const errorStr = JSON.stringify(error).toLowerCase();
             const errorMsg = (error.message || '').toLowerCase();
             
@@ -38,14 +38,12 @@ async function retryWithBackoff<T>(
                 errorStr.includes('overloaded');
 
             if (isTransientError && i < maxRetries - 1) {
-                // Se for erro de cota (429), esperamos um pouco mais
                 const backoffDelay = isQuotaError ? delay * 2.5 : delay;
                 console.warn(`Gemini API: Erro temporário ou de cota. Tentativa ${i + 1}/${maxRetries}. Aguardando ${backoffDelay}ms...`);
                 
                 await new Promise(resolve => setTimeout(resolve, backoffDelay));
-                delay *= 2; // Exponential backoff
+                delay *= 2; 
             } else {
-                // Erro fatal ou limite de tentativas excedido
                 if (isQuotaError) {
                     throw new Error("O limite de uso da IA foi atingido temporariamente. Por favor, aguarde 60 segundos e tente novamente.");
                 }
@@ -60,7 +58,6 @@ const parseJsonResponse = <T,>(jsonString: string, expectedType: 'array' | 'obje
     try {
         let cleanJsonString = jsonString.trim();
         
-        // Remove markdown code blocks if present
         if (cleanJsonString.includes('```')) {
             const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)\s*```/;
             const match = codeBlockRegex.exec(cleanJsonString);
@@ -99,11 +96,13 @@ export const parseTecJustificationsFromLatex = async (latexText: string): Promis
     
     Retorne um ARRAY JSON de strings, onde cada string é o HTML purificado do comentário de uma questão.
     
+    Exemplo de saída: ["<p>O <strong>intervalo</strong> de células...</p>", "<p>A função <em>MAIOR</em>...</p>"]
+    
     DOCUMENTO LATEX:
     ${latexText}`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_TEXT,
+        model: MODEL_PRO,
         contents: prompt,
         config: { responseMimeType: "application/json" }
     }));
@@ -173,45 +172,51 @@ export const generateCustomQuizQuestions = async (params: any): Promise<Omit<Que
 export const extractQuestionsFromTecPdf = async (pdfBase64: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
     const pdfPart = { inlineData: { mimeType: 'application/pdf', data: pdfBase64 } };
-    const prompt = `Extraia rigorosamente as questões deste PDF do TEC Concursos.
+    const prompt = `Sua tarefa é agir como um extrator de alta precisão para cadernos do TEC Concursos.
     
-    REGRAS DE FORMATAÇÃO E ESTRUTURA:
-    1. PRESERVE ESTILOS: Use HTML para manter negritos (<strong>), itálicos (<em>) e cores (<span style="color:rgb(...)">).
-    2. PRESERVE O LAYOUT: Mantenha quebras de linha (<br/>) e parágrafos (<p>) exatamente como no original.
-    3. TABELAS/PLANILHAS: Se houver representação de planilhas Excel por texto, use tags de código ou preserve as quebras de linha para manter o alinhamento visual.
-    4. ORDEM: NÃO embaralhe as alternativas. Mantenha a ordem (a, b, c, d, e).
-    5. GABARITO: O 'correctAnswer' deve ser o texto exato da alternativa correta.
+    DIRETRIZES CRÍTICAS PARA EXTRAÇÃO TOTAL:
+    1. SCANEIE O DOCUMENTO NA ÍNTEGRA: Não pare após extrair as primeiras questões. Percorra o documento até a última página.
+    2. EXTRAIA ABSOLUTAMENTE TODAS as questões numeradas (1, 2, 3, etc.) encontradas.
+    3. PRESERVAÇÃO DE ESTILOS: Use HTML para manter negritos (<strong>), itálicos (<em>) e cores.
+    4. PRESERVAÇÃO DO LAYOUT: Mantenha quebras de linha (<br/>) e parágrafos (<p>).
+    5. ORDEM ORIGINAL: NÃO embaralhe as alternativas. Mantenha a ordem (a, b, c, d, e).
+    6. GABARITO: O 'correctAnswer' deve ser o texto exato da alternativa correta.
     
-    O objetivo é que o enunciado e alternativas sejam uma cópia fiel da aparência do documento.`;
+    Certifique-se de que a contagem final de questões no JSON corresponda ao total de questões visíveis no documento.`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_TEXT,
+        model: MODEL_PRO,
         contents: { parts: [{ text: prompt }, pdfPart] },
-        config: { responseMimeType: "application/json", responseSchema: questionSchema }
+        config: { 
+            responseMimeType: "application/json", 
+            responseSchema: questionSchema,
+            thinkingConfig: { thinkingBudget: 4000 } // Dá mais tempo para o modelo processar a estrutura
+        }
     }));
     return parseJsonResponse(response.text ?? '', 'array');
 };
 
 export const extractQuestionsFromTecText = async (text: string, _generateJustifications: boolean): Promise<Omit<Question, 'id'>[]> => {
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    const prompt = `Extraia rigorosamente as questões deste texto do TEC Concursos (pode conter comandos LaTeX ou texto bruto).
+    const prompt = `Extraia RIGOROSAMENTE TODAS as questões deste texto do TEC Concursos.
     
-    REGRAS DE FORMATAÇÃO E ESTRUTURA:
-    1. CONVERTA ESTILOS PARA HTML:
-       - Negrito (\\textbf{...} ou similar) -> <strong>...</strong>
-       - Itálico (\\textit{...} ou similar) -> <em>...</em>
-       - Cores (\\textcolor{...}{...}) -> <span style="color:...">...</span>
-    2. PRESERVE QUEBRAS DE LINHA: Use <br/> para quebras únicas e <p> para parágrafos.
-    3. ORDEM: Preserve a posição original das alternativas e do gabarito.
-    4. LIMPEZA: Remova apenas comandos de controle do LaTeX (como \\textsf{}), mantendo o texto interno e sua formatação.
+    REGRAS DE OURO:
+    - NÃO IGNORE NENHUMA QUESTÃO. Extraia desde a primeira até a última numerada.
+    - CONVERTA ESTILOS PARA HTML: Negrito (\\textbf{...} ou similar) -> <strong>...</strong>.
+    - PRESERVE QUEBRAS DE LINHA: Use <br/> para quebras únicas e <p> para parágrafos.
+    - ORDEM: Preserve a posição original das alternativas e do gabarito.
     
-    TEXTO:
+    TEXTO FONTE:
     ${text}`;
 
     const response = await retryWithBackoff<GenerateContentResponse>(() => ai.models.generateContent({
-        model: MODEL_TEXT,
+        model: MODEL_PRO,
         contents: prompt,
-        config: { responseMimeType: "application/json", responseSchema: questionSchema }
+        config: { 
+            responseMimeType: "application/json", 
+            responseSchema: questionSchema,
+            thinkingConfig: { thinkingBudget: 4000 }
+        }
     }));
     return parseJsonResponse(response.text ?? '', 'array');
 };
